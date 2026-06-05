@@ -24,6 +24,7 @@ const file = process.argv[2];
 const doBook = process.argv.includes("--book");
 const doAdminRename = process.argv.includes("--admin-rename");
 const doAdminSave = process.argv.includes("--admin-save");
+const doAdminPricing = process.argv.includes("--admin-pricing");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -146,6 +147,24 @@ setTimeout(() => {
       }, 80);
     }, 80);
     return;
+  }
+
+  if (doAdminPricing) {
+    const setInput = (sel, v) => {
+      const e = $(sel); if (!e) return;
+      e.value = v; e.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    };
+    const eachEl = $('[data-each="0"]');
+    const priceEl = $('[data-pk="0"][data-f="price"]');
+    const result = { readonly: !!(eachEl && eachEl.readOnly) };
+    // type a price -> per-session derives live (first pack is 1 credit)
+    setInput('[data-pk="0"][data-f="price"]', "€100");
+    result.eachAfterPrice = eachEl ? eachEl.value : null;
+    // credits = 0 -> must blank out, never NaN/Infinity (ZeroDivision -> none)
+    setInput('[data-pk="0"][data-f="n"]', "0");
+    if (priceEl) priceEl.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    result.eachAfterZeroCredits = eachEl ? eachEl.value : null;
+    return finish({ adminPricing: result });
   }
 
   if (!doBook) return finish();

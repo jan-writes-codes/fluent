@@ -1141,9 +1141,20 @@ window.DJANGO_DATA = {{ django_data|safe }};
   const VAT_EN = "VAT-exempt educational service under Austrian law \u2014 no value-added tax is charged.";
   function money(x){ return x.toFixed(2).replace(".", ","); }
   function fmtAT(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  // Numeric euros from a price string like "€270" / "270,50" (null if none).
+  function parsePrice(s){ const m=String(s==null?"":s).replace(",",".").match(/\d+(?:\.\d+)?/); return m?parseFloat(m[0]):null; }
+  // Per-credit price for a purchase of n credits: if n matches a pack, use that
+  // pack's total ÷ n so the receipt reflects the package price (e.g. 10 → €270),
+  // not n × the per-credit rate. Falls back to the per-credit receipts rate.
+  function unitForCredits(n){
+    const p = PACKS.find(p => +p.n === +n);
+    if(p){ const amt = parsePrice(p.price); if(amt && n>0) return Math.round(amt/n); }
+    return state.creditPrice;
+  }
   function issueReceipt(s, n, dateStr){
     const no = "RE-"+NOW.getFullYear()+"-"+String(state.receiptSeq++).padStart(4,"0");
-    const r = { no, dateStr: dateStr || fmtAT(NOW), studentName: s.name, studentId: s.id, billing: (s.billing?{...s.billing}:null), credits: n, unit: state.creditPrice, net: n*state.creditPrice, total: n*state.creditPrice };
+    const unit = unitForCredits(n);
+    const r = { no, dateStr: dateStr || fmtAT(NOW), studentName: s.name, studentId: s.id, billing: (s.billing?{...s.billing}:null), credits: n, unit, net: n*unit, total: n*unit };
     state.receipts.push(r);
     return r;
   }
@@ -1984,6 +1995,15 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function esc(s){ return String(s==null?"":s).replace(/"/g,"&quot;"); }
   function escHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); if($("#adminPrice")) $("#adminPrice").value=state.creditPrice; }
+  // Auto-derived "per session" label = total price ÷ credits. Blank (never a
+  // ZeroDivision/NaN) when credits or price are missing.
+  function packEach(n, price){
+    const credits = parseInt(n, 10);
+    const amt = parsePrice(price);
+    if(!credits || credits <= 0 || amt == null) return "";
+    const per = amt / credits;
+    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / session";
+  }
   function renderAdminPacks(){
     const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
     PACKS.forEach((p,idx)=>{
@@ -1991,9 +2011,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
       row.innerHTML=`
         <label class="bf-lab">Credits<input class="bf-input" data-pk="${idx}" data-f="n" type="number" min="1" value="${p.n}"></label>
         <label class="bf-lab">Price<input class="bf-input" data-pk="${idx}" data-f="price" value="${esc(p.price)}"></label>
-        <label class="bf-lab">Per session<input class="bf-input" data-pk="${idx}" data-f="each" value="${esc(p.each)}"></label>`;
+        <label class="bf-lab">Per session<input class="bf-input" data-each="${idx}" value="${esc(packEach(p.n, p.price))}" readonly tabindex="-1" aria-readonly="true" style="opacity:0.7; cursor:default;"></label>`;
       el.appendChild(row);
     });
+    // Recompute the read-only per-session live as Credits / Price are typed.
+    const recompute = (idx)=>{
+      const nEl=el.querySelector(`[data-pk="${idx}"][data-f="n"]`);
+      const priceEl=el.querySelector(`[data-pk="${idx}"][data-f="price"]`);
+      const eachEl=el.querySelector(`[data-each="${idx}"]`);
+      if(eachEl) eachEl.value = packEach(nEl.value, priceEl.value);
+    };
+    el.querySelectorAll('[data-pk]').forEach(inp=>{ inp.oninput=()=>recompute(+inp.dataset.pk); });
   }
   function saveSettings(){
     const v=parseInt($("#adminPrice").value,10); if(!isNaN(v)&&v>0) state.creditPrice=v;
@@ -2002,6 +2030,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       if(f==="n"){ const n=parseInt(inp.value,10); if(!isNaN(n)&&n>0) p.n=n; }
       else p[f]=inp.value;
     });
+    // "each" is always derived from price ÷ credits — never hand-entered.
+    PACKS.forEach(p=>{ p.each = packEach(p.n, p.price); });
     api('PUT', '/api/settings/', { creditPrice: state.creditPrice, packs: PACKS });
     renderPacks(); renderAdmin();
     toast("Pricing saved");

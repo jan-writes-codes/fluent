@@ -139,6 +139,33 @@ def get_settings():
     return SiteSettings.objects.first() or SiteSettings.objects.create()
 
 
+def parse_price(s):
+    """Numeric euros from a price string like '€270' / '270,50' (None if absent)."""
+    import re
+    m = re.search(r"\d+(?:[.,]\d+)?", str(s or ""))
+    return float(m.group(0).replace(",", ".")) if m else None
+
+
+def receipt_unit_price(settings, n):
+    """Per-credit price for a purchase of n credits. If n matches a configured
+    pack, use that pack's total ÷ n so the receipt reflects the package price
+    (e.g. 10 credits -> €270, not 10 × the per-credit rate). Server-authoritative
+    so a client can't dictate the price. Falls back to the per-credit rate."""
+    try:
+        packs = json.loads(settings.packs_json)
+    except (ValueError, TypeError):
+        packs = []
+    for p in packs:
+        try:
+            if int(p.get("n")) == n:
+                amt = parse_price(p.get("price"))
+                if amt and n > 0:
+                    return round(amt / n)
+        except (ValueError, TypeError):
+            continue
+    return settings.credit_price
+
+
 def require_auth(request):
     if not request.user.is_authenticated:
         return JsonResponse({"error": "auth"}, status=401)
@@ -481,7 +508,7 @@ def api_credits(request, slug):
         student=student,
         date_str=date_str,
         credits=n,
-        unit_price_cents=settings.credit_price,
+        unit_price_cents=receipt_unit_price(settings, n),
     )
 
     CreditTransaction.objects.create(
