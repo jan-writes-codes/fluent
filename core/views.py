@@ -32,6 +32,16 @@ def jskey_to_date(key):
 # Serializers
 # ---------------------------------------------------------------------------
 
+def compute_initials(name):
+    """First letters of the first two words, e.g. 'Jan Heissenberger' -> 'JH'."""
+    parts = [p for p in (name or "").strip().split() if p]
+    if not parts:
+        return "NS"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[1][0]).upper()
+
+
 def serialize_user(u):
     return {
         "id": u.slug,
@@ -473,6 +483,7 @@ def api_billing(request):
         user.first_name = parts[0]
         user.last_name = parts[1] if len(parts) > 1 else ""
         user.billing_name = data["name"]
+        user.initials = compute_initials(data["name"])
     if "line1" in data:
         user.billing_line1 = data["line1"]
     if "postcode" in data:
@@ -637,6 +648,7 @@ def api_user_detail(request, slug):
         u.first_name = parts[0]
         u.last_name = parts[1] if len(parts) > 1 else ""
         u.billing_name = name
+        u.initials = compute_initials(name)
     if "email" in data:
         u.email = (data["email"] or "").strip().lower()
     if "password" in data and data["password"]:

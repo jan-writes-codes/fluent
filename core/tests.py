@@ -256,6 +256,57 @@ class RoleScopingTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Admin user management: create/edit must persist + be loggable into
+# --------------------------------------------------------------------------- #
+class AdminUserManagementTests(FluentDataMixin, TestCase):
+    def test_created_and_edited_student_can_log_in(self):
+        self.client.force_login(self.admin)
+        # 1) create a blank student
+        created = self.client.post("/api/users/", data="{}", content_type="application/json").json()
+        slug = created["slug"]
+        self.assertTrue(User.objects.filter(slug=slug).exists())
+        # 2) edit name + login email + password (what the admin editor sends)
+        resp = self.client.put(
+            f"/api/users/{slug}/",
+            data=json.dumps({
+                "name": "Jan Heissenberger",
+                "email": "jan@fluent.at",
+                "password": "geheim123",
+                "credits": 2,
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        # persisted to the DB
+        u = User.objects.get(slug=slug)
+        self.assertEqual(u.email, "jan@fluent.at")
+        self.assertEqual(u.credits, 2)
+        # initials recomputed from the new name -> avatar is correct after reload
+        self.assertEqual(u.initials, "JH")
+        self.assertEqual(resp.json()["initials"], "JH")
+        # 3) the new credentials actually work (the reported bug)
+        fresh = Client()
+        login = fresh.post(
+            "/api/login/",
+            data=json.dumps({"email": "jan@fluent.at", "password": "geheim123"}),
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["role"], "student")
+        self.assertEqual(fresh.get("/").status_code, 200)
+
+    def test_billing_name_change_updates_initials(self):
+        self.client.force_login(self.maya)
+        self.client.put(
+            "/api/users/me/billing/",
+            data=json.dumps({"name": "Maya Olsen"}),
+            content_type="application/json",
+        )
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.initials, "MO")
+
+
+# --------------------------------------------------------------------------- #
 # Frontend (jsdom) tests — run the real init script in a headless DOM
 # --------------------------------------------------------------------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "tests", "frontend")
@@ -288,7 +339,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get("/").content.decode()
@@ -299,7 +350,13 @@ class _DomProbeBase(FluentDataMixin, TestCase):
             env = dict(os.environ)
             if tz:
                 env["TZ"] = tz
-            cmd = [self._node, PROBE, path] + (["--book"] if book else [])
+            cmd = [self._node, PROBE, path]
+            if book:
+                cmd.append("--book")
+            if admin_rename:
+                cmd.append("--admin-rename")
+            if admin_save:
+                cmd.append("--admin-save")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -337,6 +394,29 @@ class DomRoleTests(_DomProbeBase):
 
     def test_identity_and_tabs_admin(self):
         self._check(self.admin, *self.EXPECTED["admin"])
+
+
+class DomAdminTests(_DomProbeBase):
+    def test_avatar_initials_update_live_on_rename(self):
+        # Admin editor opens on a user; typing a new name must update the
+        # avatar initials immediately (no save / reload).
+        r = self.run_probe(self.admin, admin_rename=True)
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertEqual(r["adminRename"]["avatarInitials"], "JH")
+        self.assertEqual(r["adminRename"]["headingName"], "Jan Heissenberger")
+
+    def test_admin_add_and_save_persist_to_server(self):
+        # The reported bug: editing a student in the admin UI never hit the
+        # server, so the account couldn't be logged into. Drive the real UI and
+        # assert both the create (POST) and the edit (PUT) are sent.
+        r = self.run_probe(self.admin, admin_save=True)
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        s = r["adminSave"]
+        self.assertTrue(s["createPosted"], "adding a student must POST /api/users/")
+        self.assertIsNotNone(s["editPut"], "saving must PUT /api/users/<slug>/")
+        self.assertEqual(s["editPut"]["body"]["email"], "jan@fluent.at")
+        self.assertEqual(s["editPut"]["body"]["name"], "Jan Heissenberger")
+        self.assertEqual(s["editPut"]["body"]["password"], "geheim123")
 
 
 class DomBookingTests(_DomProbeBase):
