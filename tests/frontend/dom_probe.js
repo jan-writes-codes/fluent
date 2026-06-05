@@ -22,6 +22,8 @@ const { JSDOM, VirtualConsole } = require("jsdom");
 
 const file = process.argv[2];
 const doBook = process.argv.includes("--book");
+const doAdminRename = process.argv.includes("--admin-rename");
+const doAdminSave = process.argv.includes("--admin-save");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -29,6 +31,7 @@ if (!file) {
 
 const html = fs.readFileSync(file, "utf8");
 const initErrors = [];
+const apiCalls = [];
 let bookingPost = null;
 
 const vc = new VirtualConsole();
@@ -45,8 +48,20 @@ const dom = new JSDOM(html, {
   url: "http://localhost/",
   beforeParse(w) {
     w.fetch = (url, opts) => {
-      if (String(url).includes("/api/bookings/") && opts && opts.method === "POST") {
-        try { bookingPost = JSON.parse(opts.body); } catch (_) { bookingPost = { _raw: opts.body }; }
+      const method = (opts && opts.method) || "GET";
+      const u = String(url);
+      let body = null;
+      if (opts && opts.body) { try { body = JSON.parse(opts.body); } catch (_) { body = opts.body; } }
+      apiCalls.push({ method, url: u, body });
+      if (u.includes("/api/bookings/") && method === "POST") bookingPost = body;
+      // Creating a student returns a serialized user the admin UI mirrors locally.
+      if (u.endsWith("/api/users/") && method === "POST") {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({
+          slug: "stutest01", id: "stutest01", email: "stutest01@fluent.at",
+          name: "New Student", initials: "NS", credits: 0,
+          color1: "#9aa0a6", color2: "#6b7177", photo: null,
+          billing: { line1: "", postcode: "", city: "", country: "Österreich" },
+        }) });
       }
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ pk: 999 }) });
     };
@@ -87,8 +102,52 @@ function finish(extra) {
   process.exit(0);
 }
 
-// Let init settle, then (optionally) drive a booking.
+// Let init settle, then (optionally) drive an interaction.
 setTimeout(() => {
+  if (doAdminRename) {
+    // Type a new display name into the admin editor and check the avatar +
+    // heading update live (without saving / reloading).
+    const nameInput = $("#edName");
+    if (!nameInput) return finish({ adminRename: { error: "no #edName (admin editor not open)" } });
+    nameInput.value = "Jan Heissenberger";
+    nameInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    const avatar = document.querySelector(".ed-avatar");
+    const nameEl = document.querySelector(".ed-name");
+    return finish({
+      adminRename: {
+        avatarInitials: avatar ? avatar.textContent : null,
+        headingName: nameEl ? nameEl.textContent : null,
+      },
+    });
+  }
+
+  if (doAdminSave) {
+    // Full admin flow: add a student, edit their login + name, save. Each step
+    // must hit the server (the bug was that none of them did).
+    const addBtn = $("#adminAddBtn");
+    if (!addBtn) return finish({ adminSave: { error: "no add button" } });
+    addBtn.click();
+    setTimeout(() => {
+      const setVal = (id, v) => { const e = $(id); if (e) { e.value = v; } };
+      setVal("#edName", "Jan Heissenberger");
+      setVal("#edEmail", "jan@fluent.at");
+      setVal("#edPass", "geheim123");
+      const save = $("#edSave");
+      if (save) save.click();
+      setTimeout(() => {
+        const post = apiCalls.find((c) => c.method === "POST" && /\/api\/users\/$/.test(c.url));
+        const put = apiCalls.find((c) => c.method === "PUT" && /\/api\/users\/[^/]+\/$/.test(c.url));
+        finish({
+          adminSave: {
+            createPosted: !!post,
+            editPut: put ? { url: put.url, body: put.body } : null,
+          },
+        });
+      }, 80);
+    }, 80);
+    return;
+  }
+
   if (!doBook) return finish();
 
   // Click the first open, clickable calendar slot, then confirm.

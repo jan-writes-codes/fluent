@@ -1128,6 +1128,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function tutorById(id){ return TUTORS.find(t=>t.id===id); }
   function studentById(id){ return state.students.find(s=>s.id===id); }
+  // Initials from a display name (mirrors the server's compute_initials).
+  function initialsOf(name){ const p=(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "NS"; if(p.length===1) return p[0].slice(0,2).toUpperCase(); return (p[0][0]+p[1][0]).toUpperCase(); }
   function allAccounts(){ return [tutorUser, ...state.students]; }
   function accountByEmail(email){ return [ADMIN, tutorUser, ...state.students].find(u=>u.email.toLowerCase()===email); }
   function accountById(id){ if(id==="davit") return tutorUser; if(id==="admin") return ADMIN; return studentById(id); }
@@ -2056,6 +2058,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     `;
     $("#edPhoto").onchange=(e)=>pickPhoto(e,u);
     if($("#edPhotoClear")) $("#edPhotoClear").onclick=()=>{ u.photo=null; reflectUser(u); renderAdmin(); };
+    // Live-preview the initials avatar + heading as the name is typed.
+    $("#edName").oninput=()=>{
+      const nm=$("#edName").value.trim();
+      const avatar=el.querySelector(".ed-avatar");
+      if(avatar && !u.photo) avatar.textContent=initialsOf(nm);
+      const nameEl=el.querySelector(".ed-name");
+      if(nameEl) nameEl.textContent=nm||u.name;
+    };
     $("#edSave").onclick=()=>saveAdminUser(u);
     $("#edViewAs").onclick=()=>impersonate(u);
     if($("#edRemove")) $("#edRemove").onclick=()=>removeAdminStudent(u);
@@ -2065,10 +2075,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
     u.name=$("#edName").value.trim()||u.name;
     u.email=$("#edEmail").value.trim().toLowerCase()||u.email;
     u.password=$("#edPass").value||u.password;
+    u.i=initialsOf(u.name);
+    const payload={ name:u.name, email:u.email, password:u.password };
     if(u.role!=="tutor"){
       const cr=parseInt($("#edCredits").value,10); if(!isNaN(cr)) setStudentCredits(u.id, cr);
       u.billing={ line1:$("#edLine1").value.trim(), postcode:$("#edZip").value.trim(), city:$("#edCity").value.trim(), country:$("#edCountry").value.trim()||"Österreich" };
+      payload.credits=u.credits; payload.billing=u.billing;
     }
+    // Persist to the server — without this the edit (incl. the login email) only
+    // lived in the browser, so the account couldn't actually be logged into.
+    api('PUT', '/api/users/'+u.id+'/', payload);
     reflectUser(u); renderAdmin();
     toast("Saved "+u.name);
   }
@@ -2077,11 +2093,21 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(state.currentUser===u.id && u.role!=="tutor"){ $("#acctHello").textContent="Hello, "+u.name.split(" ")[0]+"."; renderBilling(); }
   }
   function addAdminStudent(){
-    const id="stu"+Date.now().toString(36);
-    state.students.push({ id, email:id+"@fluent.at", name:"New Student", credits:0, c:["#9aa0a6","#6b7177"], i:"NS", password:"password", photo:null, billing:{ line1:"", postcode:"", city:"", country:"Österreich" }, log:[] });
-    state.adminSel=id; renderAdmin(); renderRoster(); toast("Student added — edit their details");
+    // Create the account on the server first so it has a real slug and can be
+    // logged into; then mirror it into local state using the server's response.
+    api('POST', '/api/users/').then(r=>{
+      if(!r || !r.slug){ toast("Couldn't add student — try again"); return; }
+      state.students.push({
+        id:r.slug, slug:r.slug, email:r.email, name:r.name, credits:r.credits||0,
+        c:[r.color1, r.color2], i:r.initials||"NS", password:"password", photo:r.photo||null,
+        billing:r.billing||{ line1:"", postcode:"", city:"", country:"Österreich" },
+        log:[], notesLog:[], activeLessons:[],
+      });
+      state.adminSel=r.slug; renderAdmin(); renderRoster(); toast("Student added — edit their details");
+    });
   }
   function removeAdminStudent(u){
+    api('DELETE', '/api/users/'+u.id+'/');
     state.students=state.students.filter(s=>s.id!==u.id);
     state.bookings=state.bookings.filter(b=>b.studentId!==u.id);
     if(state.currentUser===u.id) state.currentUser=(state.students[0]||{id:"maya"}).id;

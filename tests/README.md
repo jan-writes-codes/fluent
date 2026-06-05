@@ -28,6 +28,11 @@ python manage.py test core.tests.BookingPersistenceTests   # one class
 | Bookings didn't sync between users | `BookingPersistenceTests.*` (server persistence + role-scoped visibility) and `DomBookingTests.test_booking_persists_with_local_date` (UI booking flow + timezone) |
 | Header identity always showed "Maya" | `DomRoleTests.test_identity_and_tabs_*` |
 | A student must not receive other students' identities | `RoleScopingTests.*`, `BookingPersistenceTests.test_other_student_sees_booking_anonymized` |
+| Admin user edits didn't persist / couldn't log in | `AdminUserManagementTests.*`, `DomAdminTests.test_admin_add_and_save_persist_to_server` |
+| Avatar initials didn't update on rename | `DomAdminTests.test_avatar_initials_update_live_on_rename` |
+| API authorization (RBAC, IDOR, privilege escalation) | `AuthorizationTests.*` |
+| CSRF protection on mutating endpoints | `CsrfTests.*` |
+| Login user-enumeration | `AuthorizationTests.test_login_errors_do_not_enumerate` |
 
 ## Layers
 

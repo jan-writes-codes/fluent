@@ -256,6 +256,182 @@ class RoleScopingTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Admin user management: create/edit must persist + be loggable into
+# --------------------------------------------------------------------------- #
+class AdminUserManagementTests(FluentDataMixin, TestCase):
+    def test_created_and_edited_student_can_log_in(self):
+        self.client.force_login(self.admin)
+        # 1) create a blank student
+        created = self.client.post("/api/users/", data="{}", content_type="application/json").json()
+        slug = created["slug"]
+        self.assertTrue(User.objects.filter(slug=slug).exists())
+        # 2) edit name + login email + password (what the admin editor sends)
+        resp = self.client.put(
+            f"/api/users/{slug}/",
+            data=json.dumps({
+                "name": "Jan Heissenberger",
+                "email": "jan@fluent.at",
+                "password": "geheim123",
+                "credits": 2,
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        # persisted to the DB
+        u = User.objects.get(slug=slug)
+        self.assertEqual(u.email, "jan@fluent.at")
+        self.assertEqual(u.credits, 2)
+        # initials recomputed from the new name -> avatar is correct after reload
+        self.assertEqual(u.initials, "JH")
+        self.assertEqual(resp.json()["initials"], "JH")
+        # 3) the new credentials actually work (the reported bug)
+        fresh = Client()
+        login = fresh.post(
+            "/api/login/",
+            data=json.dumps({"email": "jan@fluent.at", "password": "geheim123"}),
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["role"], "student")
+        self.assertEqual(fresh.get("/").status_code, 200)
+
+    def test_billing_name_change_updates_initials(self):
+        self.client.force_login(self.maya)
+        self.client.put(
+            "/api/users/me/billing/",
+            data=json.dumps({"name": "Maya Olsen"}),
+            content_type="application/json",
+        )
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.initials, "MO")
+
+
+# --------------------------------------------------------------------------- #
+# Authorization (RBAC + object-level / IDOR) and login hardening
+# --------------------------------------------------------------------------- #
+class AuthorizationTests(FluentDataMixin, TestCase):
+    def _post(self, url, body=None):
+        return self.client.post(url, data=json.dumps(body or {}), content_type="application/json")
+
+    def _put(self, url, body=None):
+        return self.client.put(url, data=json.dumps(body or {}), content_type="application/json")
+
+    # ---- anonymous is locked out of every mutating endpoint (401) ----
+    def test_anonymous_endpoints_require_auth(self):
+        for method, url in [
+            ("post", "/api/users/"),
+            ("put", "/api/users/maya/"),
+            ("post", "/api/credits/maya/"),
+            ("post", "/api/availability/"),
+            ("post", "/api/custom-times/"),
+            ("post", "/api/notes/maya/"),
+            ("post", "/api/lessons/maya/"),
+            ("put", "/api/settings/"),
+            ("post", "/api/bookings/"),
+        ]:
+            fn = getattr(self, f"_{method}")
+            self.assertEqual(fn(url).status_code, 401, f"{method} {url} should be 401 for anonymous")
+
+    # ---- a student is forbidden from privileged endpoints (403) ----
+    def test_student_cannot_reach_admin_or_tutor_endpoints(self):
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.get("/api/users/").status_code, 403)
+        self.assertEqual(self._post("/api/users/").status_code, 403)
+        self.assertEqual(self._put("/api/users/ines/", {"name": "Hacked"}).status_code, 403)
+        self.assertEqual(self.client.delete("/api/users/ines/").status_code, 403)
+        self.assertEqual(self._post("/api/credits/maya/", {"n": 99}).status_code, 403)
+        self.assertEqual(self._post("/api/availability/", {"date": "2026-5-1", "time": "10:00"}).status_code, 403)
+        self.assertEqual(self._post("/api/custom-times/", {"date": "2026-5-1", "time": "10:00"}).status_code, 403)
+        self.assertEqual(self._post("/api/notes/ines/", {"text": "x"}).status_code, 403)
+        self.assertEqual(self._post("/api/lessons/ines/", {"lessonId": "a1-1"}).status_code, 403)
+        self.assertEqual(self._put("/api/settings/", {"creditPrice": 1}).status_code, 403)
+
+    def test_student_cannot_grant_self_credits(self):
+        self.client.force_login(self.maya)
+        before = self.maya.credits
+        self.assertEqual(self._post("/api/credits/maya/", {"n": 100}).status_code, 403)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before)
+
+    def test_student_cannot_book_as_another_student(self):
+        self.client.force_login(self.maya)
+        resp = self._post("/api/bookings/", {
+            "studentSlug": "ines", "tutorSlug": "davit", "date": "2026-06-08", "time": "09:30",
+        })
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(Booking.objects.filter(student=self.ines, date=date(2026, 6, 8), time="09:30").exists())
+
+    def test_student_cannot_modify_others_booking_idor(self):
+        # self.ines_booking belongs to Ines; Maya must not touch it.
+        self.client.force_login(self.maya)
+        self.assertEqual(self._put(f"/api/bookings/{self.ines_booking.pk}/", {"time": "08:00"}).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/bookings/{self.ines_booking.pk}/").status_code, 403)
+        self.assertTrue(Booking.objects.filter(pk=self.ines_booking.pk).exists())
+
+    def test_student_can_manage_own_booking(self):
+        self.client.force_login(self.maya)
+        mine = Booking.objects.create(student=self.maya, tutor=self.davit, date=date(2026, 6, 8), time="09:30")
+        self.assertEqual(self._put(f"/api/bookings/{mine.pk}/", {"time": "10:30", "notes": "hi"}).status_code, 200)
+        mine.refresh_from_db()
+        self.assertEqual(mine.time, "10:30")
+        # tutor-only fields are ignored for students
+        self._put(f"/api/bookings/{mine.pk}/", {"tutorNotes": "secret", "callLink": "http://x"})
+        mine.refresh_from_db()
+        self.assertEqual(mine.tutor_notes, "")
+        self.assertEqual(mine.call_link, "")
+        self.assertEqual(self.client.delete(f"/api/bookings/{mine.pk}/").status_code, 200)
+
+    # ---- a tutor can run tutor endpoints but not admin ones ----
+    def test_tutor_permissions(self):
+        self.client.force_login(self.davit)
+        self.assertEqual(self._post("/api/credits/maya/", {"n": 1}).status_code, 200)
+        self.assertEqual(self._post("/api/notes/maya/", {"text": "great progress"}).status_code, 200)
+        self.assertEqual(self._post("/api/availability/", {"date": "2026-5-1", "time": "10:00", "isOpen": False}).status_code, 200)
+        # but not admin-only user management / settings
+        self.assertEqual(self.client.get("/api/users/").status_code, 403)
+        self.assertEqual(self._put("/api/settings/", {"creditPrice": 40}).status_code, 403)
+
+    # ---- admin guards ----
+    def test_admin_cannot_delete_self(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.delete("/api/users/admin/").status_code, 400)
+        self.assertTrue(User.objects.filter(slug="admin").exists())
+
+    def test_admin_cannot_set_duplicate_email(self):
+        self.client.force_login(self.admin)
+        resp = self._put("/api/users/ines/", {"email": "maya@fluent.at"})
+        self.assertEqual(resp.status_code, 400)
+        self.ines.refresh_from_db()
+        self.assertNotEqual(self.ines.email, "maya@fluent.at")
+
+    # ---- login doesn't leak which emails exist ----
+    def test_login_errors_do_not_enumerate(self):
+        unknown = self.client.post(
+            "/api/login/",
+            data=json.dumps({"email": "ghost@fluent.at", "password": "x"}),
+            content_type="application/json",
+        )
+        wrong = self.client.post(
+            "/api/login/",
+            data=json.dumps({"email": "maya@fluent.at", "password": "wrong"}),
+            content_type="application/json",
+        )
+        self.assertEqual(unknown.status_code, 400)
+        self.assertEqual(wrong.status_code, 400)
+        # identical message -> can't tell a real account from a fake one
+        self.assertEqual(unknown.json()["error"], wrong.json()["error"])
+
+
+class CsrfTests(FluentDataMixin, TestCase):
+    def test_mutating_endpoints_enforce_csrf(self):
+        # A logged-in session without a CSRF token must still be rejected.
+        c = Client(enforce_csrf_checks=True)
+        c.force_login(self.admin)
+        resp = c.post("/api/users/", data="{}", content_type="application/json")
+        self.assertEqual(resp.status_code, 403)
+
+
+# --------------------------------------------------------------------------- #
 # Frontend (jsdom) tests — run the real init script in a headless DOM
 # --------------------------------------------------------------------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "tests", "frontend")
@@ -288,7 +464,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get("/").content.decode()
@@ -299,7 +475,13 @@ class _DomProbeBase(FluentDataMixin, TestCase):
             env = dict(os.environ)
             if tz:
                 env["TZ"] = tz
-            cmd = [self._node, PROBE, path] + (["--book"] if book else [])
+            cmd = [self._node, PROBE, path]
+            if book:
+                cmd.append("--book")
+            if admin_rename:
+                cmd.append("--admin-rename")
+            if admin_save:
+                cmd.append("--admin-save")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -337,6 +519,29 @@ class DomRoleTests(_DomProbeBase):
 
     def test_identity_and_tabs_admin(self):
         self._check(self.admin, *self.EXPECTED["admin"])
+
+
+class DomAdminTests(_DomProbeBase):
+    def test_avatar_initials_update_live_on_rename(self):
+        # Admin editor opens on a user; typing a new name must update the
+        # avatar initials immediately (no save / reload).
+        r = self.run_probe(self.admin, admin_rename=True)
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertEqual(r["adminRename"]["avatarInitials"], "JH")
+        self.assertEqual(r["adminRename"]["headingName"], "Jan Heissenberger")
+
+    def test_admin_add_and_save_persist_to_server(self):
+        # The reported bug: editing a student in the admin UI never hit the
+        # server, so the account couldn't be logged into. Drive the real UI and
+        # assert both the create (POST) and the edit (PUT) are sent.
+        r = self.run_probe(self.admin, admin_save=True)
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        s = r["adminSave"]
+        self.assertTrue(s["createPosted"], "adding a student must POST /api/users/")
+        self.assertIsNotNone(s["editPut"], "saving must PUT /api/users/<slug>/")
+        self.assertEqual(s["editPut"]["body"]["email"], "jan@fluent.at")
+        self.assertEqual(s["editPut"]["body"]["name"], "Jan Heissenberger")
+        self.assertEqual(s["editPut"]["body"]["password"], "geheim123")
 
 
 class DomBookingTests(_DomProbeBase):
