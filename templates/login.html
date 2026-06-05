@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in · Fluent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<meta name="csrf-token" content="{{ csrf_token }}">
+<style>
+  :root {
+    --bg: #ece0cb;
+    --bg-2: #e3d4bb;
+    --ink: #3b2f24;
+    --muted: #897a64;
+    --faint: #ab9c84;
+    --line: rgba(74,54,34,0.18);
+    --line-2: rgba(74,54,34,0.10);
+    --glass: rgba(250,244,233,0.58);
+    --glass-2: rgba(250,244,233,0.5);
+    --c1: #c2714d;  /* terracotta */
+    --c2: #d6a25c;  /* honey ochre */
+    --c3: #8a9a6b;  /* sage */
+    --accent: var(--c1);
+    --good: #6f8f57;  /* meadow */
+    --grain: 0.25;
+    --radius: 18px;
+    --shadow: 0 26px 60px -34px rgba(80,52,28,0.5);
+    --font-display: "Bricolage Grotesque", "Hanken Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-synthesis: none;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ---------- Ambient grainy gradient field ---------- */
+  .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.5; mix-blend-mode: multiply; }
+  .blob.b1 { width: 60vw; height: 60vw; left: -14vw; top: -22vw;
+    background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); animation: drift1 26s ease-in-out infinite; }
+  .blob.b2 { width: 52vw; height: 52vw; right: -12vw; top: -10vw;
+    background: radial-gradient(circle at 60% 40%, var(--c2), transparent 60%); animation: drift2 32s ease-in-out infinite; }
+  .blob.b3 { width: 58vw; height: 58vw; right: 6vw; bottom: -28vw;
+    background: radial-gradient(circle at 50% 50%, var(--c3), transparent 60%); opacity: 0.5; animation: drift3 30s ease-in-out infinite; }
+  .blob.b4 { width: 40vw; height: 40vw; left: 6vw; bottom: -22vw;
+    background: radial-gradient(circle at 50% 50%, #cf9b86, transparent 62%); opacity: 0.46; animation: drift1 36s ease-in-out infinite reverse; }
+  @keyframes drift1 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(6vw,4vw) scale(1.08);} }
+  @keyframes drift2 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(-5vw,5vw) scale(1.05);} }
+  @keyframes drift3 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(4vw,-4vw) scale(1.1);} }
+
+  .grain { position: fixed; inset: -200%; z-index: 1; pointer-events: none;
+    opacity: var(--grain);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply; animation: jitter 0.6s steps(2) infinite; }
+  @keyframes jitter { 0%{transform:translate(0,0)} 50%{transform:translate(-3%, 2%)} 100%{transform:translate(2%,-3%)} }
+  .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(125% 95% at 50% 0%, transparent 58%, rgba(92,60,32,0.15) 100%); }
+
+  /* ---------- Brand mark ---------- */
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .mark { width: 30px; height: 30px; border-radius: 9px; position: relative;
+    background: conic-gradient(from 200deg, var(--c1), var(--c2), var(--c3), var(--c1));
+    box-shadow: 0 0 22px -2px color-mix(in oklch, var(--accent) 70%, transparent); }
+  .mark::after { content:""; position:absolute; inset: 7px; border-radius: 4px; background: var(--bg); }
+  .mark::before { content:""; position:absolute; inset:0; border-radius:9px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay; }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .wordmark span { color: var(--muted); font-weight: 400; }
+
+  /* ---------- Button ---------- */
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 15px; border: 0; border-radius: 14px; cursor: pointer;
+    padding: 15px; width: 100%; color: #fbf4e8; position: relative; overflow: hidden; transition: 0.18s; letter-spacing: -0.01em;
+    background: linear-gradient(120deg, var(--c1), #b15f39 95%); }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 14px 34px -14px rgba(150,80,45,0.5); }
+  .btn:active { transform: translateY(0); }
+  .btn .grainbtn { position:absolute; inset:0; opacity:0.18; mix-blend-mode: overlay; pointer-events:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+  /* ---------- Inputs ---------- */
+  .field-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+  .t-select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: rgba(250,244,233,0.5);
+    border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; cursor: pointer; margin-bottom: 12px; }
+  .t-select:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
+
+  /* ---------- Auth card ---------- */
+  .auth-screen { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; }
+  .auth-card { width: min(380px, 100%); background: var(--glass); border: 1px solid var(--line); border-radius: 22px;
+    backdrop-filter: blur(18px); box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; }
+  .auth-card .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; justify-content: center; }
+  .auth-h { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; margin: 16px 0 5px; }
+  .auth-sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+  .auth-input { text-align: left; margin-bottom: 14px; cursor: text; color-scheme: light; width: 100%; }
+  .auth-err { color: #b8492c; font-size: 12.5px; text-align: left; margin: -4px 0 12px; min-height: 0; }
+  .auth-err:empty { display: none; }
+  .auth-card .btn { margin-top: 2px; }
+  .auth-hint { font-size: 11.5px; color: var(--faint); line-height: 1.5; margin-top: 14px; }
+  .auth-hint b { color: var(--muted); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="field">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+  </div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
+  <div class="auth-screen">
+    <form class="auth-card" id="authForm" novalidate>
+      <div class="brand">
+        <div class="mark"></div>
+        <div class="wordmark">fluent<span>.</span></div>
+      </div>
+      <h2 class="auth-h">Sign in</h2>
+      <p class="auth-sub">Log in to manage your sessions and credits.</p>
+      <label class="field-label" style="text-align:left;">Email</label>
+      <input class="t-select auth-input" id="authEmail" type="email" autocomplete="username" placeholder="you@fluent.at" value="" />
+      <label class="field-label" style="text-align:left;">Password</label>
+      <input class="t-select auth-input" id="authPass" type="password" autocomplete="current-password" placeholder="Your password" value="" />
+      <div class="auth-err" id="authErr"></div>
+      <button class="btn" type="submit" id="loginBtn"><span class="grainbtn"></span>Log in</button>
+      <div class="auth-hint">Demo logins — <b>maya@fluent.at</b> (student) or <b>davit@fluent.at</b> (tutor). Password: <b>password</b></div>
+    </form>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const $ = (s) => document.querySelector(s);
+  const authErr = (m) => { $("#authErr").textContent = m; };
+
+  async function doLogin() {
+    const email = ($("#authEmail").value || "").trim().toLowerCase();
+    const password = $("#authPass").value || "";
+    if (!email) { authErr("Enter your email"); return; }
+    authErr("");
+    let r;
+    try {
+      const res = await fetch('/api/login/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ email, password }),
+      });
+      r = await res.json().catch(() => null);
+    } catch (e) { r = null; }
+    if (!r) { authErr("Login failed. Check your connection."); return; }
+    if (r.error) { authErr(r.error); return; }
+    // Success — land on the app.
+    window.location.href = "/";
+  }
+
+  $("#authForm").addEventListener("submit", (e) => { e.preventDefault(); doLogin(); });
+  $("#authEmail").focus();
+})();
+</script>
+</body>
+</html>

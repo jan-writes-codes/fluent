@@ -1,6 +1,6 @@
 import json
 from datetime import date
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
@@ -196,10 +196,16 @@ def receipt_html(r_data, settings):
 # Main app view
 # ---------------------------------------------------------------------------
 
+def login_view(request):
+    # Standalone sign-in page. Authenticated users have no business here.
+    if request.user.is_authenticated:
+        return redirect("app")
+    return render(request, "login.html")
+
+
 def app_view(request):
     if not request.user.is_authenticated:
-        django_data = {"isAuthenticated": False}
-        return render(request, "app.html", {"django_data": json.dumps(django_data), "role": ""})
+        return redirect("login")
 
     user = request.user
     settings = get_settings()
