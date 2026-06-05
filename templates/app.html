@@ -2474,7 +2474,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
   state.students.forEach(s=>{ if(!s.notesLog) s.notesLog=[]; if(!s.activeLessons) s.activeLessons=[]; });
   renderTutors(); renderWeek(); renderSummary();
   renderPacks(); renderAccount();
-  renderTeacherWeek(); renderTeacherSummary(); renderRoster();
+  // Tutor/admin-only views are rendered on demand by applyTutor()/applyAdmin()
+  // (incl. admin impersonation). Rendering them unconditionally here crashes for
+  // students, whose payload carries anonymized "__blocked__" bookings that have
+  // no roster entry — aborting init before the role dispatch below could run,
+  // which left every nav tab visible regardless of role.
   updateCredits();
   if (!DJ.isAuthenticated) {
     document.querySelector(".app").style.display="none";
