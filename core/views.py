@@ -1,10 +1,10 @@
 import json
 from datetime import date
+from functools import wraps
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt
 from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
     CustomTime, StudentNote, ActiveLesson, SiteSettings
@@ -143,6 +143,31 @@ def require_auth(request):
     if not request.user.is_authenticated:
         return JsonResponse({"error": "auth"}, status=401)
     return None
+
+
+def require_roles(*roles):
+    """Endpoint guard: 401 if anonymous, 403 if the user's role isn't allowed.
+
+    Centralizes authorization so every mutating endpoint declares exactly who
+    may call it, instead of accepting any authenticated user.
+    """
+    def decorator(view):
+        @wraps(view)
+        def wrapped(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return JsonResponse({"error": "auth"}, status=401)
+            if getattr(request.user, "role", None) not in roles:
+                return JsonResponse({"error": "forbidden"}, status=403)
+            return view(request, *args, **kwargs)
+        return wrapped
+    return decorator
+
+
+def acting_tutor(request):
+    """The tutor a tutor/admin action is attributed to (single-tutor studio)."""
+    if getattr(request.user, "role", None) == "tutor":
+        return request.user
+    return User.objects.filter(role="tutor").first()
 
 
 def parse_body(request):
@@ -340,13 +365,14 @@ def api_login(request):
     password = data.get("password") or ""
     if not email:
         return JsonResponse({"error": "Enter your email"}, status=400)
-    try:
-        user_obj = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
-        return JsonResponse({"error": "No account found for that email."}, status=400)
-    user_obj = authenticate(request, username=user_obj.username, password=password)
+    # Single generic message for both unknown-email and wrong-password so the
+    # endpoint can't be used to enumerate which emails have accounts.
+    INVALID = "Invalid email or password."
+    user_obj = User.objects.filter(email__iexact=email).first()
+    if user_obj is not None:
+        user_obj = authenticate(request, username=user_obj.username, password=password)
     if user_obj is None:
-        return JsonResponse({"error": "Incorrect password."}, status=400)
+        return JsonResponse({"error": INVALID}, status=400)
     login(request, user_obj)
     return JsonResponse({"ok": True, "role": user_obj.role, "slug": user_obj.slug})
 
@@ -362,14 +388,15 @@ def api_logout(request):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("student", "tutor", "admin")
 def api_bookings(request):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         student = User.objects.get(slug=data["studentSlug"], role="student")
         tutor = User.objects.get(slug=data["tutorSlug"], role="tutor")
+        # A student may only create bookings for themselves; tutor/admin for anyone.
+        if request.user.role == "student" and student != request.user:
+            return JsonResponse({"error": "forbidden"}, status=403)
         booking_date = date.fromisoformat(data["date"])
         time_str = data["time"]
         title = data.get("title", "English session")
@@ -386,14 +413,18 @@ def api_bookings(request):
 
 
 @require_http_methods(["PUT", "DELETE"])
+@require_roles("student", "tutor", "admin")
 def api_booking_detail(request, pk):
-    err = require_auth(request)
-    if err:
-        return err
     try:
         b = Booking.objects.get(pk=pk)
     except Booking.DoesNotExist:
         return JsonResponse({"error": "not found"}, status=404)
+
+    # Object-level check: a student may only touch their own bookings (prevents
+    # IDOR — editing/cancelling another student's session by guessing its pk).
+    is_student = request.user.role == "student"
+    if is_student and b.student != request.user:
+        return JsonResponse({"error": "forbidden"}, status=403)
 
     if request.method == "DELETE":
         b.delete()
@@ -409,10 +440,12 @@ def api_booking_detail(request, pk):
         b.time = data["time"]
     if "notes" in data:
         b.notes = data["notes"]
-    if "tutorNotes" in data:
-        b.tutor_notes = data["tutorNotes"]
-    if "callLink" in data:
-        b.call_link = data["callLink"]
+    # tutorNotes and callLink are tutor-owned fields — students can't set them.
+    if not is_student:
+        if "tutorNotes" in data:
+            b.tutor_notes = data["tutorNotes"]
+        if "callLink" in data:
+            b.call_link = data["callLink"]
     b.save()
     return JsonResponse({"ok": True})
 
@@ -422,10 +455,8 @@ def api_booking_detail(request, pk):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("tutor", "admin")
 def api_credits(request, slug):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         student = User.objects.get(slug=slug, role="student")
@@ -501,17 +532,15 @@ def api_billing(request):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("tutor", "admin")
 def api_availability(request):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         # date_key is "YYYY-M-D" (JS keyOf format, 0-indexed month)
         d = jskey_to_date(data["date"])
         time_str = data["time"]
         is_open = bool(data.get("isOpen", True))
-        tutor = User.objects.filter(role="tutor").first()
+        tutor = acting_tutor(request)
         AvailabilityOverride.objects.update_or_create(
             tutor=tutor,
             date=d,
@@ -528,15 +557,13 @@ def api_availability(request):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("tutor", "admin")
 def api_custom_times(request):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         d = jskey_to_date(data["date"])
         time_str = data["time"]
-        tutor = User.objects.filter(role="tutor").first()
+        tutor = acting_tutor(request)
         CustomTime.objects.get_or_create(tutor=tutor, date=d, time=time_str)
         return JsonResponse({"ok": True})
     except (KeyError, ValueError, IndexError) as e:
@@ -548,17 +575,15 @@ def api_custom_times(request):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("tutor", "admin")
 def api_notes(request, slug):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         student = User.objects.get(slug=slug, role="student")
         text = (data.get("text") or "").strip()
         if not text:
             return JsonResponse({"error": "text required"}, status=400)
-        tutor = User.objects.filter(role="tutor").first()
+        tutor = acting_tutor(request)
         note = StudentNote.objects.create(tutor=tutor, student=student, text=text)
         return JsonResponse({"ok": True, "date": note.created_at.strftime("%d.%m.%Y")})
     except User.DoesNotExist as e:
@@ -570,10 +595,8 @@ def api_notes(request, slug):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
+@require_roles("tutor", "admin")
 def api_lessons(request, slug):
-    err = require_auth(request)
-    if err:
-        return err
     data = parse_body(request)
     try:
         student = User.objects.get(slug=slug, role="student")
@@ -597,11 +620,8 @@ def api_lessons(request, slug):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["GET", "POST"])
+@require_roles("admin")
 def api_users(request):
-    err = require_auth(request)
-    if err:
-        return err
-
     if request.method == "GET":
         users = list(User.objects.all())
         return JsonResponse({"users": [serialize_user(u) for u in users]})
@@ -627,16 +647,17 @@ def api_users(request):
 
 
 @require_http_methods(["PUT", "DELETE"])
+@require_roles("admin")
 def api_user_detail(request, slug):
-    err = require_auth(request)
-    if err:
-        return err
     try:
         u = User.objects.get(slug=slug)
     except User.DoesNotExist:
         return JsonResponse({"error": "not found"}, status=404)
 
     if request.method == "DELETE":
+        # Don't let an admin delete their own account out from under themselves.
+        if u == request.user:
+            return JsonResponse({"error": "You can't delete your own account."}, status=400)
         u.delete()
         return JsonResponse({"ok": True})
 
@@ -650,7 +671,11 @@ def api_user_detail(request, slug):
         u.billing_name = name
         u.initials = compute_initials(name)
     if "email" in data:
-        u.email = (data["email"] or "").strip().lower()
+        new_email = (data["email"] or "").strip().lower()
+        # Email is the login identifier — keep it unique to avoid ambiguous logins.
+        if new_email and User.objects.filter(email__iexact=new_email).exclude(pk=u.pk).exists():
+            return JsonResponse({"error": "That email is already in use."}, status=400)
+        u.email = new_email
     if "password" in data and data["password"]:
         u.set_password(data["password"])
     if "credits" in data:
@@ -678,10 +703,8 @@ def api_user_detail(request, slug):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["GET", "PUT"])
+@require_roles("admin")
 def api_settings(request):
-    err = require_auth(request)
-    if err:
-        return err
     settings = get_settings()
 
     if request.method == "GET":
