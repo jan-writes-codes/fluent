@@ -26,6 +26,7 @@ const doAdminRename = process.argv.includes("--admin-rename");
 const doAdminSave = process.argv.includes("--admin-save");
 const doAdminPricing = process.argv.includes("--admin-pricing");
 const doLearning = process.argv.includes("--learning");
+const doPreview = process.argv.includes("--preview");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -166,6 +167,24 @@ setTimeout(() => {
     if (priceEl) priceEl.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     result.eachAfterZeroCredits = eachEl ? eachEl.value : null;
     return finish({ adminPricing: result });
+  }
+
+  if (doPreview) {
+    // Tutor: open a roster student's modal and reveal the Learning preview.
+    const card = [...document.querySelectorAll("#rosterList .rost")]
+      .find((c) => /Maya/.test(c.textContent));
+    if (!card) return finish({ preview: { error: "no roster card for Maya" } });
+    card.click();
+    setTimeout(() => {
+      const t = $("#prevToggle");
+      if (t) t.click();
+      setTimeout(() => {
+        const links = [...document.querySelectorAll("#learnPreview .file-row")]
+          .map((a) => a.getAttribute("href")).filter(Boolean);
+        finish({ preview: { fileLinks: links } });
+      }, 80);
+    }, 80);
+    return;
   }
 
   if (doLearning) {

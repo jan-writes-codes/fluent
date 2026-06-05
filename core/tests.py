@@ -496,12 +496,25 @@ class LessonFileTests(FluentDataMixin, TestCase):
         self.assertEqual(resp.json()["name"], "worksheet.pdf")
         self.assertEqual(LessonFile.objects.filter(lesson_id="a1-1").count(), 1)
 
-    def test_non_pdf_rejected(self):
+    def test_disallowed_type_rejected(self):
         self.client.force_login(self.davit)
-        bad = SimpleUploadedFile("notes.txt", b"hello", content_type="text/plain")
+        bad = SimpleUploadedFile("malware.exe", b"MZ", content_type="application/octet-stream")
         resp = self.client.post("/api/lesson-files/a1-1/", {"file": bad})
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(LessonFile.objects.count(), 0)
+
+    def test_non_pdf_materials_allowed_with_kind(self):
+        self.client.force_login(self.davit)
+        mp3 = SimpleUploadedFile("listening.mp3", b"ID3 audio", content_type="audio/mpeg")
+        resp = self.client.post("/api/lesson-files/a1-1/", {"file": mp3})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["kind"], "audio")
+        self.assertEqual(resp.json()["ext"], "MP3")
+        # served with the right content-type
+        self.client.force_login(self.maya)
+        dl = self.client.get(resp.json()["url"])
+        self.assertEqual(dl.status_code, 200)
+        self.assertEqual(dl["Content-Type"], "audio/mpeg")
 
     def test_oversize_rejected(self):
         self.client.force_login(self.davit)
@@ -588,7 +601,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get("/").content.decode()
@@ -610,6 +623,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--admin-pricing")
             if learning:
                 cmd.append("--learning")
+            if preview:
+                cmd.append("--preview")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -696,6 +711,17 @@ class DomLessonTests(_DomProbeBase):
         r = self.run_probe(self.maya, learning=True)
         self.assertEqual(r["initErrors"], [])
         self.assertIn(f"/api/lesson-files/download/{lf.pk}/", r["learning"]["fileLinks"])
+
+    def test_tutor_preview_shows_student_materials(self):
+        ActiveLesson.objects.create(student=self.maya, lesson_id="a1-1")
+        lf = LessonFile.objects.create(
+            lesson_id="a1-1",
+            file=SimpleUploadedFile("worksheet.pdf", b"%PDF-1.4", content_type="application/pdf"),
+            original_name="worksheet.pdf", uploaded_by=self.davit,
+        )
+        r = self.run_probe(self.davit, preview=True)
+        self.assertEqual(r["initErrors"], [])
+        self.assertIn(f"/api/lesson-files/download/{lf.pk}/", r["preview"]["fileLinks"])
 
 
 class DomBookingTests(_DomProbeBase):

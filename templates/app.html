@@ -1936,6 +1936,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="section-h" style="margin:22px 2px 8px;"><h2>Learning files <span class="lbl-only">· A1–C1</span></h2></div>
         <div class="micro" style="text-align:left; margin:0 2px 12px;">Toggle the lessons ${escHtml(s.name.split(' ')[0])} can access in their Learning tab.</div>
         <div class="curric-mgr">${curriculumMgrHtml(s)}</div>
+        <button class="btn ghost" id="prevToggle" style="margin-top:14px;">Preview ${escHtml(s.name.split(' ')[0])}’s Learning tab</button>
+        <div class="learn-preview" id="learnPreview" hidden style="margin-top:6px;"></div>
         <div class="section-h" style="margin:22px 2px 6px;"><h2>Transaction history</h2></div>
         <div class="activity modal-txns">${txnHtml(s.log)}</div>
       </div>`;
@@ -1948,6 +1950,13 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#studentModal").querySelectorAll("[data-lvl-all]").forEach(b=> b.onclick=()=>{ toggleLevel(s, b.dataset.lvlAll); renderStudentModal(); });
     $("#studentModal").querySelectorAll("[data-upload]").forEach(inp=> inp.onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; uploadLessonFile(inp.dataset.upload, f, ()=>renderStudentModal()); });
     $("#studentModal").querySelectorAll("[data-rmfile]").forEach(b=> b.onclick=()=>{ removeLessonFile(b.dataset.lesson, +b.dataset.rmfile, ()=>renderStudentModal()); });
+    const prevToggle=$("#prevToggle");
+    if(prevToggle) prevToggle.onclick=()=>{
+      const p=$("#learnPreview"), show=p.hidden;
+      if(show){ p.innerHTML=lessonPreviewHtml(s); p.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open")); }
+      p.hidden=!show;
+      prevToggle.textContent = show ? "Hide preview" : ("Preview "+s.name.split(' ')[0]+"’s Learning tab");
+    };
     bindReceiptLinks($("#studentModal"));
     if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
   }
@@ -2219,13 +2228,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function toggleLevel(s,level){ const lvl=CURRICULUM.find(x=>x.level===level); if(!lvl) return; const allOn=lvl.lessons.every(l=>isActive(s,l.id)); lvl.lessons.forEach(l=>toggleLesson(s,l.id,!allOn)); }
   function fileIcon(kind){
     if(kind==="audio") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="19" cy="16" r="3"/></svg>';
+    if(kind==="image") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>';
   }
+  // Mirror of the server's allowed lesson-material types.
+  const ALLOWED_FILE_EXTS = ["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","rtf","mp3","m4a","wav","ogg","png","jpg","jpeg","gif","webp","zip"];
   // Real PDFs the tutor uploaded for this lesson (server-backed).
   function lessonFilesFor(id){ return (state.lessonFiles && state.lessonFiles[id]) || []; }
   function uploadLessonFile(lessonId, file, after){
     if(!file) return;
-    if(!/\.pdf$/i.test(file.name) && file.type!=="application/pdf"){ toast("Only PDF files are allowed"); return; }
+    const ext=(file.name.split(".").pop()||"").toLowerCase();
+    if(!ALLOWED_FILE_EXTS.includes(ext)){ toast("Unsupported file type"); return; }
     toast("Uploading "+file.name+"\u2026");
     apiUpload('/api/lesson-files/'+lessonId+'/', file).then(res=>{
       if(!res || res.error){ toast(res && res.error ? res.error : "Upload failed"); return; }
@@ -2256,10 +2269,22 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${l.t}</span><span class="les-tag">Locked</span></div></div>`;
     const files=lessonFilesFor(l.id);
     const filesHtml = files.length
-      ? files.map(f=>`<a class="file-row" href="${escHtml(f.url)}"><span class="file-ic doc">${fileIcon("doc")}</span><span class="file-n">${escHtml(f.name)}</span><span class="file-ext">PDF</span></a>`).join("")
+      ? files.map(f=>`<a class="file-row" href="${escHtml(f.url)}"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${escHtml(f.name)}</span><span class="file-ext">${escHtml(f.ext||'FILE')}</span></a>`).join("")
       : `<div class="micro" style="text-align:left;padding:8px 4px;">No materials yet — your tutor hasn’t added files for this lesson.</div>`;
     return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${l.t}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
       <div class="les-files">${filesHtml}</div></div>`;
+  }
+  // Read-only render of a student's Learning tab exactly as they see it — only
+  // the lessons they've unlocked, with their downloadable materials.
+  function lessonPreviewHtml(s){
+    const secs = CURRICULUM.map(lvl=>{
+      const ls = lvl.lessons.filter(l=>isActive(s,l.id));
+      if(!ls.length) return "";
+      return `<div class="lvl-sec" style="margin-top:14px;">
+        <div class="lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="lvl-name">${lvl.title}</span></div>
+        <div class="lesson-list">${ls.map(l=>lessonRow(s,l)).join("")}</div></div>`;
+    }).filter(Boolean).join("");
+    return secs || `<div class="empty-list">No lessons unlocked yet — toggle some above.</div>`;
   }
   function curriculumMgrHtml(s){
     return CURRICULUM.map(lvl=>{
@@ -2272,7 +2297,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
           const filesHtml = files.map(f=>`<span class="cm-file"><a href="${escHtml(f.url)}" title="Download">${escHtml(f.name)}</a><button class="cm-file-x" data-rmfile="${f.id}" data-lesson="${l.id}" title="Remove" aria-label="Remove file">×</button></span>`).join("");
           return `<div class="cm-les-wrap">
             <button class="cm-les ${on?'on':''}" data-lesson="${l.id}"><span class="cm-toggle"></span><span class="cm-les-t">${l.t}</span></button>
-            <div class="cm-files">${filesHtml}<label class="cm-upload">+ PDF<input type="file" accept="application/pdf,.pdf" data-upload="${l.id}" hidden></label></div>
+            <div class="cm-files">${filesHtml}<label class="cm-upload">+ File<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip" data-upload="${l.id}" hidden></label></div>
           </div>`;
         }).join("")}</div>
       </div>`;

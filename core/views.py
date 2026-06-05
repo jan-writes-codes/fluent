@@ -10,8 +10,27 @@ from .models import (
     CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile
 )
 
-# Uploaded lesson materials must be PDFs and reasonably sized.
+# Uploaded lesson materials: an allowed type, reasonably sized.
 MAX_LESSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
+AUDIO_EXTS = {"mp3", "m4a", "wav", "ogg"}
+IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
+DOC_EXTS = {"pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "rtf"}
+ALLOWED_LESSON_EXTS = AUDIO_EXTS | IMAGE_EXTS | DOC_EXTS | {"zip"}
+
+
+def file_ext(name):
+    return name.rsplit(".", 1)[-1].lower() if name and "." in name else ""
+
+
+def file_kind(name):
+    e = file_ext(name)
+    if e in AUDIO_EXTS:
+        return "audio"
+    if e in IMAGE_EXTS:
+        return "image"
+    if e in DOC_EXTS:
+        return "doc"
+    return "file"
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +158,8 @@ def serialize_lesson_file(lf):
         "id": lf.pk,
         "lessonId": lf.lesson_id,
         "name": lf.original_name,
+        "ext": file_ext(lf.original_name).upper() or "FILE",
+        "kind": file_kind(lf.original_name),
         "url": f"/api/lesson-files/download/{lf.pk}/",
     }
 
@@ -676,10 +697,12 @@ def api_lesson_files(request, lesson_id):
     f = request.FILES.get("file")
     if not f:
         return JsonResponse({"error": "No file uploaded."}, status=400)
-    name = f.name or "file.pdf"
-    is_pdf = getattr(f, "content_type", "") == "application/pdf" or name.lower().endswith(".pdf")
-    if not is_pdf:
-        return JsonResponse({"error": "Only PDF files are allowed."}, status=400)
+    name = f.name or "file"
+    if file_ext(name) not in ALLOWED_LESSON_EXTS:
+        return JsonResponse(
+            {"error": "Unsupported file type. Allowed: PDF, Office docs, images, audio, zip."},
+            status=400,
+        )
     if f.size > MAX_LESSON_FILE_BYTES:
         return JsonResponse({"error": "File too large (max 25 MB)."}, status=400)
     lf = LessonFile.objects.create(
@@ -714,12 +737,15 @@ def api_lesson_file_download(request, file_id):
         student=request.user, lesson_id=lf.lesson_id
     ).exists():
         return JsonResponse({"error": "forbidden"}, status=403)
+    import mimetypes
+    ctype = mimetypes.guess_type(lf.original_name)[0] or "application/octet-stream"
     try:
-        resp = FileResponse(lf.file.open("rb"), content_type="application/pdf")
+        resp = FileResponse(lf.file.open("rb"), content_type=ctype)
     except FileNotFoundError:
         raise Http404
-    # Sanitize the user-supplied filename before putting it in a header.
-    safe = lf.original_name.replace('"', "").replace("\r", "").replace("\n", "") or "lesson.pdf"
+    # Sanitize the user-supplied filename before putting it in a header. Served
+    # as an attachment (+ global nosniff) so nothing renders inline.
+    safe = lf.original_name.replace('"', "").replace("\r", "").replace("\n", "") or "lesson"
     resp["Content-Disposition"] = f'attachment; filename="{safe}"'
     return resp
 
