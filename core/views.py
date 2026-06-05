@@ -199,7 +199,7 @@ def receipt_html(r_data, settings):
 def app_view(request):
     if not request.user.is_authenticated:
         django_data = {"isAuthenticated": False}
-        return render(request, "app.html", {"django_data": json.dumps(django_data)})
+        return render(request, "app.html", {"django_data": json.dumps(django_data), "role": ""})
 
     user = request.user
     settings = get_settings()
@@ -310,7 +310,7 @@ def app_view(request):
         },
     }
 
-    return render(request, "app.html", {"django_data": json.dumps(django_data)})
+    return render(request, "app.html", {"django_data": json.dumps(django_data), "role": user.role})
 
 
 # ---------------------------------------------------------------------------

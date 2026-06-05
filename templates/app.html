@@ -97,6 +97,18 @@
   nav.tabs button svg { width: 16px; height: 16px; opacity: 0.8; }
   nav.tabs button:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
   nav.tabs button.active { color: var(--ink); background: rgba(255,255,255,0.07); box-shadow: inset 0 0 0 1px var(--line); }
+  /* Role-gated nav tabs. Visibility is driven by the server-rendered data-role
+     on .app, so tabs stay correctly gated on first paint even if later JS throws
+     before the client-side role dispatch runs. The attribute is updated in JS on
+     login and admin impersonation (see showTabsForRole). */
+  .app[data-role] nav.tabs button { display: none; }
+  .app[data-role="student"] .tab[data-view="book"],
+  .app[data-role="student"] .tab[data-view="account"],
+  .app[data-role="student"] .tab[data-view="games"],
+  .app[data-role="student"] .tab[data-view="files"],
+  .app[data-role="tutor"] .tab[data-view="teacher"],
+  .app[data-role="tutor"] .tab[data-view="students"],
+  .app[data-role="admin"] .tab[data-view="admin"] { display: flex; }
 
   .spacer { flex: 1; }
 
@@ -701,7 +713,7 @@
   <div class="grain"></div>
   <div class="vignette"></div>
 
-  <div class="app">
+  <div class="app" data-role="{{ role }}">
     <div class="imp-banner" id="impBanner" hidden>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
       <span>Viewing as <b id="impName"></b> — exactly what they see.</span>
@@ -2369,8 +2381,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const um=$("#umAvatar"); um.style.cssText=st+";width:40px;height:40px;"; um.textContent=u.i;
     $("#umName").textContent=u.name; $("#umMail").textContent=u.email;
   }
-  const TAB_ROLES = { book:["student"], account:["student"], games:["student"], files:["student"], teacher:["tutor"], students:["tutor"], admin:["admin"] };
-  function showTabsForRole(role){ document.querySelectorAll(".tab").forEach(t=>{ t.style.display=(TAB_ROLES[t.dataset.view]||[]).includes(role)?"":"none"; }); }
+  // Nav-tab visibility is gated in CSS off this attribute (see the .app[data-role]
+  // rules). Driving it from a single attribute keeps gating robust: it survives a
+  // partial JS init and updates instantly on login / admin impersonation.
+  function showTabsForRole(role){ const app=document.querySelector(".app"); if(app) app.dataset.role=role||""; }
   function resetTransient(){
     state.selected=null; state.managing=null; state.justBooked=null; state.justAction="booked";
     gameState=null; state.studentQuery="";
