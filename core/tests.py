@@ -30,10 +30,13 @@ import subprocess
 import tempfile
 from datetime import date, timedelta
 
-from django.test import TestCase, Client
-from django.urls import reverse
+from unittest import mock
 
-from .models import User, Booking, Receipt
+from django.test import TestCase, Client, override_settings
+from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+from .models import User, Booking, Receipt, ActiveLesson, LessonFile
 
 
 # --------------------------------------------------------------------------- #
@@ -464,6 +467,95 @@ class PricingReceiptTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Lesson PDF materials: upload (tutor), download (access-controlled), scoping
+# --------------------------------------------------------------------------- #
+_LESSON_MEDIA = tempfile.mkdtemp(prefix="fluent-test-media-")
+
+
+@override_settings(MEDIA_ROOT=_LESSON_MEDIA)
+class LessonFileTests(FluentDataMixin, TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_LESSON_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        super().setUp()
+        ActiveLesson.objects.create(student=self.maya, lesson_id="a1-1")  # ines does NOT have it
+
+    def _pdf(self, name="worksheet.pdf"):
+        return SimpleUploadedFile(name, b"%PDF-1.4 test pdf", content_type="application/pdf")
+
+    def _upload(self, lesson="a1-1"):
+        return self.client.post(f"/api/lesson-files/{lesson}/", {"file": self._pdf()})
+
+    def test_tutor_uploads_pdf(self):
+        self.client.force_login(self.davit)
+        resp = self._upload()
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["name"], "worksheet.pdf")
+        self.assertEqual(LessonFile.objects.filter(lesson_id="a1-1").count(), 1)
+
+    def test_non_pdf_rejected(self):
+        self.client.force_login(self.davit)
+        bad = SimpleUploadedFile("notes.txt", b"hello", content_type="text/plain")
+        resp = self.client.post("/api/lesson-files/a1-1/", {"file": bad})
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(LessonFile.objects.count(), 0)
+
+    def test_oversize_rejected(self):
+        self.client.force_login(self.davit)
+        with mock.patch("core.views.MAX_LESSON_FILE_BYTES", 4):
+            resp = self._upload()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(LessonFile.objects.count(), 0)
+
+    def test_student_cannot_upload_or_delete(self):
+        self.client.force_login(self.davit)
+        lf_id = self._upload().json()["id"]
+        self.client.force_login(self.maya)
+        self.assertEqual(self._upload().status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/lesson-files/{lf_id}/").status_code, 403)
+        self.assertTrue(LessonFile.objects.filter(pk=lf_id).exists())
+
+    def test_download_access_control(self):
+        self.client.force_login(self.davit)
+        lf_id = self._upload().json()["id"]
+        url = f"/api/lesson-files/download/{lf_id}/"
+        # maya has a1-1 unlocked -> can download
+        self.client.force_login(self.maya)
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        self.assertIn("attachment", r["Content-Disposition"])
+        # ines has NOT unlocked a1-1 -> forbidden
+        self.client.force_login(self.ines)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        # anonymous -> 401
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 401)
+
+    def test_payload_scopes_files_to_unlocked_lessons(self):
+        self.client.force_login(self.davit)
+        self._upload()
+        # maya (a1-1 unlocked) receives the file
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get("/").content.decode())
+        self.assertIn("a1-1", payload["lessonFiles"])
+        self.assertEqual(payload["lessonFiles"]["a1-1"][0]["name"], "worksheet.pdf")
+        # ines (locked) does not
+        self.client.force_login(self.ines)
+        payload = extract_payload(self.client.get("/").content.decode())
+        self.assertNotIn("a1-1", payload.get("lessonFiles", {}))
+
+    def test_tutor_deletes_file(self):
+        self.client.force_login(self.davit)
+        lf_id = self._upload().json()["id"]
+        self.assertEqual(self.client.delete(f"/api/lesson-files/{lf_id}/").status_code, 200)
+        self.assertFalse(LessonFile.objects.filter(pk=lf_id).exists())
+
+
+# --------------------------------------------------------------------------- #
 # Frontend (jsdom) tests — run the real init script in a headless DOM
 # --------------------------------------------------------------------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "tests", "frontend")
@@ -496,7 +588,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get("/").content.decode()
@@ -516,6 +608,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--admin-save")
             if admin_pricing:
                 cmd.append("--admin-pricing")
+            if learning:
+                cmd.append("--learning")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -588,6 +682,20 @@ class DomPricingTests(_DomProbeBase):
         self.assertEqual(p["eachAfterPrice"], "€100 / session")
         # credits = 0 -> blank, never NaN/Infinity (ZeroDivision -> none)
         self.assertEqual(p["eachAfterZeroCredits"], "")
+
+
+@override_settings(MEDIA_ROOT=_LESSON_MEDIA)
+class DomLessonTests(_DomProbeBase):
+    def test_student_sees_real_download_link(self):
+        ActiveLesson.objects.create(student=self.maya, lesson_id="a1-1")
+        lf = LessonFile.objects.create(
+            lesson_id="a1-1",
+            file=SimpleUploadedFile("worksheet.pdf", b"%PDF-1.4", content_type="application/pdf"),
+            original_name="worksheet.pdf", uploaded_by=self.davit,
+        )
+        r = self.run_probe(self.maya, learning=True)
+        self.assertEqual(r["initErrors"], [])
+        self.assertIn(f"/api/lesson-files/download/{lf.pk}/", r["learning"]["fileLinks"])
 
 
 class DomBookingTests(_DomProbeBase):

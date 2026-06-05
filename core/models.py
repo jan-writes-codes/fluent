@@ -121,6 +121,28 @@ class ActiveLesson(models.Model):
         return f'{self.student.slug}: {self.lesson_id}'
 
 
+def lesson_upload_path(instance, filename):
+    return f'lessons/{instance.lesson_id}/{filename}'
+
+
+class LessonFile(models.Model):
+    """A PDF the tutor attaches to a curriculum lesson (e.g. 'a1-1'). Files are
+    shared across all students who have that lesson unlocked."""
+    lesson_id = models.CharField(max_length=20, db_index=True)
+    file = models.FileField(upload_to=lesson_upload_path)
+    original_name = models.CharField(max_length=255)
+    uploaded_by = models.ForeignKey(
+        User, null=True, on_delete=models.SET_NULL, related_name='uploaded_lesson_files'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['uploaded_at']
+
+    def __str__(self):
+        return f'{self.lesson_id}: {self.original_name}'
+
+
 class SiteSettings(models.Model):
     credit_price = models.IntegerField(default=30)  # EUR
     packs_json = models.TextField(

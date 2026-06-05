@@ -2,13 +2,16 @@ import json
 from datetime import date
 from functools import wraps
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
 from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
-    CustomTime, StudentNote, ActiveLesson, SiteSettings
+    CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile
 )
+
+# Uploaded lesson materials must be PDFs and reasonably sized.
+MAX_LESSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +131,15 @@ def serialize_receipt(r):
         "unit": r.unit_price_cents,  # already in EUR (stored as integer EUR)
         "net": r.credits * r.unit_price_cents,
         "total": r.credits * r.unit_price_cents,
+    }
+
+
+def serialize_lesson_file(lf):
+    return {
+        "id": lf.pk,
+        "lessonId": lf.lesson_id,
+        "name": lf.original_name,
+        "url": f"/api/lesson-files/download/{lf.pk}/",
     }
 
 
@@ -344,6 +356,17 @@ def app_view(request):
         ids = list(ActiveLesson.objects.filter(student=s).values_list("lesson_id", flat=True))
         active_lessons[s.slug] = ids
 
+    # Lesson PDFs: {lesson_id: [{id,name,url}]}. A student only receives files for
+    # lessons they've unlocked; tutor/admin get the full set to manage.
+    lesson_files = {}
+    if is_student:
+        my_ids = set(active_lessons.get(user.slug, []))
+        lf_qs = LessonFile.objects.filter(lesson_id__in=my_ids) if my_ids else LessonFile.objects.none()
+    else:
+        lf_qs = LessonFile.objects.all()
+    for lf in lf_qs:
+        lesson_files.setdefault(lf.lesson_id, []).append(serialize_lesson_file(lf))
+
     # Settings
     packs = json.loads(settings.packs_json)
     # receiptSeq: compute from max receipt number
@@ -371,6 +394,7 @@ def app_view(request):
         "customTimes": custom_times,
         "studentNotes": student_notes,
         "activeLessons": active_lessons,
+        "lessonFiles": lesson_files,
         "settings": {
             "creditPrice": settings.credit_price,
             "packs": packs,
@@ -640,6 +664,64 @@ def api_lessons(request, slug):
         return JsonResponse({"ok": True})
     except User.DoesNotExist as e:
         return JsonResponse({"error": str(e)}, status=404)
+
+
+# ---------------------------------------------------------------------------
+# Lesson files API (PDF materials, shared per lesson)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_lesson_files(request, lesson_id):
+    f = request.FILES.get("file")
+    if not f:
+        return JsonResponse({"error": "No file uploaded."}, status=400)
+    name = f.name or "file.pdf"
+    is_pdf = getattr(f, "content_type", "") == "application/pdf" or name.lower().endswith(".pdf")
+    if not is_pdf:
+        return JsonResponse({"error": "Only PDF files are allowed."}, status=400)
+    if f.size > MAX_LESSON_FILE_BYTES:
+        return JsonResponse({"error": "File too large (max 25 MB)."}, status=400)
+    lf = LessonFile.objects.create(
+        lesson_id=lesson_id, file=f, original_name=name[:255], uploaded_by=request.user,
+    )
+    return JsonResponse(serialize_lesson_file(lf))
+
+
+@require_http_methods(["DELETE"])
+@require_roles("tutor", "admin")
+def api_lesson_file_detail(request, file_id):
+    try:
+        lf = LessonFile.objects.get(pk=file_id)
+    except LessonFile.DoesNotExist:
+        return JsonResponse({"error": "not found"}, status=404)
+    lf.file.delete(save=False)  # remove the blob from storage too
+    lf.delete()
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["GET"])
+def api_lesson_file_download(request, file_id):
+    # Access-controlled file serving (no public MEDIA URL): students may only
+    # download materials for lessons they have unlocked; tutor/admin always.
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "auth"}, status=401)
+    try:
+        lf = LessonFile.objects.get(pk=file_id)
+    except LessonFile.DoesNotExist:
+        raise Http404
+    if request.user.role == "student" and not ActiveLesson.objects.filter(
+        student=request.user, lesson_id=lf.lesson_id
+    ).exists():
+        return JsonResponse({"error": "forbidden"}, status=403)
+    try:
+        resp = FileResponse(lf.file.open("rb"), content_type="application/pdf")
+    except FileNotFoundError:
+        raise Http404
+    # Sanitize the user-supplied filename before putting it in a header.
+    safe = lf.original_name.replace('"', "").replace("\r", "").replace("\n", "") or "lesson.pdf"
+    resp["Content-Disposition"] = f'attachment; filename="{safe}"'
+    return resp
 
 
 # ---------------------------------------------------------------------------

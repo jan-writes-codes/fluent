@@ -12,3 +12,6 @@ venv/
 
 # Node (frontend test deps)
 node_modules/
+
+# Uploaded media
+media/

@@ -25,6 +25,7 @@ const doBook = process.argv.includes("--book");
 const doAdminRename = process.argv.includes("--admin-rename");
 const doAdminSave = process.argv.includes("--admin-save");
 const doAdminPricing = process.argv.includes("--admin-pricing");
+const doLearning = process.argv.includes("--learning");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -165,6 +166,17 @@ setTimeout(() => {
     if (priceEl) priceEl.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     result.eachAfterZeroCredits = eachEl ? eachEl.value : null;
     return finish({ adminPricing: result });
+  }
+
+  if (doLearning) {
+    const tab = document.querySelector('.tab[data-view="files"]');
+    if (tab) tab.click();
+    setTimeout(() => {
+      const links = [...document.querySelectorAll("#filesContent .file-row")]
+        .map((a) => a.getAttribute("href")).filter(Boolean);
+      finish({ learning: { fileLinks: links } });
+    }, 80);
+    return;
   }
 
   if (!doBook) return finish();
