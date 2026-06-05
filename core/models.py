@@ -1,0 +1,133 @@
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+import json
+
+
+class User(AbstractUser):
+    ROLES = [('student', 'Student'), ('tutor', 'Tutor'), ('admin', 'Admin')]
+    role = models.CharField(max_length=10, choices=ROLES, default='student')
+    slug = models.CharField(max_length=50, unique=True, default='')
+    initials = models.CharField(max_length=4, default='')
+    credits = models.IntegerField(default=0)
+    photo = models.TextField(blank=True, null=True)  # base64 data URL
+    color1 = models.CharField(max_length=20, default='#c2714d')
+    color2 = models.CharField(max_length=20, default='#a85535')
+    billing_name = models.CharField(max_length=200, blank=True)
+    billing_line1 = models.CharField(max_length=200, blank=True)
+    billing_postcode = models.CharField(max_length=20, blank=True)
+    billing_city = models.CharField(max_length=100, blank=True)
+    billing_country = models.CharField(max_length=100, default='Österreich')
+    receipt_seq = models.IntegerField(default=1000)
+
+    class Meta:
+        db_table = 'core_user'
+
+    def __str__(self):
+        return f'{self.slug} ({self.role})'
+
+
+class Booking(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_bookings')
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tutor_bookings')
+    date = models.DateField()
+    time = models.CharField(max_length=5)  # "HH:MM"
+    title = models.CharField(max_length=200, default='English session')
+    notes = models.TextField(blank=True)
+    tutor_notes = models.TextField(blank=True)
+    call_link = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'time']
+
+    def __str__(self):
+        return f'{self.student.slug} + {self.tutor.slug} on {self.date} at {self.time}'
+
+
+class CreditTransaction(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    txn_type = models.CharField(max_length=10)  # book, buy, done
+    label = models.CharField(max_length=200)
+    sub = models.CharField(max_length=200, blank=True)
+    amount = models.IntegerField(default=0)
+    receipt_no = models.CharField(max_length=30, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.student.slug}: {self.label}'
+
+
+class Receipt(models.Model):
+    number = models.CharField(max_length=30, unique=True)
+    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    date_str = models.CharField(max_length=20)
+    credits = models.IntegerField()
+    unit_price_cents = models.IntegerField()  # in cents to avoid float
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.number
+
+
+class AvailabilityOverride(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField()
+    time = models.CharField(max_length=5)
+    is_open = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ['tutor', 'date', 'time']
+
+    def __str__(self):
+        return f'{self.tutor.slug} {self.date} {self.time} {"open" if self.is_open else "closed"}'
+
+
+class CustomTime(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField()
+    time = models.CharField(max_length=5)
+
+    class Meta:
+        unique_together = ['tutor', 'date', 'time']
+
+    def __str__(self):
+        return f'{self.tutor.slug} {self.date} {self.time}'
+
+
+class StudentNote(models.Model):
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notes_created')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notes_received')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Note on {self.student.slug} by {self.tutor.slug}'
+
+
+class ActiveLesson(models.Model):
+    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    lesson_id = models.CharField(max_length=20)
+
+    class Meta:
+        unique_together = ['student', 'lesson_id']
+
+    def __str__(self):
+        return f'{self.student.slug}: {self.lesson_id}'
+
+
+class SiteSettings(models.Model):
+    credit_price = models.IntegerField(default=30)  # EUR
+    packs_json = models.TextField(
+        default='[{"n":1,"price":"€32","each":"€32 / session","feat":false},'
+                '{"n":5,"price":"€145","each":"€29 / session","feat":true,"tag":"Popular"},'
+                '{"n":10,"price":"€270","each":"€27 / session","feat":false}]'
+    )
+
+    def __str__(self):
+        return f'SiteSettings (credit_price={self.credit_price})'

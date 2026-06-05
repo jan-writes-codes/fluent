@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fluent — English Tutoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+{% load static %}
+<meta name="csrf-token" content="{{ csrf_token }}">
+<style>
+  :root {
+    --bg: #ece0cb;
+    --bg-2: #e3d4bb;
+    --ink: #3b2f24;
+    --muted: #897a64;
+    --faint: #ab9c84;
+    --line: rgba(74,54,34,0.18);
+    --line-2: rgba(74,54,34,0.10);
+    --glass: rgba(250,244,233,0.58);
+    --glass-2: rgba(250,244,233,0.5);
+    --c1: #c2714d;  /* terracotta */
+    --c2: #d6a25c;  /* honey ochre */
+    --c3: #8a9a6b;  /* sage */
+    --accent: var(--c1);
+    --good: #6f8f57;  /* meadow */
+    --grain: 0.25;
+    --radius: 18px;
+    --shadow: 0 26px 60px -34px rgba(80,52,28,0.5);
+    --font-display: "Bricolage Grotesque", "Hanken Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-synthesis: none;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ---------- Ambient grainy gradient field ---------- */
+  .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.5; mix-blend-mode: multiply; }
+  .blob.b1 { width: 60vw; height: 60vw; left: -14vw; top: -22vw;
+    background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); animation: drift1 26s ease-in-out infinite; }
+  .blob.b2 { width: 52vw; height: 52vw; right: -12vw; top: -10vw;
+    background: radial-gradient(circle at 60% 40%, var(--c2), transparent 60%); animation: drift2 32s ease-in-out infinite; }
+  .blob.b3 { width: 58vw; height: 58vw; right: 6vw; bottom: -28vw;
+    background: radial-gradient(circle at 50% 50%, var(--c3), transparent 60%); opacity: 0.5; animation: drift3 30s ease-in-out infinite; }
+  .blob.b4 { width: 40vw; height: 40vw; left: 6vw; bottom: -22vw;
+    background: radial-gradient(circle at 50% 50%, #cf9b86, transparent 62%); opacity: 0.46; animation: drift1 36s ease-in-out infinite reverse; }
+  @keyframes drift1 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(6vw,4vw) scale(1.08);} }
+  @keyframes drift2 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(-5vw,5vw) scale(1.05);} }
+  @keyframes drift3 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(4vw,-4vw) scale(1.1);} }
+
+  .grain { position: fixed; inset: -200%; z-index: 1; pointer-events: none;
+    opacity: var(--grain);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    mix-blend-mode: multiply; animation: jitter 0.6s steps(2) infinite; }
+  @keyframes jitter { 0%{transform:translate(0,0)} 50%{transform:translate(-3%, 2%)} 100%{transform:translate(2%,-3%)} }
+  .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(125% 95% at 50% 0%, transparent 58%, rgba(92,60,32,0.15) 100%); }
+
+  /* ---------- App shell ---------- */
+  .app { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; }
+
+  header.top {
+    display: flex; align-items: center; gap: 28px;
+    padding: 16px 30px;
+    border-bottom: 1px solid var(--line-2);
+    backdrop-filter: blur(14px);
+    background: linear-gradient(180deg, rgba(250,244,233,0.72), rgba(250,244,233,0.22));
+    position: relative; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .mark { width: 30px; height: 30px; border-radius: 9px; position: relative;
+    background: conic-gradient(from 200deg, var(--c1), var(--c2), var(--c3), var(--c1));
+    box-shadow: 0 0 22px -2px color-mix(in oklch, var(--accent) 70%, transparent); }
+  .mark::after { content:""; position:absolute; inset: 7px; border-radius: 4px; background: var(--bg); }
+  .mark::before { content:""; position:absolute; inset:0; border-radius:9px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+    mix-blend-mode: overlay; }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+  .wordmark span { color: var(--muted); font-weight: 400; }
+
+  nav.tabs { display: flex; gap: 4px; margin-left: 4px; }
+  nav.tabs button {
+    font-family: inherit; font-size: 14px; color: var(--muted);
+    background: transparent; border: 0; padding: 9px 16px; border-radius: 11px;
+    cursor: pointer; transition: 0.18s; letter-spacing: -0.01em; display:flex; align-items:center; gap:8px;
+  }
+  nav.tabs button svg { width: 16px; height: 16px; opacity: 0.8; }
+  nav.tabs button:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+  nav.tabs button.active { color: var(--ink); background: rgba(255,255,255,0.07); box-shadow: inset 0 0 0 1px var(--line); }
+
+  .spacer { flex: 1; }
+
+  .credits-pill {
+    display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 15px;
+    border-radius: 999px; border: 1px solid var(--line);
+    background: var(--glass); backdrop-filter: blur(10px); cursor: pointer; transition: 0.18s;
+  }
+  .credits-pill:hover { border-color: color-mix(in oklch, var(--accent) 45%, var(--line)); }
+  .credits-pill .lbl { font-size: 12px; color: var(--muted); letter-spacing: 0.02em; }
+  .credits-pill .num { font-family: var(--font-display); font-weight: 700; font-size: 16px;
+    background: linear-gradient(90deg, var(--c1), var(--ink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .credits-pill .coin { width: 26px; height: 26px; border-radius: 50%; display:grid; place-items:center;
+    background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c3), var(--c1)); font-size: 12px; }
+  .credits-pill .coin span { width: 20px; height: 20px; border-radius: 50%; background: var(--bg); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--c1); }
+
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 600; font-size: 13px; color: var(--ink); border: 1px solid rgba(255,255,255,0.32); }
+
+  /* ---------- Main scroll area ---------- */
+  main { flex: 1; overflow-y: auto; overflow-x: hidden; }
+  main::-webkit-scrollbar { width: 10px; }
+  main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+  .view { display: none; }
+  .view.active { display: block; animation: fade 0.4s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 30px 30px 80px; }
+
+  .eyebrow { font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+  h1.title { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.03em; line-height: 1.02; }
+  .sub { color: var(--muted); font-size: 15px; margin-top: 8px; max-width: 56ch; line-height: 1.5; }
+
+  /* ---------- Booking layout ---------- */
+  .book-grid { display: grid; grid-template-columns: 1fr 340px; gap: 22px; margin-top: 26px; align-items: start; }
+  @media (max-width: 1000px) { .book-grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius);
+    backdrop-filter: blur(16px); box-shadow: var(--shadow); position: relative; overflow: hidden; }
+  .panel::before { content:""; position:absolute; inset:0; pointer-events:none; border-radius: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.05; mix-blend-mode: multiply; }
+
+  /* tutor selector */
+  .tutors { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 18px; border-bottom: 1px solid var(--line-2); }
+  .tutor-chip { display: flex; align-items: center; gap: 10px; padding: 7px 14px 7px 7px; border-radius: 999px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.02); cursor: pointer; transition: 0.16s; }
+  .tutor-chip:hover { background: rgba(255,255,255,0.05); }
+  .tutor-chip.sel { border-color: color-mix(in oklch, var(--accent) 60%, transparent);
+    background: color-mix(in oklch, var(--accent) 14%, transparent); box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent) 35%, transparent); }
+  .tutor-chip .avatar { width: 28px; height: 28px; font-size: 11px; }
+  .tutor-chip .tn { font-size: 13.5px; font-weight: 500; }
+  .tutor-chip .tm { font-size: 11px; color: var(--faint); }
+
+  /* week header */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 4px; }
+  .cal-head .month { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+  .weeknav { display: flex; gap: 6px; align-items: center; }
+  .weeknav button { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line);
+    background: rgba(255,255,255,0.02); color: var(--ink); cursor: pointer; display: grid; place-items: center; transition: 0.15s; }
+  .weeknav button:hover { background: rgba(255,255,255,0.07); }
+  .weeknav .today { width: auto; padding: 0 14px; font-family: inherit; font-size: 13px; color: var(--muted); }
+
+  .cal-scroll { padding: 8px 18px 20px; }
+  .days-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .day-col { min-width: 0; }
+  .day-name { text-align: center; padding: 8px 0 12px; }
+  .day-name .dn { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  .day-name .dd { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin-top: 3px; }
+  .day-name.is-today .dd { color: var(--c1); }
+  .day-name.is-today .pip { width: 5px; height: 5px; border-radius: 50%; background: var(--c1); margin: 4px auto 0; box-shadow: 0 0 8px var(--c1); }
+
+  .slots { display: flex; flex-direction: column; gap: 8px; }
+  .slot { font-family: var(--font-body); font-size: 13px; font-weight: 500; padding: 11px 6px; border-radius: 11px;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.025); color: var(--ink); cursor: pointer;
+    text-align: center; transition: 0.14s; position: relative; }
+  .slot:hover:not(.booked):not(.off) { border-color: color-mix(in oklch, var(--accent) 60%, transparent);
+    background: color-mix(in oklch, var(--accent) 16%, transparent); transform: translateY(-1px); }
+  .slot.sel { border-color: transparent; color: #fbf4e8; font-weight: 600;
+    background: linear-gradient(120deg, var(--c1), #b15f39); box-shadow: 0 10px 22px -10px rgba(150,80,45,0.55); }
+  .slot.booked { color: var(--good); background: color-mix(in oklch, var(--good) 12%, transparent);
+    border-color: color-mix(in oklch, var(--good) 35%, transparent); cursor: default; }
+  .slot.booked::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--good); right: 8px; top: 8px; opacity: 0.85; }
+  .slot.off { opacity: 0.28; cursor: default; text-decoration: line-through; }
+  .no-slot { font-size: 11px; color: var(--faint); text-align: center; padding: 11px 0; opacity: 0.5; }
+
+  /* ---------- Booking summary aside ---------- */
+  aside.summary { position: sticky; top: 0; }
+  .sum-card { padding: 22px; }
+  .sum-empty { text-align: center; color: var(--muted); padding: 30px 18px; }
+  .sum-empty .ic { width: 54px; height: 54px; border-radius: 16px; margin: 0 auto 16px; display:grid; place-items:center;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
+  .sum-empty h3 { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--ink); margin-bottom: 6px; }
+  .sum-empty p { font-size: 13px; line-height: 1.5; }
+
+  .sum-head { display: flex; align-items: center; gap: 13px; margin-bottom: 18px; }
+  .sum-head .avatar { width: 46px; height: 46px; font-size: 16px; }
+  .sum-head .nm { font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+  .sum-head .rl { font-size: 12px; color: var(--muted); }
+  .sum-rows { display: flex; flex-direction: column; gap: 1px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line-2); }
+  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; background: rgba(255,255,255,0.025); font-size: 13.5px; }
+  .sum-row .k { color: var(--muted); }
+  .sum-row .v { font-weight: 500; }
+  .sum-row .v.hl { color: var(--c1); }
+
+  .cost { display: flex; align-items: center; justify-content: space-between; margin: 18px 2px 16px; }
+  .cost .k { font-size: 13px; color: var(--muted); }
+  .cost .v { font-family: var(--font-display); font-weight: 700; font-size: 20px; display:flex; align-items:center; gap:8px; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 15px; border: 0; border-radius: 14px; cursor: pointer;
+    padding: 15px; width: 100%; color: #fbf4e8; position: relative; overflow: hidden; transition: 0.18s; letter-spacing: -0.01em;
+    background: linear-gradient(120deg, var(--c1), #b15f39 95%); }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 14px 34px -14px rgba(150,80,45,0.5); }
+  .btn:active { transform: translateY(0); }
+  .btn.ghost { background: rgba(255,255,255,0.05); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn.ghost:hover { background: rgba(255,255,255,0.09); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.4); }
+  .btn[disabled]:hover { transform: none; box-shadow: none; }
+  .btn .grainbtn { position:absolute; inset:0; opacity:0.18; mix-blend-mode: overlay; pointer-events:none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .btn svg { vertical-align: -2px; }
+  .sum-confirm { text-align: center; padding: 8px 6px 6px; }
+  .confirm-badge { width: 54px; height: 54px; border-radius: 50%; margin: 6px auto 16px; display: grid; place-items: center;
+    font-size: 25px; color: #fbf4e8; background: linear-gradient(120deg, var(--good), var(--c2));
+    box-shadow: 0 12px 26px -10px rgba(111,143,87,0.6); animation: pop 0.45s cubic-bezier(.2,.9,.3,1.4); }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+  .confirm-h { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; margin-bottom: 7px; }
+  .confirm-p { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 20px; }
+  .micro { font-size: 11.5px; color: var(--faint); text-align: center; margin-top: 11px; line-height: 1.4; }
+
+  /* ---------- Account view ---------- */
+  .acct-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; margin-top: 26px; }
+  @media (max-width: 920px) { .acct-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- Practice games ---------- */
+  .games-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin-top: 26px; }
+  .game-card { text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; cursor: pointer;
+    background: var(--glass); backdrop-filter: blur(6px); transition: 0.16s; font-family: var(--font-body); color: var(--ink); position: relative; overflow: hidden; }
+  .game-card:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--ga, var(--c1)) 55%, transparent); box-shadow: 0 18px 40px -26px rgba(80,52,28,0.6); }
+  .gc-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 14px;
+    background: color-mix(in oklch, var(--ga) 16%, transparent); color: var(--ga); }
+  .gc-icon svg { width: 24px; height: 24px; }
+  .gc-tag { font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--ga); font-weight: 600; margin-bottom: 5px; }
+  .gc-title { font-family: var(--font-display); font-weight: 700; font-size: 19px; margin-bottom: 6px; }
+  .gc-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 14px; }
+  .gc-best { font-size: 11.5px; color: var(--faint); display: flex; align-items: center; gap: 6px; }
+  .gc-best::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ga); opacity: 0.6; }
+
+  .game-bar { display: flex; align-items: center; gap: 14px; margin-top: 22px; margin-bottom: 14px; }
+  .game-title-mini { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .game-panel { padding: 30px; min-height: 320px; }
+  #gameProgress { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted);
+    padding-bottom: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--line-2); }
+  #gameProgress:empty { display: none; }
+  .gp-score { color: var(--good); font-weight: 600; }
+  .q-sentence { font-family: var(--font-display); font-size: 25px; line-height: 1.5; color: var(--ink); text-wrap: pretty; }
+  .q-blank { display: inline-block; min-width: 64px; border-bottom: 2.5px dashed color-mix(in oklch, var(--c1) 55%, transparent); margin: 0 3px; }
+  .q-hint { font-size: 13.5px; color: var(--muted); margin-top: 16px; }
+  .q-hint b { color: var(--c1); font-weight: 600; }
+  .q-input-row { display: flex; gap: 10px; margin-top: 20px; max-width: 420px; }
+  .q-input { flex: 1; font-size: 16px; }
+  .q-input.correct { border-color: var(--good); color: var(--good); }
+  .q-input.wrong { border-color: #c0593c; color: #c0593c; }
+  .q-input-row .btn { width: auto; padding-left: 22px; padding-right: 22px; flex-shrink: 0; }
+  .q-options { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 24px; max-width: 460px; }
+  .q-opt { font-family: var(--font-body); font-size: 16px; font-weight: 500; padding: 15px; border-radius: 13px;
+    border: 1px solid var(--line); background: rgba(250,244,233,0.5); color: var(--ink); cursor: pointer; transition: 0.14s; }
+  .q-opt:hover:not(:disabled) { border-color: color-mix(in oklch, var(--c1) 55%, transparent); transform: translateY(-1px); }
+  .q-opt:disabled { cursor: default; }
+  .q-opt.correct { background: color-mix(in oklch, var(--good) 18%, transparent); border-color: var(--good); color: #46603a; font-weight: 600; }
+  .q-opt.wrong { background: rgba(192,89,60,0.14); border-color: #c0593c; color: #c0593c; }
+  .q-feedback { margin-top: 22px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+  .q-feedback .btn { width: auto; padding-left: 26px; padding-right: 26px; }
+  .fb { font-size: 15px; font-weight: 600; }
+  .fb.ok { color: var(--good); }
+  .fb.no { color: #c0593c; font-weight: 500; }
+  .fb.no b { font-weight: 700; }
+  .scramble-answer { display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 12px; margin-top: 18px;
+    border: 1.5px dashed var(--line); border-radius: 13px; background: rgba(250,244,233,0.35); }
+  .scramble-answer:empty::after { content: "Tap words below to build the sentence…"; color: var(--faint); font-size: 13.5px; font-style: italic; }
+  .scramble-pool { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+  .word-chip { font-family: var(--font-body); font-size: 15.5px; padding: 9px 15px; border-radius: 10px; cursor: pointer; transition: 0.13s;
+    border: 1px solid var(--line); background: var(--glass); color: var(--ink); }
+  .word-chip:hover { transform: translateY(-1px); border-color: color-mix(in oklch, var(--c1) 50%, transparent); }
+  .word-chip.in { background: color-mix(in oklch, var(--c1) 13%, transparent); border-color: color-mix(in oklch, var(--c1) 40%, transparent); color: var(--c1); font-weight: 500; }
+  .game-result { text-align: center; padding: 24px 0; }
+  .gr-score { font-family: var(--font-display); font-weight: 800; font-size: 64px; color: var(--c1); line-height: 1; }
+  .gr-score span { font-size: 30px; color: var(--faint); font-weight: 600; }
+  .gr-msg { font-size: 16px; color: var(--muted); margin-top: 12px; }
+  .gr-actions { display: flex; gap: 12px; justify-content: center; margin-top: 26px; }
+  .gr-actions .btn { width: auto; padding-left: 28px; padding-right: 28px; }
+
+  /* ---------- Learning files ---------- */
+  .lvl-sec { margin-top: 26px; }
+  .lvl-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .lvl-badge { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; color: #fbf4e8;
+    width: 38px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+  .lvl-badge.a1 { background: #6f8f57; } .lvl-badge.a2 { background: #8a9a6b; }
+  .lvl-badge.b1 { background: #d6a25c; } .lvl-badge.b2 { background: #c2714d; } .lvl-badge.c1 { background: #a85535; }
+  .lvl-name { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--ink); }
+  .lvl-count { margin-left: auto; font-size: 12px; color: var(--faint); }
+  .lesson-list { display: flex; flex-direction: column; gap: 9px; }
+  .lesson { border: 1px solid var(--line); border-radius: 13px; background: var(--glass); overflow: hidden; transition: 0.15s; }
+  .lesson:not(.locked):hover { border-color: color-mix(in oklch, var(--c1) 40%, transparent); }
+  .les-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+  .lesson.locked .les-head { cursor: default; }
+  .les-ic { width: 22px; height: 22px; flex-shrink: 0; display: grid; place-items: center; color: var(--good); }
+  .les-ic.lock { color: var(--faint); }
+  .les-ic.lock svg { width: 17px; height: 17px; }
+  .les-ic.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); margin: 0 6px; }
+  .les-t { font-size: 14.5px; font-weight: 500; color: var(--ink); }
+  .lesson.locked .les-t { color: var(--faint); font-weight: 400; }
+  .les-tag { margin-left: auto; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .les-chev { margin-left: auto; color: var(--muted); transition: transform 0.2s; }
+  .les-chev svg { width: 18px; height: 18px; display: block; }
+  .lesson.open .les-chev { transform: rotate(180deg); }
+  .les-files { max-height: 0; overflow: hidden; transition: max-height 0.28s ease; }
+  .lesson.open .les-files { max-height: 240px; }
+  .file-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px 11px 18px; border-top: 1px solid var(--line-2); text-decoration: none; color: var(--ink); transition: 0.13s; }
+  .file-row:hover { background: rgba(74,54,34,0.04); }
+  .file-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;
+    background: color-mix(in oklch, var(--c1) 13%, transparent); color: var(--c1); }
+  .file-ic svg { width: 16px; height: 16px; }
+  .file-ic.audio { background: color-mix(in oklch, var(--c3) 18%, transparent); color: #5f7048; }
+  .file-n { font-size: 13.5px; }
+  .file-ext { margin-left: auto; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; color: var(--faint); }
+
+  /* ---------- Curriculum manager (tutor) ---------- */
+  .curric-mgr { display: flex; flex-direction: column; gap: 14px; }
+  .cm-lvl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .cm-lvl-name { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; }
+  .cm-all { margin-left: auto; font-family: var(--font-body); font-size: 11.5px; padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--bg-2); color: var(--muted); transition: 0.14s; }
+  .cm-all:hover { color: var(--c1); border-color: color-mix(in oklch, var(--c1) 45%, transparent); }
+  .cm-lessons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  @media (max-width: 560px) { .cm-lessons { grid-template-columns: 1fr; } }
+  .cm-les { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; cursor: pointer; text-align: left;
+    border: 1px solid var(--line); background: rgba(250,244,233,0.4); color: var(--muted); font-family: var(--font-body); transition: 0.14s; }
+  .cm-les:hover { border-color: color-mix(in oklch, var(--c1) 35%, transparent); }
+  .cm-toggle { width: 32px; height: 18px; border-radius: 10px; background: rgba(74,54,34,0.2); position: relative; flex-shrink: 0; transition: 0.16s; }
+  .cm-toggle::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fbf4e8; top: 2px; left: 2px; transition: 0.16s; }
+  .cm-les.on { background: color-mix(in oklch, var(--good) 13%, transparent); border-color: color-mix(in oklch, var(--good) 40%, transparent); color: var(--ink); }
+  .cm-les.on .cm-toggle { background: var(--good); }
+  .cm-les.on .cm-toggle::after { left: 16px; }
+  .cm-les-t { font-size: 13px; font-weight: 500; line-height: 1.3; }
+
+  .balance { padding: 28px; position: relative; }
+  .balance .ring { position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in oklch, var(--accent) 45%, transparent), transparent 65%); filter: blur(20px); }
+  .balance .ey { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  .balance .big { font-family: var(--font-display); font-weight: 800; font-size: clamp(50px, 9vw, 78px); line-height: 1; letter-spacing: -0.04em; margin: 10px 0 2px;
+    background: linear-gradient(135deg, #5e3a24, var(--c1) 56%, #d08a3f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .balance .unit { font-size: 14px; color: var(--muted); }
+  .balance .meta { display: flex; gap: 26px; margin-top: 24px; }
+  .balance .meta .m .mv { font-family: var(--font-display); font-weight: 600; font-size: 22px; }
+  .balance .meta .m .mk { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 6px 2px 14px; }
+  .section-h h2 { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+  .section-h .lnk { font-size: 13px; color: var(--c1); cursor: pointer; }
+
+  .packs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pack { padding: 18px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,0.025);
+    cursor: pointer; transition: 0.16s; position: relative; text-align: center; }
+  .pack:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--accent) 50%, transparent);
+    background: rgba(255,255,255,0.05); }
+  .pack.feat { border-color: color-mix(in oklch, var(--accent) 55%, transparent); background: color-mix(in oklch, var(--accent) 12%, transparent); }
+  .pack .tag { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; background: linear-gradient(120deg, var(--c1), var(--c2)); color: #fbf4e8; font-weight: 700; }
+  .pack .pc { font-family: var(--font-display); font-weight: 700; font-size: 30px; }
+  .pack .pl { font-size: 11px; color: var(--muted); margin-top: -2px; }
+  .pack .pp { margin-top: 12px; font-size: 15px; font-weight: 600; }
+  .pack .pe { font-size: 11px; color: var(--faint); margin-top: 2px; }
+
+  .list { display: flex; flex-direction: column; }
+  .li { display: flex; align-items: center; gap: 14px; padding: 14px 4px; border-top: 1px solid var(--line-2); }
+  .li:first-child { border-top: 0; }
+  .li .dt { width: 50px; text-align: center; flex-shrink: 0; }
+  .li .dt .dm { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .li .dt .dnum { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; }
+  .li .info { flex: 1; min-width: 0; }
+  .li .info .t { font-size: 14.5px; font-weight: 500; }
+  .li .info .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .li .tail { font-size: 12px; color: var(--faint); text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 9px; }
+  .ics-mini { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: rgba(74,54,34,0.04);
+    color: var(--ink); cursor: pointer; display: grid; place-items: center; transition: 0.15s; }
+  .ics-mini:hover { background: color-mix(in oklch, var(--accent) 16%, transparent); border-color: color-mix(in oklch, var(--accent) 50%, transparent); transform: translateY(-1px); }
+
+  /* ---------- Manage / reschedule ---------- */
+  .manage-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
+  .manage-actions { display: flex; gap: 10px; margin-bottom: 12px; }
+  .manage-actions .btn { padding: 13px; font-size: 14px; }
+  .btn.danger-btn { background: linear-gradient(120deg, #c0532f, #a23a22); color: #fbf4e8; }
+  .btn.danger-btn:hover { filter: brightness(1.07); box-shadow: 0 14px 30px -14px rgba(150,50,30,0.5); }
+  .btn-text { display: block; width: 100%; background: transparent; border: 0; color: var(--muted); font-family: var(--font-body);
+    font-size: 13px; padding: 9px; cursor: pointer; transition: 0.15s; border-radius: 9px; margin-top: 2px; }
+  .btn-text:hover { color: var(--ink); background: rgba(74,54,34,0.05); }
+  .lock-note { display: flex; gap: 11px; align-items: flex-start; padding: 14px; border-radius: 13px; margin-bottom: 14px;
+    background: color-mix(in oklch, #c0532f 9%, transparent); border: 1px solid color-mix(in oklch, #c0532f 26%, transparent); }
+  .lock-note svg { color: #bb4a2c; flex-shrink: 0; margin-top: 1px; }
+  .lock-note span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .lock-note b { color: var(--ink); font-weight: 600; }
+  .reschedule-move { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px; border-radius: 14px;
+    border: 1px solid var(--line-2); background: rgba(250,244,233,0.4); margin-bottom: 14px; }
+  .reschedule-move .rm-old, .reschedule-move .rm-new { display: flex; flex-direction: column; }
+  .reschedule-move span { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+  .reschedule-move b { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .reschedule-move .rm-old b { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--muted) 50%, transparent); }
+  .reschedule-move .rm-new b { color: var(--c1); }
+  .rm-arrow { margin: 1px 0; }
+  .pick-prompt { display: flex; gap: 11px; align-items: flex-start; padding: 14px; border-radius: 13px; margin: 14px 0;
+    background: color-mix(in oklch, var(--c1) 9%, transparent); border: 1px solid color-mix(in oklch, var(--c1) 26%, transparent); }
+  .pick-prompt svg { flex-shrink: 0; margin-top: 1px; }
+  .pick-prompt span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .resched-banner { display: flex; align-items: center; gap: 11px; margin: 0 18px; padding: 11px 15px; border-radius: 13px;
+    background: color-mix(in oklch, var(--c1) 12%, transparent); border: 1px solid color-mix(in oklch, var(--c1) 35%, transparent); font-size: 13.5px; }
+  .resched-banner[hidden] { display: none; }
+  .resched-banner b { font-weight: 600; }
+  .resched-banner .banner-x { margin-left: auto; font-family: var(--font-body); font-size: 12.5px; padding: 6px 12px; border-radius: 9px; cursor: pointer;
+    border: 1px solid color-mix(in oklch, var(--c1) 40%, transparent); background: transparent; color: var(--ink); transition: 0.15s; }
+  .resched-banner .banner-x:hover { background: color-mix(in oklch, var(--c1) 18%, transparent); }
+  .li-actions { display: flex; gap: 6px; align-items: center; }
+  .mini-btn { font-family: var(--font-body); font-size: 11.5px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: rgba(74,54,34,0.04); color: var(--ink); cursor: pointer; transition: 0.15s; }
+  .mini-btn:hover { background: color-mix(in oklch, var(--accent) 14%, transparent); border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .mini-btn.danger:hover { background: color-mix(in oklch, #c0532f 14%, transparent); border-color: color-mix(in oklch, #c0532f 50%, transparent); color: #a23a22; }
+  .lock-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--faint); padding: 5px 9px;
+    border-radius: 8px; background: rgba(74,54,34,0.05); border: 1px solid var(--line-2); }
+
+  /* ---------- Teacher portal ---------- */
+  .teach-grid { display: grid; grid-template-columns: 1fr 340px; gap: 22px; margin-top: 26px; align-items: start; }
+  @media (max-width: 1000px) { .teach-grid { grid-template-columns: 1fr; } }
+  .slot.t-open, .slot.t-booked { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 9px 11px; }
+  .slot .ts-time { font-size: 12.5px; font-weight: 600; }
+  .slot .ts-add { font-size: 10.5px; color: var(--faint); letter-spacing: 0.01em; }
+  .slot.t-open:hover .ts-add { color: var(--c1); }
+  .slot.t-booked { background: color-mix(in oklch, var(--good) 13%, transparent); border-color: color-mix(in oklch, var(--good) 30%, transparent); cursor: pointer; }
+  .slot.t-booked:hover { filter: brightness(1.04); }
+  .slot.t-booked .ts-name { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink); }
+  .slot .ts-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .slot.t-open.sel .ts-time, .slot.t-open.sel .ts-add,
+  .slot.t-booked.sel .ts-time, .slot.t-booked.sel .ts-name { color: #fbf4e8; }
+
+  .weeknav .avail-toggle { width: auto; padding: 0 13px; height: 34px; border-radius: 10px; border: 1px solid var(--line);
+    background: rgba(255,255,255,0.02); color: var(--muted); font-family: var(--font-body); font-size: 13px; cursor: pointer;
+    transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; line-height: 1; }
+  .weeknav .avail-toggle:hover { background: rgba(74,54,34,0.06); color: var(--ink); }
+  .weeknav .avail-toggle.active { background: color-mix(in oklch, var(--c1) 16%, transparent); border-color: color-mix(in oklch, var(--c1) 45%, transparent); color: var(--ink); }
+  .slot.avail { display: flex; flex-direction: column; gap: 1px; align-items: flex-start; text-align: left; padding: 7px 10px; }
+  .slot.avail .av-state { font-size: 10px; }
+  .slot.avail-on { border-color: color-mix(in oklch, var(--good) 38%, transparent); background: color-mix(in oklch, var(--good) 10%, transparent); }
+  .slot.avail-on .av-state { color: var(--good); }
+  .slot.avail-off { opacity: 0.55; }
+  .slot.avail-off .ts-time { color: var(--muted); }
+  .slot.avail-off .av-state { color: var(--faint); }
+  .slot.avail:hover { filter: brightness(1.04); transform: translateY(-1px); }
+  .slot.avail-blocked { opacity: 0.4; cursor: default; }
+  .slot.avail-blocked .ts-time { text-decoration: line-through; }
+  .slot.avail-blocked .av-state { color: var(--faint); }
+  .slot.avail-blocked:hover { filter: none; transform: none; }
+  .slot.t-booked.locked { cursor: default; opacity: 0.85; }
+
+  .field-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+  .t-select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: rgba(250,244,233,0.5);
+    border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; cursor: pointer; margin-bottom: 12px; }
+  .t-select:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
+  .custom-add { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-2); }
+  .ca-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .ca-row .ca-day { flex: 1.3; }
+  .ca-row .ca-time { flex: 1; margin-bottom: 0; cursor: text; color-scheme: light; }
+  input.t-select::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
+  .assign-note { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+  .assign-note .warn { color: #b8492c; }
+
+  .roster { display: flex; flex-direction: column; }
+  .rost { display: flex; align-items: center; gap: 14px; padding: 15px 4px; border-top: 1px solid var(--line-2); }
+  .rost:first-child { border-top: 0; }
+  .rinfo { flex: 1; min-width: 0; }
+  .rname { font-size: 14.5px; font-weight: 500; display: flex; align-items: center; gap: 9px; }
+  .rname .you { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c1); font-weight: 600;
+    border: 1px solid color-mix(in oklch, var(--c1) 40%, transparent); padding: 2px 7px; border-radius: 999px; }
+  .rsub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .rcredits { text-align: right; flex-shrink: 0; }
+  .rc-num { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; color: var(--c1); }
+  .rc-lbl { font-size: 10.5px; color: var(--faint); letter-spacing: 0.04em; }
+  .rc-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  @media (max-width: 600px) { .rc-actions { display: none; } }
+  .rost:hover { background: rgba(74,54,34,0.035); }
+
+  /* ---------- Student history modal ---------- */
+  .modal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(40,26,12,0.55); backdrop-filter: blur(7px);
+    display: grid; place-items: center; padding: 24px; animation: fade 0.22s ease; }
+  .modal-overlay[hidden] { display: none; }
+  .modal-card { width: min(460px, 100%); max-height: 84vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 20px; padding: 26px; box-shadow: var(--shadow); position: relative; }
+  .modal-card .nm { font-family: var(--font-display); font-weight: 600; font-size: 18px; display: flex; align-items: center; gap: 9px; }
+  .modal-x { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line);
+    background: rgba(74,54,34,0.05); color: var(--ink); font-size: 18px; cursor: pointer; line-height: 1; transition: 0.15s; }
+  .modal-x:hover { background: rgba(74,54,34,0.1); }
+  .modal-add { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-radius: 14px;
+    background: color-mix(in oklch, var(--c1) 9%, transparent); border: 1px solid color-mix(in oklch, var(--c1) 24%, transparent); }
+  .ma-label { font-size: 13px; font-weight: 500; }
+  .ma-label em { font-style: normal; color: var(--faint); font-size: 11px; display: block; margin-top: 1px; letter-spacing: 0.02em; }
+  .ma-btns { display: flex; gap: 6px; }
+  .modal-txns { max-height: 320px; overflow-y: auto; margin-top: 2px; }
+  .modal-txns::-webkit-scrollbar { width: 8px; }
+  .modal-txns::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+
+  /* ---------- Receipt ---------- */
+  .rcpt-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-family: var(--font-body); font-size: 11px; color: var(--c1);
+    background: transparent; border: 1px solid color-mix(in oklch, var(--c1) 35%, transparent); padding: 3px 9px; border-radius: 7px; cursor: pointer; transition: 0.15s; }
+  .rcpt-link:hover { background: color-mix(in oklch, var(--c1) 12%, transparent); }
+  #receiptModal { z-index: 70; }
+  .receipt-shell { position: relative; width: min(560px, 100%); max-height: 88vh; overflow-y: auto; }
+  .receipt-shell .modal-x { position: absolute; top: 14px; right: 14px; z-index: 3; background: #fff; border-color: rgba(0,0,0,0.12); color: #2a2118; }
+  .receipt-shell .modal-x:hover { background: #f0ebe1; }
+  .receipt-doc { background: #fdfbf6; color: #2a2118; border: 1px solid rgba(0,0,0,0.1); border-radius: 16px; padding: 34px; font-size: 13px; line-height: 1.5; }
+  .receipt-doc .mark { width: 32px; height: 32px; }
+  .receipt-doc .r-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid rgba(0,0,0,0.1); }
+  .r-brand { display: flex; align-items: center; gap: 11px; }
+  .r-brand b { font-family: var(--font-display); font-weight: 700; font-size: 18px; display: block; line-height: 1; color: #2a2118; }
+  .r-brand span { font-size: 11px; color: #8a7c66; }
+  .r-meta { text-align: right; font-size: 12px; color: #6b6052; }
+  .r-meta .r-h { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: #2a2118; margin-bottom: 4px; }
+  .r-parties { display: flex; justify-content: space-between; gap: 24px; padding: 18px 0; font-size: 12.5px; }
+  .r-lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #9a8c75; margin-bottom: 5px; }
+  .r-table { width: 100%; border-collapse: collapse; margin: 4px 0 14px; font-size: 12.5px; }
+  .r-table th { text-align: left; font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #9a8c75; font-weight: 600; padding: 8px 6px; border-bottom: 1px solid rgba(0,0,0,0.14); }
+  .r-table th:nth-child(3), .r-table th:nth-child(4), .r-table td:nth-child(3), .r-table td:nth-child(4) { text-align: right; white-space: nowrap; }
+  .r-table td { padding: 11px 6px; vertical-align: top; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .r-table .r-sub { color: #9a8c75; font-size: 11px; }
+  .r-totals { margin-left: auto; width: 240px; font-size: 12.5px; }
+  .r-row { display: flex; justify-content: space-between; padding: 5px 6px; }
+  .r-grand { border-top: 1px solid rgba(0,0,0,0.16); margin-top: 4px; padding-top: 9px; font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+  .r-vat { margin-top: 18px; padding: 12px 14px; background: #f1ece1; border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; font-size: 11.5px; color: #4a4034; line-height: 1.5; }
+  .r-vat b { font-weight: 600; }
+  .r-foot { margin-top: 16px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 10.5px; color: #9a8c75; }
+  .receipt-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .receipt-actions .btn { width: auto; flex: 1; }
+  @media print {
+    body > *:not(#receiptModal) { display: none !important; }
+    #receiptModal { position: static !important; display: block !important; background: #fff; padding: 0; backdrop-filter: none; }
+    .receipt-shell { width: 100%; max-height: none; overflow: visible; }
+    .receipt-doc { box-shadow: none; border: 0; border-radius: 0; padding: 0; }
+    .receipt-actions, .modal-x { display: none !important; }
+  }
+
+  /* ---------- User menu + auth ---------- */
+  button.avatar { cursor: pointer; font-family: var(--font-body); padding: 0; }
+  .user-wrap { position: relative; }
+  .user-menu { position: absolute; top: 46px; right: 0; width: 234px; background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 8px; z-index: 65; animation: fade 0.15s ease; }
+  .user-menu[hidden] { display: none; }
+  .um-head { display: flex; align-items: center; gap: 11px; padding: 10px 10px 12px; border-bottom: 1px solid var(--line-2); margin-bottom: 6px; }
+  .um-name { font-size: 14px; font-weight: 600; }
+  .um-mail { font-size: 12px; color: var(--muted); }
+  .um-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 0; background: transparent;
+    color: var(--ink); font-family: var(--font-body); font-size: 13.5px; border-radius: 9px; cursor: pointer; transition: 0.15s; }
+  .um-item:hover { background: rgba(74,54,34,0.06); }
+  .um-item svg { color: var(--muted); }
+  .auth-screen { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; }
+  .auth-screen[hidden] { display: none; }
+  .auth-card { width: min(380px, 100%); background: var(--glass); border: 1px solid var(--line); border-radius: 22px;
+    backdrop-filter: blur(18px); box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; }
+  .auth-card .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .auth-h { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; margin: 16px 0 5px; }
+  .auth-sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
+  .auth-input { text-align: left; margin-bottom: 14px; cursor: text; color-scheme: light; width: 100%; }
+  .auth-err { color: #b8492c; font-size: 12.5px; text-align: left; margin: -4px 0 12px; min-height: 0; }
+  .auth-err:empty { display: none; }
+  .auth-card .btn { margin-top: 2px; }
+  .auth-hint { font-size: 11.5px; color: var(--faint); line-height: 1.5; margin-top: 14px; }
+  .auth-hint b { color: var(--muted); font-weight: 600; }
+
+  /* ---------- Buy-credits info ---------- */
+  .buy-card { text-align: center; }
+  .buy-ic { width: 56px; height: 56px; border-radius: 16px; margin: 4px auto 16px; display: grid; place-items: center;
+    background: color-mix(in oklch, var(--c1) 14%, transparent); border: 1px solid color-mix(in oklch, var(--c1) 30%, transparent); color: var(--c1); }
+  .buy-h { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; margin-bottom: 8px; }
+  .buy-p { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 16px; }
+  .buy-contact { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; margin-bottom: 18px;
+    background: rgba(74,54,34,0.05); border: 1px solid var(--line-2); font-size: 13px; }
+  .buy-contact svg { color: var(--muted); }
+  a.btn { display: block; text-align: center; text-decoration: none; }
+  .buy-card .btn.ghost { margin-top: 10px; }
+  .cal-url { display: flex; gap: 8px; margin-bottom: 16px; }
+  .cal-url input { flex: 1; min-width: 0; font-family: var(--font-body); font-size: 12.5px; color: var(--ink);
+    background: rgba(74,54,34,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; text-overflow: ellipsis; }
+  .cal-url .mini-btn { flex-shrink: 0; }
+  .time-edit { display: flex; align-items: center; gap: 12px; }
+  .time-edit .bf-input { width: auto; flex: 0 0 auto; color-scheme: light; }
+  .time-end { font-size: 12.5px; color: var(--muted); }
+  .join-btn { margin-top: 14px; }
+  .join-mini { font-family: var(--font-body); font-size: 11.5px; font-weight: 500; padding: 5px 11px; border-radius: 8px; text-decoration: none;
+    background: linear-gradient(120deg, var(--c1), #b15f39); color: #fbf4e8; white-space: nowrap; transition: 0.15s; }
+  .join-mini:hover { filter: brightness(1.07); }
+
+  /* ---------- Impersonation banner ---------- */
+  .imp-banner { display: flex; align-items: center; gap: 10px; padding: 10px 30px; font-size: 13.5px; color: #4a3514; position: relative; z-index: 31;
+    background: linear-gradient(90deg, color-mix(in oklch, var(--c2) 42%, transparent), color-mix(in oklch, var(--c2) 22%, transparent));
+    border-bottom: 1px solid color-mix(in oklch, var(--c2) 45%, transparent); }
+  .imp-banner[hidden] { display: none; }
+  .imp-banner svg { color: #8a6418; flex-shrink: 0; }
+  .imp-banner b { font-weight: 700; }
+  .imp-banner button { margin-left: auto; font-family: var(--font-body); font-size: 12.5px; padding: 6px 13px; border-radius: 9px; cursor: pointer;
+    border: 1px solid color-mix(in oklch, var(--c1) 45%, transparent); background: var(--bg-2); color: var(--ink); transition: 0.15s; }
+  .imp-banner button:hover { background: var(--bg); }
+
+  /* ---------- Forms (billing + admin) ---------- */
+  .billing-form, .ed-fields { display: flex; flex-direction: column; gap: 12px; }
+  .bf-lab { display: flex; flex-direction: column; gap: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .bf-input { font-family: var(--font-body); font-size: 14px; letter-spacing: normal; text-transform: none; color: var(--ink);
+    background: rgba(250,244,233,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; }
+  .bf-input:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
+  .bf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ---------- Students search bar ---------- */
+  .students-bar { display: flex; align-items: center; gap: 16px; margin-top: 26px; margin-bottom: 4px; }
+  .search-wrap { flex: 1; max-width: 380px; position: relative; display: flex; align-items: center; }
+  .search-wrap svg { position: absolute; left: 14px; width: 17px; height: 17px; color: var(--faint); pointer-events: none; }
+  .search-input { width: 100%; font-family: var(--font-body); font-size: 14.5px; color: var(--ink); padding: 12px 14px 12px 40px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--glass); transition: 0.15s; }
+  .search-input:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); background: rgba(250,244,233,0.7); }
+  .search-input::placeholder { color: var(--faint); }
+  .students-count { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .notes-block { margin: 16px 0 4px; }
+  .notes-ta { width: 100%; min-height: 74px; resize: vertical; font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
+    background: rgba(250,244,233,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; line-height: 1.5; }
+  .notes-ta::placeholder { color: var(--faint); }
+  .notes-ta:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
+  .note-line { font-size: 12px; color: var(--muted); margin-top: 5px; font-style: italic; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .notes-ta.private { background: color-mix(in oklch, var(--c1) 7%, rgba(250,244,233,0.5)); }
+  .lbl-only { color: var(--c1); font-weight: 600; }
+  .snote-add { display: flex; gap: 8px; margin-bottom: 8px; }
+  .snote-input { flex: 1; }
+  .snote-btn { flex-shrink: 0; align-self: stretch; }
+  .snote-log { display: flex; flex-direction: column; }
+  .snote { padding: 11px 2px; border-top: 1px solid var(--line-2); }
+  .snote:first-child { border-top: 0; }
+  .snote-date { font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-bottom: 3px; }
+  .snote-text { font-size: 13.5px; color: var(--ink); line-height: 1.5; }
+
+  /* ---------- Admin portal ---------- */
+  .admin-grid { display: grid; grid-template-columns: 320px 1fr; gap: 22px; margin-top: 26px; align-items: start; }
+  @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+  .admin-list { display: flex; flex-direction: column; }
+  .admin-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px; border: 0; background: transparent;
+    border-radius: 12px; cursor: pointer; transition: 0.15s; color: var(--ink); font-family: var(--font-body); }
+  .admin-item:hover { background: rgba(74,54,34,0.05); }
+  .admin-item.sel { background: color-mix(in oklch, var(--c1) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--c1) 35%, transparent); }
+  .ai-info { min-width: 0; }
+  .ai-name { font-size: 14px; font-weight: 600; }
+  .ai-role { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ed-head { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .ed-avatar { flex-shrink: 0; }
+  .ed-photo-actions { display: flex; align-items: center; justify-content: space-between; flex: 1; gap: 12px; flex-wrap: wrap; }
+  .ed-who .ed-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .ed-who .ed-role { font-size: 12px; color: var(--muted); }
+  .ed-photo-btns { display: flex; gap: 6px; }
+  label.mini-btn { display: inline-flex; align-items: center; }
+  .ed-sub { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+  .ed-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .ed-actions .btn { flex: 1; }
+  .ed-actions .btn.ghost { margin-top: 0; }
+  .admin-packs { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .apack-row { display: grid; grid-template-columns: 0.7fr 1fr 1fr; gap: 10px; }
+  .li .tail .pill2 { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 500;
+    background: color-mix(in oklch, var(--c3) 14%, transparent); color: var(--c3); border: 1px solid color-mix(in oklch, var(--c3) 30%, transparent); }
+  .li .tail .pill2.done { background: rgba(74,54,34,0.06); color: var(--faint); border-color: var(--line-2); }
+  .empty-list { color: var(--faint); font-size: 13px; padding: 22px 4px; text-align: center; }
+
+  .activity .ai { display:flex; align-items:center; gap: 12px; padding: 11px 4px; border-top: 1px solid var(--line-2); font-size: 13.5px; }
+  .activity .ai:first-child { border-top: 0; }
+  .activity .ai .adot { width: 30px; height: 30px; border-radius: 9px; display:grid; place-items:center; font-size:13px; flex-shrink:0; }
+  .activity .ai .at { flex:1; }
+  .activity .ai .at .as { font-size: 12px; color: var(--faint); }
+  .activity .ai .amt { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+  .amt.plus { color: var(--good); } .amt.minus { color: var(--muted); }
+
+  .grid2 { display: grid; gap: 22px; grid-template-columns: 1fr; }
+
+  /* ---------- Toast ---------- */
+  .toast-wrap { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .toast { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: 14px;
+    background: rgba(250,244,233,0.95); border: 1px solid var(--line); backdrop-filter: blur(16px); box-shadow: var(--shadow);
+    font-size: 14px; animation: toastin 0.4s cubic-bezier(.2,.9,.3,1.3); }
+  @keyframes toastin { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: none; } }
+  .toast .ti { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(120deg, var(--good), var(--c2)); color: #fbf4e8; font-weight: 800; }
+
+  .fineprint { text-align: center; color: var(--faint); font-size: 12px; margin-top: 40px; opacity: 0.7; }
+</style>
+</head>
+<body>
+  <div class="field">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+  </div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
+  <div class="app">
+    <div class="imp-banner" id="impBanner" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Viewing as <b id="impName"></b> — exactly what they see.</span>
+      <button id="impExit">Exit to admin</button>
+    </div>
+    <header class="top">
+      <div class="brand">
+        <div class="mark"></div>
+        <div class="wordmark">fluent<span>.</span></div>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-view="book">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+          Book
+        </button>
+        <button class="tab" data-view="account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
+          Account
+        </button>
+        <button class="tab" data-view="games">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6.5" width="19" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg>
+          Practice
+        </button>
+        <button class="tab" data-view="files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Learning
+        </button>
+        <button class="tab" data-view="teacher">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3.5" width="18" height="13" rx="2"/><path d="M3 20.5h18M9 16.5v4M15 16.5v4"/><path d="M7.5 9.5l2.4 2.4L16 6.5"/></svg>
+          Tutor portal
+        </button>
+        <button class="tab" data-view="students">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6.2a3 3 0 0 1 0 5.6M18 19c0-2.3-1-4-2.6-4.6"/></svg>
+          Students
+        </button>
+        <button class="tab" data-view="admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.3 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          Admin
+        </button>
+      </nav>
+      <div class="spacer"></div>
+      <div class="credits-pill" id="creditsPill" title="View your credits">
+        <span class="lbl">Credits</span>
+        <span class="num" id="creditsNum">8</span>
+        <span class="coin"><span id="coinNum">8</span></span>
+      </div>
+      <div class="user-wrap">
+        <button class="avatar" id="meAvatar" style="background: conic-gradient(from 140deg, #d6a25c, #c2714d, #8a9a6b, #d6a25c);">MK</button>
+        <div class="user-menu" id="userMenu" hidden>
+          <div class="um-head">
+            <div class="avatar" id="umAvatar" style="background: conic-gradient(from 140deg, #d6a25c, #c2714d, #8a9a6b, #d6a25c); width:40px; height:40px;">MK</div>
+            <div><div class="um-name" id="umName">Maya Karlsson</div><div class="um-mail" id="umMail">maya@fluent.at</div></div>
+          </div>
+          <button class="um-item" id="logoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="view active" id="view-book">
+        <div class="wrap">
+          <div class="eyebrow">Live availability · 50-minute sessions</div>
+          <h1 class="title">Book your next English session.</h1>
+          <p class="sub">Pick a tutor, choose an open slot, and lock it in. Each session is 50 minutes and costs one credit.</p>
+
+          <div class="book-grid">
+            <div class="panel" style="grid-column: 1;">
+              <div class="tutors" id="tutors"></div>
+              <div class="resched-banner" id="reschedBanner" hidden></div>
+              <div class="cal-head">
+                <div class="month" id="monthLabel">June 2026</div>
+                <div class="weeknav">
+                  <button class="today" id="todayBtn">This week</button>
+                  <button id="prevWeek" aria-label="Previous week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                  <button id="nextWeek" aria-label="Next week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                </div>
+              </div>
+              <div class="cal-scroll">
+                <div class="days-row" id="daysRow"></div>
+              </div>
+            </div>
+
+            <aside class="summary">
+              <div class="panel sum-card" id="sumCard">
+                <div class="sum-empty" id="sumEmpty">
+                  <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M12 13v4M10 15h4" stroke="var(--c3)"/></svg></div>
+                  <h3>No slot selected</h3>
+                  <p>Tap an open time on the calendar to see session details and confirm your booking.</p>
+                </div>
+              </div>
+            </aside>
+          </div>
+          <div class="fineprint">Times shown in your local timezone · GMT+1. Free reschedule or cancellation up to 24 hours before — inside 24h the credit is forfeited.</div>
+        </div>
+      </section>
+
+      <!-- ===================== ACCOUNT VIEW ===================== -->
+      <section class="view" id="view-account">
+        <div class="wrap">
+          <div class="eyebrow">Your account</div>
+          <h1 class="title" id="acctHello">Hello, Maya.</h1>
+          <p class="sub">Manage your credits, top up your balance, and keep an eye on your upcoming sessions.</p>
+
+          <div class="acct-grid">
+            <div class="panel balance">
+              <div class="ring"></div>
+              <div class="ey">Credit balance</div>
+              <div class="big" id="balanceBig">8</div>
+              <div class="unit">credits available · 1 credit = one 50-min session</div>
+              <div class="meta">
+                <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Upcoming</div></div>
+                <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Completed</div></div>
+              </div>
+            </div>
+
+            <div class="panel" style="padding: 24px;">
+              <div class="section-h"><h2>Top up credits</h2></div>
+              <div class="packs" id="packs"></div>
+              <div class="micro" style="margin-top:16px;">Credits never expire. Packs are purchased through your tutor — tap one to get in touch.</div>
+            </div>
+          </div>
+
+          <div class="acct-grid" style="margin-top: 22px;">
+            <div class="panel" style="padding: 24px;">
+              <div class="section-h"><h2>Upcoming sessions</h2><span class="lnk" id="goBook">+ Book another</span></div>
+              <div class="list" id="upcomingList"></div>
+            </div>
+
+            <div class="panel activity" style="padding: 24px;">
+              <div class="section-h"><h2>Recent activity</h2></div>
+              <div id="activityList"></div>
+            </div>
+          </div>
+
+          <div class="panel" style="padding: 24px; margin-top: 22px;" data-comment-anchor="52dba6f243-div">
+            <div class="section-h"><h2>Receipt address</h2><span class="lnk" id="billingSave">Save changes</span></div>
+            <div class="billing-form">
+              <label class="bf-lab">Full name<input class="bf-input" id="bfName" /></label>
+              <label class="bf-lab">Street &amp; no.<input class="bf-input" id="bfLine1" /></label>
+              <div class="bf-grid">
+                <label class="bf-lab">Postcode<input class="bf-input" id="bfZip" /></label>
+                <label class="bf-lab">City<input class="bf-input" id="bfCity" /></label>
+              </div>
+              <label class="bf-lab">Country<input class="bf-input" id="bfCountry" /></label>
+              <div class="micro" style="text-align:left; margin-top:4px;">Used as the billing address on the VAT receipts your tutor issues.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== PRACTICE GAMES ===================== -->
+      <section class="view" id="view-games" data-screen-label="Practice">
+        <div class="wrap">
+          <div class="eyebrow">Practice · between sessions</div>
+          <h1 class="title">Play &amp; practise.</h1>
+          <p class="sub">Quick English games to keep sharp between lessons — no credits needed.</p>
+          <div class="games-menu" id="gamesMenu"></div>
+          <div class="game-host" id="gameHost" hidden>
+            <div class="game-bar">
+              <button class="btn-text" id="gameExit" style="margin:0;">← All games</button>
+              <div class="game-title-mini" id="gameTitleMini"></div>
+            </div>
+            <div class="panel game-panel"><div id="gameProgress"></div><div id="gameStage"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== LEARNING FILES ===================== -->
+      <section class="view" id="view-files" data-screen-label="Learning">
+        <div class="wrap">
+          <div class="eyebrow">Learning files · your curriculum</div>
+          <h1 class="title">Your learning files.</h1>
+          <p class="sub">Worksheets and materials your tutor has unlocked for you, organised by level. Locked lessons open up as you progress.</p>
+          <div id="filesContent"></div>
+        </div>
+      </section>
+
+      <!-- ===================== TEACHER PORTAL ===================== -->
+      <section class="view" id="view-teacher" data-screen-label="Tutor portal">
+        <div class="wrap">
+          <div class="eyebrow">Tutor portal · Davit</div>
+          <h1 class="title">Your studio.</h1>
+          <p class="sub">Add students into open times on your calendar and manage your sessions. Credits, notes and learning files live in the <b>Students</b> tab.</p>
+
+          <div class="teach-grid">
+            <div class="panel">
+              <div class="cal-head">
+                <div class="month" id="tMonthLabel">June 2026</div>
+                <div class="weeknav">
+                  <button class="avail-toggle" id="availToggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability</button>
+                  <button class="today" id="tTodayBtn">This week</button>
+                  <button id="tPrevWeek" aria-label="Previous week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                  <button id="tNextWeek" aria-label="Next week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                </div>
+              </div>
+              <div class="cal-scroll"><div class="days-row" id="tDaysRow"></div></div>
+            </div>
+
+            <aside class="summary">
+              <div class="panel sum-card" id="tSumCard"></div>
+            </aside>
+          </div>
+
+          <div class="section-h" style="margin-top:34px;"><h2>Upcoming sessions</h2><span class="lnk" id="calSyncBtn">↻ Subscribe / sync calendar</span></div>
+          <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorUpcoming"></div></div>
+
+          <div class="section-h" style="margin-top:34px;"><h2>Completed sessions</h2></div>
+          <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorCompleted"></div></div>
+          <div class="fineprint">Adding a student to a slot deducts one of their credits (or books a comp session if they have none). Removing a booking returns the credit.</div>
+        </div>
+      </section>
+
+      <!-- ===================== STUDENTS (tutor) ===================== -->
+      <section class="view" id="view-students" data-screen-label="Students">
+        <div class="wrap">
+          <div class="eyebrow">Tutor portal · your students</div>
+          <h1 class="title">Your students.</h1>
+          <p class="sub">Tap any student to manage their credits, notes, learning files and history.</p>
+          <div class="students-bar">
+            <div class="search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="studentSearch" class="search-input" type="search" placeholder="Search students…" autocomplete="off">
+            </div>
+            <div class="students-count" id="studentsCount"></div>
+          </div>
+          <div class="panel" style="padding: 8px 22px;"><div class="roster" id="rosterList"></div></div>
+        </div>
+      </section>
+
+      <!-- ===================== ADMIN PORTAL ===================== -->
+      <section class="view" id="view-admin" data-screen-label="Admin">
+        <div class="wrap">
+          <div class="eyebrow">Admin · user management</div>
+          <h1 class="title">Manage users.</h1>
+          <p class="sub">Select any tutor or student to edit their name, photo, address and login — or open their account to see exactly what they see.</p>
+
+          <div class="admin-grid">
+            <div class="panel" style="padding: 8px;">
+              <div class="admin-list" id="adminList"></div>
+              <button class="btn ghost" id="adminAddBtn" style="margin:8px; width:calc(100% - 16px);">+ Add student</button>
+            </div>
+            <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
+          </div>
+
+          <div class="panel" style="padding: 24px; margin-top: 22px;">
+            <div class="section-h"><h2>Pricing</h2></div>
+            <div class="bf-grid">
+              <label class="bf-lab">Per-credit price (€) · receipts<input class="bf-input" id="adminPrice" type="number" min="1" /></label>
+              <div></div>
+            </div>
+            <div class="ed-sub">Credit packs shown to students</div>
+            <div class="admin-packs" id="adminPacks"></div>
+            <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Save pricing</button>
+            <div class="micro" style="text-align:left; margin-top:10px;">Per-credit price applies to VAT receipts; packs are what students see under “Top up credits”.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+  <div class="modal-overlay" id="studentModal" hidden></div>
+  <div class="modal-overlay" id="receiptModal" hidden></div>
+  <div class="modal-overlay" id="buyModal" hidden></div>
+  <div class="auth-screen" id="authScreen" hidden>
+    <div class="auth-card">
+      <div class="brand" style="justify-content:center;">
+        <div class="mark"></div>
+        <div class="wordmark">fluent<span>.</span></div>
+      </div>
+      <h2 class="auth-h">Sign in</h2>
+      <p class="auth-sub">Log in to manage your sessions and credits.</p>
+      <label class="field-label" style="text-align:left;">Email</label>
+      <input class="t-select auth-input" id="authEmail" type="email" autocomplete="username" placeholder="you@fluent.at" value="" />
+      <label class="field-label" style="text-align:left;">Password</label>
+      <input class="t-select auth-input" id="authPass" type="password" autocomplete="current-password" placeholder="Your password" value="" />
+      <div class="auth-err" id="authErr"></div>
+      <button class="btn" id="loginBtn"><span class="grainbtn"></span>Log in</button>
+      <div class="auth-hint">Demo logins — <b>maya@fluent.at</b> (student) or <b>davit@fluent.at</b> (tutor). Password: <b>password</b></div>
+    </div>
+  </div>
+
+<script>
+window.DJANGO_DATA = {{ django_data|safe }};
+</script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Data (from Django) ----------
+  const DJ = window.DJANGO_DATA || {};
+  const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  async function api(method, url, body) {
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (r.status === 401) { logout(); return null; }
+      return r.ok ? r.json().catch(() => null) : null;
+    } catch (e) { return null; }
+  }
+
+  const TUTORS = [
+    { id: "davit", name: "Davit", role: "English tutor · Conversation & IELTS", c: ["#c2714d","#a85535"], i: "D" },
+  ];
+  const tutorUser = (DJ.tutors && DJ.tutors[0]) ? {
+    id: DJ.tutors[0].slug,
+    role: "tutor",
+    name: DJ.tutors[0].name,
+    email: DJ.tutors[0].email,
+    i: DJ.tutors[0].initials,
+    c: [DJ.tutors[0].color1, DJ.tutors[0].color2],
+    photo: DJ.tutors[0].photo || null,
+  } : { id:"davit", role:"tutor", name:"Davit Petrosyan", email:"davit@fluent.at", i:"DV", c:["#c2714d","#a85535"], photo:null };
+  const ADMIN = (DJ.role === "admin" && DJ.currentUser) ? {
+    id: DJ.currentUser.slug,
+    role: "admin",
+    name: DJ.currentUser.name,
+    email: DJ.currentUser.email,
+    i: DJ.currentUser.initials,
+    c: [DJ.currentUser.color1, DJ.currentUser.color2],
+    photo: DJ.currentUser.photo || null,
+  } : { id:"admin", role:"admin", name:"Studio Admin", email:"admin@fluent.at", i:"AD", c:["#8a7cb0","#5f5188"], photo:null };
+
+  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=30){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
+  const DOW = ["Mon","Tue","Wed","Thu","Fri"];
+
+  let PACKS = [
+    { n: 1,  price: "€32", each: "€32 / session", feat: false },
+    { n: 5,  price: "€145", each: "€29 / session", feat: true, tag: "Popular" },
+    { n: 10, price: "€270", each: "€27 / session", feat: false },
+  ];
+
+  // deterministic availability per tutor/day/time
+  function seeded(str) { let h = 2166136261; for (let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return ((h>>>0)%1000)/1000; }
+  function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+  function defaultAvail(date,time){ if(toMin(time)%60!==0) return false; return seeded("davit"+keyOf(date)+time) > 0.4; }
+  function slotOpen(date,time){ const k=keyOf(date)+"|"+time; if(k in state.availability) return state.availability[k]; return defaultAvail(date,time); }
+  function bookingConflict(date,time,exclude){ const s=toMin(time), e=s+50; return state.bookings.some(b=>{ if(b.tutorId!=="davit"||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+50; return s<be && bs<e; }); }
+  function dayTimes(date){ const dk=keyOf(date); const extra=state.customTimes[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
+
+  const state = {
+    // static UI state
+    view: "book",
+    credits: 0,
+    tutor: TUTORS[0].id,
+    weekOffset: 0,
+    selected: null,
+    justBooked: null,
+    justAction: "booked",
+    managing: null,
+    rescheduling: null,
+    tWeekOffset: 0,
+    teacherSel: null,
+    teacherManage: null,
+    teacherStudent: null,
+    receipts: [],
+    receiptSeq: (DJ.settings && DJ.settings.receiptSeq) || 1042,
+    availability: DJ.availability || {},
+    customTimes: (() => {
+      const ct = {};
+      Object.entries(DJ.customTimes || {}).forEach(([k, times]) => { ct[k] = times; });
+      return ct;
+    })(),
+    editAvail: false,
+    role: DJ.role || "student",
+    currentUser: DJ.currentUserId || "maya",
+    creditPrice: (DJ.settings && DJ.settings.creditPrice) || 30,
+    impersonating: false,
+    adminSel: "davit",
+    students: (DJ.students || []).map(s => ({
+      ...s,
+      id: s.slug || s.id,
+      c: [s.color1, s.color2],
+      i: s.initials,
+      billing: s.billing || {},
+      log: (DJ.transactions && DJ.transactions[s.slug]) || [],
+      notesLog: (DJ.studentNotes && DJ.studentNotes[s.slug]) || [],
+      activeLessons: (DJ.activeLessons && DJ.activeLessons[s.slug]) || [],
+    })),
+    bookings: (DJ.bookings || []).map(b => ({
+      ...b,
+      _pk: b.pk,
+      studentId: b.studentId,
+      tutorId: b.tutorId,
+      date: new Date(b.date + 'T00:00:00'),
+      time: b.time,
+    })),
+    gameBest: {},
+    studentQuery: "",
+  };
+
+  // Credit packs from settings or fallback
+  if (DJ.settings && DJ.settings.packs && DJ.settings.packs.length) {
+    PACKS.length = 0;
+    DJ.settings.packs.forEach(p => PACKS.push(p));
+  }
+
+  // Load receipts from server
+  if (DJ.receipts) {
+    state.receipts = DJ.receipts.map(r => ({
+      no: r.no,
+      dateStr: r.dateStr,
+      studentName: r.studentName,
+      studentId: r.studentId,
+      billing: r.billing,
+      credits: r.credits,
+      unit: r.unit,
+      net: r.net,
+      total: r.total,
+    }));
+  }
+
+  // Set initial credits from current user data
+  if (DJ.role === "student" && DJ.currentUser) {
+    state.credits = DJ.currentUser.credits || 0;
+  }
+
+  // ---------- Date helpers ----------
+  function startOfWeek(d) { const x = new Date(d); const day = (x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+  function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+  function keyOf(d){ return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate(); }
+  const NOW = new Date(2026,5,1); // Mon Jun 1 2026 — start of a fresh week
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const MONTHS_S = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  // ---------- Element refs ----------
+  const $ = (s) => document.querySelector(s);
+  const tutorsEl = $("#tutors");
+  const daysRow = $("#daysRow");
+  const monthLabel = $("#monthLabel");
+  const sumCard = $("#sumCard");
+
+  function tutorById(id){ return TUTORS.find(t=>t.id===id); }
+  function studentById(id){ return state.students.find(s=>s.id===id); }
+  function allAccounts(){ return [tutorUser, ...state.students]; }
+  function accountByEmail(email){ return [ADMIN, tutorUser, ...state.students].find(u=>u.email.toLowerCase()===email); }
+  function accountById(id){ if(id==="davit") return tutorUser; if(id==="admin") return ADMIN; return studentById(id); }
+  function meLog(){ return studentById(state.currentUser).log; }
+
+  // ---------- Receipts (Austrian, VAT-exempt) ----------
+  const SUPPLIER = { name:"Davit Petrosyan e.U.", line2:"Englisch-Privatunterricht", addr:"Lindengasse 12/4", city:"1070 Wien, \u00d6sterreich", email:"davit@fluent.at" };
+  const VAT_DE = "Steuerfrei gem\u00e4\u00df \u00a7 6 Abs. 1 Z 11 UStG (Unterrichtsleistung eines Privatlehrers).";
+  const VAT_EN = "VAT-exempt educational service under Austrian law \u2014 no value-added tax is charged.";
+  function money(x){ return x.toFixed(2).replace(".", ","); }
+  function fmtAT(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  function issueReceipt(s, n, dateStr){
+    const no = "RE-"+NOW.getFullYear()+"-"+String(state.receiptSeq++).padStart(4,"0");
+    const r = { no, dateStr: dateStr || fmtAT(NOW), studentName: s.name, studentId: s.id, billing: (s.billing?{...s.billing}:null), credits: n, unit: state.creditPrice, net: n*state.creditPrice, total: n*state.creditPrice };
+    state.receipts.push(r);
+    return r;
+  }
+  function findReceipt(no){ return state.receipts.find(r=>r.no===no); }
+  function openReceiptNo(no){ const r=findReceipt(no); if(r) openReceipt(r); }
+  function bindReceiptLinks(root){ if(!root) return; root.querySelectorAll("[data-receipt]").forEach(el=> el.onclick=(e)=>{ e.stopPropagation(); openReceiptNo(el.dataset.receipt); }); }
+
+  function receiptDocHtml(r){
+    return `<div class="receipt-doc">
+      <div class="r-top">
+        <div class="r-brand"><div class="mark"></div><div><b>fluent.</b><span>English tutoring</span></div></div>
+        <div class="r-meta"><div class="r-h">Beleg · Receipt</div><div>Nr. ${r.no}</div><div>${r.dateStr}</div></div>
+      </div>
+      <div class="r-parties">
+        <div><div class="r-lbl">Leistungserbringer · From</div>${SUPPLIER.name}<br/>${SUPPLIER.line2}<br/>${SUPPLIER.addr}<br/>${SUPPLIER.city}<br/>${SUPPLIER.email}</div>
+        <div><div class="r-lbl">Empfänger · Billed to</div>${r.studentName}${r.billing?'<br/>'+r.billing.line1+'<br/>'+r.billing.postcode+' '+r.billing.city+'<br/>'+r.billing.country:''}</div>
+      </div>
+      <table class="r-table">
+        <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
+        <tbody><tr><td>${r.credits}</td><td>Guthaben für Englisch-Einzelunterricht<br/><span class="r-sub">1 Guthaben = eine 50-Minuten-Einheit</span></td><td>€ ${money(r.unit)}</td><td>€ ${money(r.net)}</td></tr></tbody>
+      </table>
+      <div class="r-totals">
+        <div class="r-row"><span>Nettobetrag · Net</span><span>€ ${money(r.net)}</span></div>
+        <div class="r-row"><span>USt · VAT (0%)</span><span>€ 0,00</span></div>
+        <div class="r-row r-grand"><span>Gesamt · Total</span><span>€ ${money(r.total)}</span></div>
+      </div>
+      <div class="r-vat"><b>${VAT_DE}</b><br/>${VAT_EN}</div>
+      <div class="r-foot"><div>Zahlung · Payment: Externe Überweisung — bezahlt</div><div>Automatisch ausgestellter Beleg</div></div>
+    </div>`;
+  }
+  function openReceipt(r){
+    const m=$("#receiptModal");
+    m.innerHTML = `<div class="receipt-shell" id="receiptShell">
+      <button class="modal-x" id="rcptX" aria-label="Close">×</button>
+      ${receiptDocHtml(r)}
+      <div class="receipt-actions">
+        <button class="btn ghost" id="rcptClose">Done</button>
+        <button class="btn" id="rcptPrint"><span class="grainbtn"></span>Print / Save PDF</button>
+      </div>
+    </div>`;
+    m.hidden=false;
+    $("#receiptShell").onclick=(e)=>e.stopPropagation();
+    $("#rcptX").onclick = closeReceipt;
+    $("#rcptClose").onclick = closeReceipt;
+    $("#rcptPrint").onclick = ()=>window.print();
+  }
+  function closeReceipt(){ $("#receiptModal").hidden=true; }
+  function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; s.credits=Math.max(0, val); if(id===state.currentUser){ state.credits=s.credits; updateCredits(); } }
+  function addStudentCredits(id, n){ const s=studentById(id); if(!s) return; setStudentCredits(id, s.credits + n); }
+  function avatarStyle(t){ if(t && t.photo) return `background-image:url('${t.photo}'); background-size:cover; background-position:center; color:transparent;`; const c=(t&&t.c)||["#c2714d","#a85535"]; return `background: conic-gradient(from 140deg, ${c[0]}, ${c[1]}, ${c[0]});`; }
+
+  // ---------- Render tutors ----------
+  function renderTutors() {
+    tutorsEl.innerHTML = "";
+    TUTORS.forEach(t => {
+      const chip = document.createElement("div");
+      chip.className = "tutor-chip" + (t.id===state.tutor ? " sel" : "");
+      chip.innerHTML = `<div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
+        <div><div class="tn">${t.name}</div><div class="tm">${t.role}</div></div>`;
+      chip.onclick = () => { state.tutor = t.id; state.selected = null; renderTutors(); renderWeek(); renderSummary(); };
+      tutorsEl.appendChild(chip);
+    });
+  }
+
+  // ---------- Render week ----------
+  function renderWeek() {
+    const weekStart = addDays(startOfWeek(NOW), state.weekOffset*7);
+    const _rb = document.getElementById("reschedBanner");
+    if (_rb) {
+      if (state.rescheduling) {
+        _rb.hidden = false;
+        _rb.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.9"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
+          <span>Rescheduling <b>${state.rescheduling.title}</b> — pick a new open time below.</span>
+          <button class="banner-x" id="bannerCancel">Cancel</button>`;
+        _rb.querySelector("#bannerCancel").onclick = cancelReschedule;
+      } else { _rb.hidden = true; }
+    }
+    const firstMonth = weekStart.getMonth(), lastMonth = addDays(weekStart,4).getMonth();
+    monthLabel.textContent = firstMonth===lastMonth
+      ? MONTHS[firstMonth]+" "+weekStart.getFullYear()
+      : MONTHS_S[firstMonth]+" – "+MONTHS_S[lastMonth]+" "+weekStart.getFullYear();
+
+    daysRow.innerHTML = "";
+    for (let i=0;i<5;i++) {
+      const date = addDays(weekStart, i);
+      const isToday = sameDay(date, NOW);
+      const isPast = date < NOW && !isToday;
+      const col = document.createElement("div");
+      col.className = "day-col";
+
+      const head = document.createElement("div");
+      head.className = "day-name" + (isToday ? " is-today" : "");
+      head.innerHTML = `<div class="dn">${DOW[i]}</div><div class="dd">${date.getDate()}</div>${isToday?'<div class="pip"></div>':''}`;
+      col.appendChild(head);
+
+      const slots = document.createElement("div");
+      slots.className = "slots";
+      let any = false;
+      dayTimes(date).forEach(time => {
+        const dk = keyOf(date);
+        const myBk = state.bookings.find(b => b.studentId===state.currentUser && b.tutorId===state.tutor && sameDay(b.date,date) && b.time===time);
+        const booked = !!myBk;
+        const open = !isPast && slotOpen(date,time) && !bookingConflict(date,time); // unavailable if its 50 min overlap a booking
+        if (!open && !booked) return; // skip closed/conflicting slots
+        any = true;
+        const el = document.createElement("button");
+        const isSel = state.selected && state.selected.dateKey===dk && state.selected.time===time && state.selected.tutorId===state.tutor;
+        el.className = "slot" + (booked?" booked":"") + (isSel?" sel":"");
+        el.textContent = time;
+        if (booked) {
+          if (!state.rescheduling) {
+            el.title = "Manage this booking";
+            el.style.cursor = "pointer";
+            el.onclick = () => openManage(state.bookings.find(x => x.studentId===state.currentUser && x.tutorId===state.tutor && sameDay(x.date,date) && x.time===time));
+          }
+        } else {
+          el.onclick = () => selectSlot(date, time);
+        }
+        slots.appendChild(el);
+      });
+      if (!any) { const n = document.createElement("div"); n.className="no-slot"; n.textContent = isPast? "—" : "Full"; slots.appendChild(n); }
+      col.appendChild(slots);
+      daysRow.appendChild(col);
+    }
+  }
+
+  function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
+  const DOW_FULL = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+
+  function selectSlot(date, time) {
+    state.justBooked = null; state.managing = null;
+    state.selected = { tutorId: (state.rescheduling ? state.rescheduling.tutorId : state.tutor), dateKey: keyOf(date), date: new Date(date), time, };
+    renderWeek(); renderSummary();
+  }
+
+  // ---------- Reschedule / cancel ----------
+  function bookingStart(b){ const [h,m]=b.time.split(":").map(Number); const dt=new Date(b.date); dt.setHours(h,m,0,0); return dt; }
+  function canModify(b){ return (bookingStart(b) - NOW) >= 24*3600000; }
+
+  function openManage(b){ if(!b) return; state.selected=null; state.justBooked=null; state.rescheduling=null; state.managing=b; setView("book"); renderWeek(); renderSummary(); document.querySelector("#main").scrollTop=0; }
+
+  function startReschedule(b){ state.managing=null; state.justBooked=null; state.selected=null; state.rescheduling=b; setView("book"); renderWeek(); renderSummary(); document.querySelector("#main").scrollTop=0; toast("Pick a new time for your session"); }
+
+  function cancelReschedule(){ const b=state.rescheduling; state.rescheduling=null; state.selected=null; state.managing=b; renderWeek(); renderSummary(); }
+
+  function confirmReschedule(){
+    const b=state.rescheduling, s=state.selected; if(!b||!s) return;
+    const t=tutorById(b.tutorId);
+    b.date=new Date(s.date); b.time=s.time;
+    meLog().unshift({ type:"book", label:"Rescheduled with "+t.name, sub:"Now "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate()+" · "+b.time, amt:"" });
+    if (b._pk) api('PUT', '/api/bookings/' + b._pk + '/', { date: b.date.toISOString().split('T')[0], time: b.time });
+    state.rescheduling=null; state.selected=null; state.managing=null;
+    state.justBooked=b; state.justAction="rescheduled";
+    renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
+    toast("Session rescheduled to "+b.time);
+  }
+
+  function cancelBooking(b){
+    const i=state.bookings.indexOf(b); if(i<0) return;
+    const refund=canModify(b);
+    state.bookings.splice(i,1);
+    if(refund){ state.credits+=1; }
+    const t=tutorById(b.tutorId);
+    meLog().unshift({ type: refund?"buy":"done", label: refund?"Cancelled \u2014 credit refunded":"Cancelled (within 24h)", sub: t.name+" \u00b7 "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate(), amt: refund?"+1":"" });
+    if (b._pk) api('DELETE', '/api/bookings/' + b._pk + '/');
+    if (refund) { const _s = studentById(b.studentId); if (_s) _s.credits += 1; }
+    state.managing=null; state.selected=null; state.justBooked=null;
+    updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
+    toast(refund ? "Session cancelled \u00b7 1 credit refunded" : "Session cancelled");
+  }
+
+  // ---------- Calendar (.ics) export ----------
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function icsStamp(d, time){ const [h,m]=time.split(":").map(Number); return d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+"T"+pad2(h)+pad2(m)+"00"; }
+  function buildIcs(b){
+    const t = tutorById(b.tutorId);
+    const [h,m] = b.time.split(":").map(Number);
+    const end = new Date(b.date); end.setHours(h, m+50, 0, 0);
+    const dt = icsStamp(b.date, b.time);
+    const dtEnd = end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate())+"T"+pad2(end.getHours())+pad2(end.getMinutes())+"00";
+    return [
+      "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//English Tutoring//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
+      "BEGIN:VEVENT","UID:fluent-"+b.tutorId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
+      "SUMMARY:English session with "+t.name,
+      "DESCRIPTION:50-minute 1-on-1 English tutoring ("+t.role+") with "+t.name+" on Fluent.",
+      "LOCATION:"+(b.callLink||"Fluent video call"),"STATUS:CONFIRMED",
+      "BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:Your Fluent session starts in 30 minutes","END:VALARM",
+      "END:VEVENT","END:VCALENDAR"
+    ].join("\r\n");
+  }
+  function downloadIcs(b){
+    const t = tutorById(b.tutorId);
+    const blob = new Blob([buildIcs(b)], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fluent-"+t.name.split(" ")[0].toLowerCase()+"-"+icsStamp(b.date,b.time)+".ics";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    toast("Calendar invite (.ics) downloaded");
+  }
+  function icsEsc(t){ return String(t==null?"":t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
+  function buildIcsAll(){
+    const evs = state.bookings.filter(b=>b.tutorId==="davit").sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
+    const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//Tutor Schedule//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEsc("Fluent — Davit’s sessions"),"REFRESH-INTERVAL;VALUE=DURATION:PT1H","X-PUBLISHED-TTL:PT1H"];
+    evs.forEach(b=>{
+      const s=studentById(b.studentId);
+      const [h,m]=b.time.split(":").map(Number);
+      const end=new Date(b.date); end.setHours(h,m+50,0,0);
+      const dt=icsStamp(b.date,b.time);
+      const dtEnd=end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate())+"T"+pad2(end.getHours())+pad2(end.getMinutes())+"00";
+      lines.push("BEGIN:VEVENT","UID:fluent-"+b.studentId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
+        "SUMMARY:"+icsEsc((b.title||"English session")+" — "+(s?s.name:"")),
+        "DESCRIPTION:"+icsEsc(b.notes||"50-minute 1-on-1 session"),
+        "LOCATION:"+icsEsc(b.callLink||"Fluent video call"),"STATUS:CONFIRMED","END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+  function downloadIcsAll(){
+    const blob=new Blob([buildIcsAll()],{type:"text/calendar;charset=utf-8"});
+    const url=URL.createObjectURL(blob); const a=document.createElement("a");
+    a.href=url; a.download="fluent-davit-schedule.ics"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500); toast("Full schedule (.ics) downloaded");
+  }
+  const CAL_FEED = "webcal://calendar.fluent.app/feeds/davit-7f3a9c.ics";
+  function openCalSync(){
+    const m=$("#buyModal");
+    const gcal="https://calendar.google.com/calendar/render?cid="+encodeURIComponent(CAL_FEED);
+    m.innerHTML=`<div class="modal-card buy-card" id="buyCard">
+      <button class="modal-x" id="buyX" aria-label="Close">×</button>
+      <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8.5 15.5a3 3 0 1 0 3-3"/></svg></div>
+      <h3 class="buy-h">Subscribe to your schedule</h3>
+      <p class="buy-p">Add this live feed once — new bookings, reschedules and cancellations sync to your calendar automatically, no re-downloading.</p>
+      <div class="cal-url"><input id="calUrl" readonly value="${CAL_FEED}"><button class="mini-btn" id="calCopy">Copy</button></div>
+      <a class="btn" href="${CAL_FEED}">Subscribe · Apple &amp; Outlook</a>
+      <a class="btn ghost" href="${gcal}" target="_blank" rel="noopener">Add to Google Calendar</a>
+      <button class="btn-text" id="calDownload">Or download a one-off .ics</button>
+    </div>`;
+    m.hidden=false;
+    $("#buyCard").onclick=(e)=>e.stopPropagation();
+    $("#buyX").onclick=closeBuy;
+    $("#calCopy").onclick=()=>{ const i=$("#calUrl"); i.select(); let done=false; try{ const p=navigator.clipboard&&navigator.clipboard.writeText(i.value); if(p&&p.then){ p.then(()=>{}).catch(()=>{ try{document.execCommand("copy");}catch(e){} }); done=true; } }catch(e){} if(!done){ try{document.execCommand("copy");}catch(e){} } toast("Subscription link copied"); };
+    $("#calDownload").onclick=downloadIcsAll;
+  }
+
+  // ---------- Render summary ----------
+  function renderSummary() {
+    // ----- Reschedule mode -----
+    if (state.rescheduling) {
+      const b = state.rescheduling, t = tutorById(b.tutorId);
+      if (state.selected) {
+        const d = state.selected.date;
+        sumCard.innerHTML = `
+          <div class="manage-eyebrow">Reschedule session</div>
+          <div class="reschedule-move">
+            <div class="rm-old"><span>From</span><b>${fmtLong(b.date)} · ${b.time}</b></div>
+            <svg class="rm-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="2"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+            <div class="rm-new"><span>To</span><b>${fmtLong(d)} · ${state.selected.time}</b></div>
+          </div>
+          <div class="micro" style="margin:0 0 16px;">No credit charged — you're moving an existing session.</div>
+          <button class="btn" id="reschConfirm"><span class="grainbtn"></span>Confirm new time</button>
+          <button class="btn ghost" id="reschCancel" style="margin-top:10px;">Cancel rescheduling</button>
+        `;
+        $("#reschConfirm").onclick = confirmReschedule;
+        $("#reschCancel").onclick = cancelReschedule;
+      } else {
+        sumCard.innerHTML = `
+          <div class="manage-eyebrow">Reschedule session</div>
+          <div class="sum-head">
+            <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
+            <div><div class="nm">${b.title}</div><div class="rl">Currently ${fmtLong(b.date)} · ${b.time}</div></div>
+          </div>
+          <div class="pick-prompt">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span>Tap any open slot on the calendar to move this session.</span>
+          </div>
+          <button class="btn ghost" id="reschCancel">Cancel rescheduling</button>
+        `;
+        $("#reschCancel").onclick = cancelReschedule;
+      }
+      return;
+    }
+
+    // ----- Just booked / rescheduled confirmation -----
+    if (state.justBooked) {
+      const b = state.justBooked, t = tutorById(b.tutorId);
+      const resched = state.justAction === "rescheduled";
+      sumCard.innerHTML = `
+        <div class="sum-confirm">
+          <div class="confirm-badge">✓</div>
+          <h3 class="confirm-h">${resched ? "Rescheduled!" : "You’re booked!"}</h3>
+          <p class="confirm-p">${fmtLong(b.date)}<br/>${b.time} – ${endTime(b.time)} with ${t.name}</p>
+        </div>
+        <button class="btn" id="icsBtn">
+          <span class="grainbtn"></span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
+          ${resched ? "Update calendar" : "Add to calendar"}
+        </button>
+        <button class="btn ghost" id="bookMoreBtn" style="margin-top:10px;">Done</button>
+        <div class="micro">Downloads an <b style='color:var(--c1)'>.ics</b> file — opens in Apple Calendar, Google Calendar or Outlook.</div>
+      `;
+      $("#icsBtn").onclick = ()=>downloadIcs(b);
+      $("#bookMoreBtn").onclick = ()=>{ state.justBooked=null; renderSummary(); };
+      return;
+    }
+
+    // ----- Manage an existing booking -----
+    if (state.managing) {
+      const b = state.managing, t = tutorById(b.tutorId), mod = canModify(b);
+      sumCard.innerHTML = `
+        <div class="manage-eyebrow">Manage booking</div>
+        <div class="sum-head">
+          <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
+          <div><div class="nm">${b.title}</div><div class="rl">with ${t.name}</div></div>
+        </div>
+        <div class="sum-rows">
+          <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(b.date)}</span></div>
+          <div class="sum-row"><span class="k">Time</span><span class="v hl">${b.time} – ${endTime(b.time)}</span></div>
+          <div class="sum-row"><span class="k">Duration</span><span class="v">50 minutes</span></div>
+        </div>
+        ${b.callLink?`<a class="btn join-btn" href="${escHtml(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Join call</a>`:`<div class="micro" style="text-align:left;margin:2px 0 0;">Your tutor will post the call link here before the session.</div>`}
+        <div class="notes-block">
+          <label class="field-label">What to discuss</label>
+          <textarea class="notes-ta" id="noteTA" placeholder="Topics, questions or goals for this session…">${escHtml(b.notes)}</textarea>
+          <div class="micro" style="text-align:left;margin:6px 0 0;">Shared with your tutor.</div>
+        </div>
+        ${mod ? `
+          <div class="manage-actions">
+            <button class="btn ghost" id="reschBtn">Reschedule</button>
+            <button class="btn danger-btn" id="cancelBtn"><span class="grainbtn"></span>Cancel</button>
+          </div>
+          <div class="micro">More than 24h away — reschedule for free, or cancel to get your <b style='color:var(--c1)'>1 credit</b> back.</div>
+        ` : `
+          <div class="lock-note">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <span><b>Within 24 hours of your session.</b> It can no longer be rescheduled or cancelled — the credit is forfeited if you don’t attend.</span>
+          </div>
+          <div class="manage-actions">
+            <button class="btn ghost" disabled>Reschedule</button>
+            <button class="btn ghost" disabled>Cancel</button>
+          </div>
+        `}
+        <button class="btn-text" id="manageIcs">Add to calendar (.ics)</button>
+        <button class="btn-text" id="manageBack">← Back to calendar</button>
+      `;
+      if (mod) {
+        $("#reschBtn").onclick = ()=>startReschedule(b);
+        $("#cancelBtn").onclick = ()=>cancelBooking(b);
+      }
+      $("#manageIcs").onclick = ()=>downloadIcs(b);
+      $("#manageBack").onclick = ()=>{ state.managing=null; renderSummary(); };
+      const _ta=$("#noteTA"); if(_ta){ _ta.oninput=(e)=>{ b.notes=e.target.value; }; _ta.onblur=()=>{ renderAccount(); renderTutorLists(); if (b._pk) api('PUT', '/api/bookings/' + b._pk + '/', { notes: b.notes }); }; }
+      return;
+    }
+
+    if (!state.selected) {
+      sumCard.innerHTML = `<div class="sum-empty">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M12 13v4M10 15h4" stroke="var(--c3)"/></svg></div>
+        <h3>No slot selected</h3>
+        <p>Tap an open time on the calendar to see session details and confirm your booking.</p>
+      </div>`;
+      return;
+    }
+    const t = tutorById(state.selected.tutorId);
+    const d = state.selected.date;
+    const noCredit = state.credits < 1;
+    sumCard.innerHTML = `
+      <div class="sum-head">
+        <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
+        <div><div class="nm">${t.name}</div><div class="rl">${t.role} tutor</div></div>
+      </div>
+      <div class="sum-rows">
+        <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(d)}</span></div>
+        <div class="sum-row"><span class="k">Time</span><span class="v hl">${state.selected.time} – ${endTime(state.selected.time)}</span></div>
+        <div class="sum-row"><span class="k">Duration</span><span class="v">50 minutes</span></div>
+        <div class="sum-row"><span class="k">Format</span><span class="v">1-on-1 · Video</span></div>
+      </div>
+      <div class="cost">
+        <span class="k">Cost</span>
+        <span class="v">1 <span style="font-size:13px;color:var(--muted);font-weight:400;">credit</span></span>
+      </div>
+      <button class="btn" id="confirmBtn" ${noCredit?"disabled":""}>
+        <span class="grainbtn"></span>${noCredit ? "Not enough credits" : "Confirm booking"}
+      </button>
+      <div class="micro">${noCredit ? "Top up in your Account to book this session." : "You have <b style='color:var(--c1)'>"+state.credits+"</b> credits · this uses 1. Free reschedule or cancellation up to 24h before."}</div>
+    `;
+    const cb = $("#confirmBtn");
+    if (cb && !noCredit) cb.onclick = confirmBooking;
+  }
+
+  function confirmBooking() {
+    const s = state.selected; if (!s) return;
+    const t = tutorById(s.tutorId);
+    state.credits -= 1;
+    const booking = { studentId: state.currentUser, tutorId: s.tutorId, date: new Date(s.date), time: s.time, title: "English session" };
+    state.bookings.push(booking);
+    meLog().unshift({ type:"book", label:"Booked with "+t.name, sub: "Session · "+MONTHS_S[s.date.getMonth()]+" "+s.date.getDate(), amt:"-1" });
+    state.selected = null;
+    state.justBooked = booking; state.justAction = "booked";
+    updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
+    toast(`Session booked with ${t.name.split(" ")[0]} · ${s.time}`);
+    api('POST', '/api/bookings/', {
+      studentSlug: state.currentUser,
+      tutorSlug: s.tutorId,
+      date: s.date.toISOString().split('T')[0],
+      time: s.time,
+      title: 'English session',
+    }).then(r => { if (r && r.pk) booking._pk = r.pk; });
+  }
+
+  // ---------- Credits ----------
+  function updateCredits() {
+    if (state.students) { const _m = state.students.find(s=>s.id===state.currentUser); if (_m) _m.credits = state.credits; }
+    $("#creditsNum").textContent = state.credits;
+    $("#coinNum").textContent = state.credits;
+    $("#balanceBig").textContent = state.credits;
+    $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length;
+  }
+
+  // ---------- Account ----------
+  function renderPacks() {
+    const el = $("#packs"); el.innerHTML="";
+    PACKS.forEach(p => {
+      const d = document.createElement("div");
+      d.className = "pack" + (p.feat?" feat":"");
+      d.innerHTML = `${p.tag?`<span class="tag">${p.tag}</span>`:""}
+        <div class="pc">${p.n}</div><div class="pl">credit${p.n>1?"s":""}</div>
+        <div class="pp">${p.price}</div><div class="pe">${p.each}</div>`;
+      d.onclick = () => openBuyInfo(p);
+      el.appendChild(d);
+    });
+  }
+  function openBuyInfo(p){
+    const m=$("#buyModal");
+    m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
+      <button class="modal-x" id="buyX" aria-label="Close">×</button>
+      <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg></div>
+      <h3 class="buy-h">Credits are added by your tutor</h3>
+      <p class="buy-p">To get the <b>${p.n}-credit pack</b> (<b>${p.price}</b>), message Davit. He adds the credits to your balance and an Austrian VAT receipt is issued to you automatically.</p>
+      <div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>davit@fluent.at</span></div>
+      <a class="btn" id="buyMail" href="mailto:davit@fluent.at?subject=${encodeURIComponent('Credit top-up — '+p.n+'-credit pack')}&body=${encodeURIComponent('Hi Davit, I\u2019d like to buy the '+p.n+'-credit pack ('+p.price+'). Thanks!')}"><span class="grainbtn"></span>Message tutor</a>
+      <button class="btn ghost" id="buyClose">Close</button>
+    </div>`;
+    m.hidden=false;
+    $("#buyCard").onclick=(e)=>e.stopPropagation();
+    $("#buyX").onclick=closeBuy; $("#buyClose").onclick=closeBuy;
+  }
+  function closeBuy(){ $("#buyModal").hidden=true; }
+
+  function renderUpcoming() {
+    const el = $("#upcomingList"); el.innerHTML="";
+    const up = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).sort((a,b)=>a.date-b.date);
+    if (!up.length) { el.innerHTML = `<div class="empty-list">No upcoming sessions yet — book one from the calendar.</div>`; return; }
+    up.forEach(b => {
+      const t = tutorById(b.tutorId);
+      const row = document.createElement("div"); row.className="li";
+      const mod = canModify(b);
+      row.innerHTML = `
+        <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
+        <div class="avatar" style="${avatarStyle(t)};width:38px;height:38px;font-size:13px;">${t.i}</div>
+        <div class="info"><div class="t">${b.title}</div><div class="s">${t.name} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
+        <div class="tail">
+          ${b.callLink?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener" title="Join call">Join</a>`:""}
+          <button class="ics-mini" title="Add to calendar (.ics)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></button>
+          <div class="li-actions">
+            ${mod
+              ? `<button class="mini-btn resch">Reschedule</button><button class="mini-btn danger cancel">Cancel</button>`
+              : `<span class="lock-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> within 24h</span>`}
+          </div>
+        </div>`;
+      row.querySelector(".ics-mini").onclick = ()=>downloadIcs(b);
+      if (mod) {
+        row.querySelector(".resch").onclick = ()=>startReschedule(b);
+        row.querySelector(".cancel").onclick = ()=>cancelBooking(b);
+      }
+      el.appendChild(row);
+    });
+  }
+
+  const TXN_ICONS = {
+    book: { bg:"linear-gradient(120deg,var(--c1),var(--c2))", t:"📅" },
+    buy:  { bg:"linear-gradient(120deg,var(--good),var(--c2))", t:"＋" },
+    done: { bg:"rgba(74,54,34,0.12)", t:"✓" },
+  };
+  function txnHtml(log) {
+    if (!log || !log.length) return `<div class="empty-list">No transactions yet.</div>`;
+    return log.map(a => {
+      const ic = TXN_ICONS[a.type] || TXN_ICONS.done;
+      const amtCls = a.amt.startsWith("+")?"plus":(a.amt.startsWith("-")?"minus":"");
+      return `<div class="ai"><div class="adot" style="background:${ic.bg}">${ic.t}</div>
+        <div class="at"><div>${a.label}</div><div class="as">${a.sub}</div>${a.receiptNo?`<button class="rcpt-link" data-receipt="${a.receiptNo}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${a.receiptNo}</button>`:""}</div>
+        ${a.amt?`<div class="amt ${amtCls}">${a.amt}</div>`:""}</div>`;
+    }).join("");
+  }
+  function renderActivity() { $("#activityList").innerHTML = txnHtml(meLog()); bindReceiptLinks($("#activityList")); }
+
+  function renderAccount() { updateCredits(); renderUpcoming(); renderActivity(); $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length; }
+
+  // ---------- Teacher portal ----------
+  function renderTeacherWeek() {
+    const weekStart = addDays(startOfWeek(NOW), state.tWeekOffset*7);
+    const fM=weekStart.getMonth(), lM=addDays(weekStart,4).getMonth();
+    $("#tMonthLabel").textContent = fM===lM ? MONTHS[fM]+" "+weekStart.getFullYear() : MONTHS_S[fM]+" – "+MONTHS_S[lM]+" "+weekStart.getFullYear();
+    const row = $("#tDaysRow"); row.innerHTML="";
+    for (let i=0;i<5;i++) {
+      const date=addDays(weekStart,i), isToday=sameDay(date,NOW), isPast=date<NOW&&!isToday;
+      const col=document.createElement("div"); col.className="day-col";
+      const head=document.createElement("div"); head.className="day-name"+(isToday?" is-today":"");
+      head.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${date.getDate()}</div>${isToday?'<div class="pip"></div>':''}`;
+      col.appendChild(head);
+      const slots=document.createElement("div"); slots.className="slots"; let any=false;
+      dayTimes(date).forEach(time=>{
+        const dk=keyOf(date);
+        const bk=state.bookings.find(b=>b.tutorId==="davit"&&sameDay(b.date,date)&&b.time===time);
+        const conflict = bookingConflict(date,time);
+        const open = !isPast && slotOpen(date,time) && !conflict;
+        if(state.editAvail){
+          if(isPast) return;
+          any=true;
+          const el=document.createElement("button");
+          if(bk){
+            const s=studentById(bk.studentId);
+            el.className="slot t-booked locked";
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}</span>`;
+            el.onclick=()=>toast("Booked time can\u2019t be closed");
+          } else if(conflict){
+            el.className="slot avail avail-blocked";
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">Booked nearby</span>`;
+            el.onclick=()=>toast("Within 50 min of a booking");
+          } else {
+            const on=slotOpen(date,time);
+            el.className="slot avail "+(on?"avail-on":"avail-off");
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">${on?"Available":"Off"}</span>`;
+            el.onclick=()=>toggleAvail(date,time);
+          }
+          slots.appendChild(el);
+          return;
+        }
+        if(!open && !bk) return;
+        any=true;
+        const el=document.createElement("button");
+        if(bk){
+          const s=studentById(bk.studentId);
+          el.className="slot t-booked"+(state.teacherManage===bk?" sel":"");
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}</span>`;
+          el.onclick=()=>teacherManageSlot(bk);
+        } else {
+          const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
+          el.className="slot t-open"+(isSel?" sel":"");
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ add student</span>`;
+          el.onclick=()=>teacherSelectSlot(date,time);
+        }
+        slots.appendChild(el);
+      });
+      if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent="\u2014"; slots.appendChild(n); }
+      col.appendChild(slots); row.appendChild(col);
+    }
+  }
+
+  function teacherSelectSlot(date,time){ state.teacherManage=null; state.teacherSel={ dateKey:keyOf(date), date:new Date(date), time }; renderTeacherWeek(); renderTeacherSummary(); }
+  function teacherManageSlot(bk){ state.teacherSel=null; state.teacherManage=bk; renderTeacherWeek(); renderTeacherSummary(); }
+  function toggleAvail(date,time){ const dk=keyOf(date), k=dk+"|"+time; const newOpen = !slotOpen(date,time); state.availability[k] = newOpen; api('POST', '/api/availability/', { date: dk, time, isOpen: newOpen }); renderTeacherWeek(); renderWeek(); }
+  function exitEditAvail(){ state.editAvail=false; const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability`; } renderTeacherWeek(); renderTeacherSummary(); renderWeek(); }
+  function addCustomTime(i, time){
+    if(!/^\d{1,2}:\d{2}$/.test(time||"")){ toast("Enter a valid time"); return; }
+    const ws=addDays(startOfWeek(NOW), state.tWeekOffset*7);
+    const date=addDays(ws, i), dk=keyOf(date);
+    if(bookingConflict(date,time)){ toast("That overlaps a booking — pick another time"); return; }
+    state.customTimes[dk]=state.customTimes[dk]||[];
+    if(!state.customTimes[dk].includes(time) && !TIMES.includes(time)) state.customTimes[dk].push(time);
+    state.availability[dk+"|"+time]=true;
+    api('POST', '/api/custom-times/', { date: dk, time });
+    renderTeacherWeek(); renderTeacherSummary(); renderWeek();
+    toast("Added "+time+" on "+DOW[i]+" "+date.getDate());
+  }
+
+  function teacherAssign(date, time, studentId){
+    const s=studentById(studentId); if(!s) return;
+    const comp = s.credits<=0;
+    if(!comp) setStudentCredits(studentId, s.credits-1);
+    s.log.unshift({ type:"book", label: comp?"Comp session booked by tutor":"Session booked by tutor", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt: comp?"":"-1" });
+    state.bookings.push({ studentId, tutorId:"davit", date:new Date(date), time, title: comp?"Comp session":"English session" });
+    api('POST', '/api/bookings/', {
+      studentSlug: studentId,
+      tutorSlug: 'davit',
+      date: date.toISOString().split('T')[0],
+      time,
+      title: comp ? 'Comp session' : 'English session',
+    }).then(r => { if (r && r.pk) state.bookings[state.bookings.length-1]._pk = r.pk; });
+    state.teacherSel=null; state.teacherManage=null;
+    renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
+    toast(`${s.name.split(" ")[0]} added · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
+  }
+
+  function teacherRemove(bk){
+    const i=state.bookings.indexOf(bk); if(i<0) return;
+    const s=studentById(bk.studentId);
+    state.bookings.splice(i,1);
+    if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/');
+    addStudentCredits(bk.studentId, 1);
+    s.log.unshift({ type:"buy", label:"Booking removed by tutor", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · credit returned", amt:"+1" });
+    state.teacherManage=null; state.teacherSel=null;
+    renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
+    toast(`Removed ${s.name.split(" ")[0]} · 1 credit returned`);
+  }
+
+  function renderTeacherSummary(){
+    const card=$("#tSumCard");
+    if(state.editAvail){
+      const ws = addDays(startOfWeek(NOW), state.tWeekOffset*7);
+      const dayOpts = DOW.map((d,i)=>{ const dt=addDays(ws,i); return `<option value="${i}">${d} ${dt.getDate()}</option>`; }).join("");
+      card.innerHTML=`
+        <div class="manage-eyebrow">Edit availability</div>
+        <div class="pick-prompt">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+          <span>Tap any time to switch it <b>Available</b> or <b>Off</b>. Booked sessions stay locked.</span>
+        </div>
+        <div class="custom-add">
+          <label class="field-label">Add a custom start time</label>
+          <div class="ca-row">
+            <select class="t-select ca-day" id="caDay">${dayOpts}</select>
+            <input type="time" class="t-select ca-time" id="caTime" value="09:15" step="300" min="07:00" max="21:00" />
+          </div>
+          <div class="micro" style="text-align:left;margin:0 0 14px;">Any start time — as long as its 50 minutes don’t overlap a booking.</div>
+          <button class="btn" id="caAdd"><span class="grainbtn"></span>Add start time</button>
+        </div>
+        <button class="btn ghost" id="availDone" style="margin-top:10px;">Done editing</button>
+      `;
+      $("#caAdd").onclick=()=>addCustomTime(+$("#caDay").value, $("#caTime").value);
+      $("#availDone").onclick=exitEditAvail;
+      return;
+    }
+    if(state.teacherSel){
+      const sel=state.teacherSel;
+      const opts=state.students.map(s=>`<option value="${s.id}">${s.name} — ${s.credits} credit${s.credits!==1?"s":""}</option>`).join("");
+      card.innerHTML=`
+        <div class="manage-eyebrow">Add student to slot</div>
+        <div class="sum-rows" style="margin-bottom:16px;">
+          <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(sel.date)}</span></div>
+          <div class="sum-row"><span class="k">Time</span><span class="v hl">${sel.time} – ${endTime(sel.time)}</span></div>
+        </div>
+        <label class="field-label">Student</label>
+        <select class="t-select" id="assignSel">${opts}</select>
+        <div class="assign-note" id="assignNote"></div>
+        <button class="btn" id="assignBtn"><span class="grainbtn"></span>Add to slot</button>
+        <button class="btn-text" id="assignCancel">Cancel</button>
+      `;
+      const selEl=$("#assignSel");
+      const note=()=>{ const s=studentById(selEl.value); $("#assignNote").innerHTML = s.credits>0
+        ? `Books the session and deducts <b style='color:var(--c1)'>1 credit</b> from ${s.name.split(" ")[0]} (→ ${s.credits-1}).`
+        : `<span class="warn">${s.name.split(" ")[0]} has 0 credits — this will be booked as a comp session.</span>`; };
+      selEl.onchange=note; note();
+      $("#assignBtn").onclick=()=>teacherAssign(sel.date, sel.time, selEl.value);
+      $("#assignCancel").onclick=()=>{ state.teacherSel=null; renderTeacherWeek(); renderTeacherSummary(); };
+      return;
+    }
+    if(state.teacherManage){
+      const bk=state.teacherManage, s=studentById(bk.studentId);
+      card.innerHTML=`
+        <div class="manage-eyebrow">Booked slot</div>
+        <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${s.name}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div></div></div>
+        <label class="field-label">Session title</label>
+        <input class="bf-input" id="tTitle" value="${escHtml(bk.title)}">
+        <label class="field-label" style="margin-top:12px;">Start time <span class="lbl-only">· 50 min</span></label>
+        <div class="time-edit">
+          <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00">
+          <span class="time-end" id="tTimeEnd">ends ${endTime(bk.time)}</span>
+        </div>
+        <label class="field-label" style="margin-top:12px;">Call link <span class="lbl-only">· Zoom, Teams…</span></label>
+        <input class="bf-input" id="tCallLink" type="url" placeholder="https://… paste meeting link" value="${escHtml(bk.callLink)}">
+        <label class="field-label" style="margin-top:12px;">What to discuss</label>
+        <textarea class="notes-ta" id="tNoteTA" placeholder="Notes shared with ${escHtml(s.name.split(' ')[0])}…">${escHtml(bk.notes)}</textarea>
+        <label class="field-label" style="margin-top:12px;">Private session notes <span class="lbl-only">· only you</span></label>
+        <textarea class="notes-ta private" id="tPrivTA" placeholder="Private notes on how the session went…">${escHtml(bk.tutorNotes)}</textarea>
+        <button class="btn" id="tNoteSave" style="margin-top:12px;"><span class="grainbtn"></span>Save details</button>
+        <button class="btn danger-btn" id="tRemove" style="margin-top:10px;"><span class="grainbtn"></span>Remove from slot</button>
+        <button class="btn-text" id="tBack">← Back</button>
+        <div class="micro">Removing frees the time and returns <b style='color:var(--c1)'>1 credit</b> to ${s.name.split(" ")[0]}.</div>
+      `;
+      $("#tTitle").oninput=(e)=>{ bk.title=e.target.value; };
+      $("#tNoteTA").oninput=(e)=>{ bk.notes=e.target.value; };
+      $("#tPrivTA").oninput=(e)=>{ bk.tutorNotes=e.target.value; };
+      $("#tTimeInput").oninput=(e)=>{ const v=e.target.value; if(/^\d{2}:\d{2}$/.test(v)) $("#tTimeEnd").textContent="ends "+endTime(v); };
+      $("#tCallLink").oninput=(e)=>{ bk.callLink=e.target.value.trim(); };
+      $("#tNoteSave").onclick=()=>{
+        const nt=$("#tTimeInput").value;
+        if(/^\d{2}:\d{2}$/.test(nt) && nt!==bk.time){
+          if(bookingConflict(bk.date, nt, bk)){ toast("That start time overlaps another booking — not changed"); }
+          else { bk.time=nt; const dk=keyOf(bk.date); if(!dayTimes(bk.date).includes(nt)){ state.customTimes[dk]=state.customTimes[dk]||[]; state.customTimes[dk].push(nt); } toast("Session moved to "+nt); }
+        } else { toast("Session details saved"); }
+        if (bk._pk) api('PUT', '/api/bookings/' + bk._pk + '/', {
+          title: bk.title, notes: bk.notes, tutorNotes: bk.tutorNotes, callLink: bk.callLink, time: bk.time
+        });
+        renderTeacherWeek(); renderTutorLists(); renderAccount(); renderWeek(); renderTeacherSummary();
+      };
+      $("#tRemove").onclick=()=>teacherRemove(bk);
+      $("#tBack").onclick=()=>{ state.teacherManage=null; renderTeacherSummary(); };
+      return;
+    }
+    card.innerHTML=`<div class="sum-empty">
+      <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M17 8h5M19.5 5.5v5" stroke="var(--c1)"/></svg></div>
+      <h3>Manage your schedule</h3>
+      <p>Tap an <b style="color:var(--c1)">open</b> time to add a student, or a booked time to free it up.</p>
+    </div>`;
+  }
+
+  function topUp(s, n, fromModal){
+    const r = issueReceipt(s, n);
+    s.log.unshift({ type:"buy", label:"Credits added by tutor", sub:"Today · paid externally", amt:"+"+n, receiptNo: r.no });
+    addStudentCredits(s.id, n);
+    api('POST', '/api/credits/' + s.id + '/', { n }).then(res => {
+      if (res && res.receiptNo) {
+        const entry = s.log[0];
+        entry.receiptNo = res.receiptNo;
+      }
+    });
+    renderRoster(); renderAccount();
+    if(fromModal) renderStudentModal();
+    openReceipt(r);
+    toast(`+${n} credits → ${s.name.split(" ")[0]} · receipt ${r.no}`);
+  }
+
+  // ---------- Student history modal ----------
+  function openStudentModal(s){ state.teacherStudent=s; renderStudentModal(); $("#studentModal").hidden=false; }
+  function closeStudentModal(){ state.teacherStudent=null; $("#studentModal").hidden=true; }
+  function renderStudentModal(){
+    const s=state.teacherStudent; if(!s) return;
+    const prevScroll = $("#modalCard") ? $("#modalCard").scrollTop : 0;
+    const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
+    $("#studentModal").innerHTML = `
+      <div class="modal-card" id="modalCard">
+        <button class="modal-x" id="modalX" aria-label="Close">×</button>
+        <div class="sum-head" style="margin-bottom:18px;">
+          <div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${s.i}</div>
+          <div><div class="nm">${s.name}</div><div class="rl">${s.credits} credits · ${upc} upcoming session${upc!==1?"s":""}</div></div>
+        </div>
+        <div class="modal-add">
+          <span class="ma-label">Add credits<em>Paid externally</em></span>
+          <div class="ma-btns">
+            <button class="mini-btn" data-madd="1">+1</button>
+            <button class="mini-btn" data-madd="5">+5</button>
+            <button class="mini-btn" data-madd="10">+10</button>
+          </div>
+        </div>
+        <div class="section-h" style="margin:20px 2px 6px;"><h2>Tutor notes</h2></div>
+        <div class="snote-add">
+          <input class="bf-input snote-input" id="snoteInput" placeholder="Add a note about ${escHtml(s.name.split(' ')[0])}…">
+          <button class="mini-btn snote-btn" id="snoteAdd">Add</button>
+        </div>
+        <div class="snote-log">${notesLogHtml(s)}</div>
+        <div class="section-h" style="margin:22px 2px 8px;"><h2>Learning files <span class="lbl-only">· A1–C1</span></h2></div>
+        <div class="micro" style="text-align:left; margin:0 2px 12px;">Toggle the lessons ${escHtml(s.name.split(' ')[0])} can access in their Learning tab.</div>
+        <div class="curric-mgr">${curriculumMgrHtml(s)}</div>
+        <div class="section-h" style="margin:22px 2px 6px;"><h2>Transaction history</h2></div>
+        <div class="activity modal-txns">${txnHtml(s.log)}</div>
+      </div>`;
+    $("#modalCard").onclick = (e)=>e.stopPropagation();
+    $("#modalX").onclick = closeStudentModal;
+    $("#studentModal").querySelectorAll("[data-madd]").forEach(btn=> btn.onclick=()=>topUp(s, +btn.dataset.madd, true));
+    $("#snoteAdd").onclick=()=>addStudentNote(s);
+    $("#snoteInput").addEventListener("keydown", e=>{ if(e.key==="Enter") addStudentNote(s); });
+    $("#studentModal").querySelectorAll("[data-lesson]").forEach(b=> b.onclick=()=>{ toggleLesson(s, b.dataset.lesson); renderStudentModal(); });
+    $("#studentModal").querySelectorAll("[data-lvl-all]").forEach(b=> b.onclick=()=>{ toggleLevel(s, b.dataset.lvlAll); renderStudentModal(); });
+    bindReceiptLinks($("#studentModal"));
+    if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
+  }
+  function notesLogHtml(s){ const l=s.notesLog||[]; if(!l.length) return `<div class="empty-list">No notes yet — add the first above.</div>`; return l.map(n=>`<div class="snote"><div class="snote-date">${n.date}</div><div class="snote-text">${escHtml(n.text)}</div></div>`).join(""); }
+  function addStudentNote(s){ const inp=$("#snoteInput"); const t=(inp.value||"").trim(); if(!t) return; s.notesLog=s.notesLog||[]; s.notesLog.unshift({ date:fmtAT(NOW), text:t }); inp.value=""; api('POST', '/api/notes/' + s.id + '/', { text: t }); renderStudentModal(); toast("Note added to "+s.name.split(" ")[0]); }
+
+  function renderRoster(){
+    const el=$("#rosterList"); el.innerHTML="";
+    const q=(state.studentQuery||"").trim().toLowerCase();
+    const list=state.students.filter(s=> !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
+    const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} of ${state.students.length}` : `${state.students.length} student${state.students.length!==1?"s":""}`;
+    if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">No students match “${escHtml(q)}”.</div>`; renderTutorLists(); return; }
+    list.forEach(s=>{
+      const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
+      const card=document.createElement("div"); card.className="rost";
+      card.innerHTML=`
+        <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${s.i}</div>
+        <div class="rinfo"><div class="rname">${s.name}</div><div class="rsub">${upc} upcoming session${upc!==1?"s":""}</div></div>
+        <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">credits</div></div>
+        <div class="rc-actions">
+          <button class="mini-btn" data-add="1">+1</button>
+          <button class="mini-btn" data-add="5">+5</button>
+          <button class="mini-btn" data-add="10">+10</button>
+        </div>`;
+      card.querySelectorAll("[data-add]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); topUp(s, +btn.dataset.add, false); });
+      card.onclick=(e)=>{ if(e.target.closest("[data-add]")) return; openStudentModal(s); };
+      card.style.cursor="pointer";
+      el.appendChild(card);
+    });
+    renderTutorLists();
+  }
+
+  function tutorRow(b, completed){
+    const s=studentById(b.studentId);
+    return `<div class="li">
+      <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
+      <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
+      <div class="info"><div class="t">${b.title}</div><div class="s">${s.name} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
+      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Join</a>`:""}${completed?'<span class="pill2 done">Completed</span>':'<span class="pill2">50 min</span>'}</div>
+    </div>`;
+  }
+  function renderTutorLists(){
+    const up=$("#tutorUpcoming"), done=$("#tutorCompleted");
+    if(!up||!done) return;
+    const upcoming = state.bookings.filter(b=> b.date>=NOW || sameDay(b.date,NOW)).sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
+    const past = state.bookings.filter(b=> b.date<NOW && !sameDay(b.date,NOW)).sort((a,b)=> b.date-a.date || toMin(b.time)-toMin(a.time));
+    up.innerHTML = upcoming.length ? upcoming.map(b=>tutorRow(b,false)).join("") : `<div class="empty-list">No upcoming sessions.</div>`;
+    done.innerHTML = past.length ? past.map(b=>tutorRow(b,true)).join("") : `<div class="empty-list">No completed sessions yet.</div>`;
+  }
+
+  // ---------- Billing (student receipt address) ----------
+  function renderBilling(){
+    if(!$("#bfName")) return;
+    const s=studentById(state.currentUser); if(!s) return;
+    const b=s.billing||{};
+    $("#bfName").value=s.name;
+    $("#bfLine1").value=b.line1||""; $("#bfZip").value=b.postcode||""; $("#bfCity").value=b.city||""; $("#bfCountry").value=b.country||"Österreich";
+  }
+  function saveBilling(){
+    const s=studentById(state.currentUser); if(!s) return;
+    s.name = $("#bfName").value.trim()||s.name;
+    s.billing = { line1:$("#bfLine1").value.trim(), postcode:$("#bfZip").value.trim(), city:$("#bfCity").value.trim(), country:$("#bfCountry").value.trim()||"Österreich" };
+    $("#acctHello").textContent="Hello, "+s.name.split(" ")[0]+".";
+    setIdentity(s); renderAccount();
+    api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
+    toast("Receipt details saved");
+  }
+
+  // ---------- Admin: user management ----------
+  function esc(s){ return String(s==null?"":s).replace(/"/g,"&quot;"); }
+  function escHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); if($("#adminPrice")) $("#adminPrice").value=state.creditPrice; }
+  function renderAdminPacks(){
+    const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
+    PACKS.forEach((p,idx)=>{
+      const row=document.createElement("div"); row.className="apack-row";
+      row.innerHTML=`
+        <label class="bf-lab">Credits<input class="bf-input" data-pk="${idx}" data-f="n" type="number" min="1" value="${p.n}"></label>
+        <label class="bf-lab">Price<input class="bf-input" data-pk="${idx}" data-f="price" value="${esc(p.price)}"></label>
+        <label class="bf-lab">Per session<input class="bf-input" data-pk="${idx}" data-f="each" value="${esc(p.each)}"></label>`;
+      el.appendChild(row);
+    });
+  }
+  function saveSettings(){
+    const v=parseInt($("#adminPrice").value,10); if(!isNaN(v)&&v>0) state.creditPrice=v;
+    $("#adminPacks").querySelectorAll("[data-pk]").forEach(inp=>{
+      const p=PACKS[+inp.dataset.pk], f=inp.dataset.f;
+      if(f==="n"){ const n=parseInt(inp.value,10); if(!isNaN(n)&&n>0) p.n=n; }
+      else p[f]=inp.value;
+    });
+    api('PUT', '/api/settings/', { creditPrice: state.creditPrice, packs: PACKS });
+    renderPacks(); renderAdmin();
+    toast("Pricing saved");
+  }
+  function renderAdminList(){
+    const el=$("#adminList"); if(!el) return; el.innerHTML="";
+    allAccounts().forEach(u=>{
+      const item=document.createElement("button");
+      item.className="admin-item"+(u.id===state.adminSel?" sel":"");
+      item.innerHTML=`<div class="avatar" style="${avatarStyle(u)};width:36px;height:36px;font-size:12px;">${u.i}</div>
+        <div class="ai-info"><div class="ai-name">${u.name}</div><div class="ai-role">${u.role==="tutor"?"Tutor":"Student"} · ${u.email}</div></div>`;
+      item.onclick=()=>{ state.adminSel=u.id; renderAdmin(); };
+      el.appendChild(item);
+    });
+  }
+  function renderAdminEditor(){
+    const el=$("#adminEditor"); if(!el) return;
+    const u=accountById(state.adminSel); if(!u){ el.innerHTML=""; return; }
+    const isStudent = u.role!=="tutor";
+    const b=u.billing||{};
+    el.innerHTML=`
+      <div class="ed-head">
+        <div class="avatar ed-avatar" style="${avatarStyle(u)};width:64px;height:64px;font-size:22px;">${u.i}</div>
+        <div class="ed-photo-actions">
+          <div class="ed-who"><div class="ed-name">${u.name}</div><div class="ed-role">${isStudent?"Student":"Tutor"}</div></div>
+          <div class="ed-photo-btns">
+            <label class="mini-btn">Upload photo<input type="file" id="edPhoto" accept="image/*" hidden></label>
+            ${u.photo?'<button class="mini-btn" id="edPhotoClear">Remove</button>':''}
+          </div>
+        </div>
+      </div>
+      <div class="ed-fields">
+        <label class="bf-lab">Display name<input class="bf-input" id="edName" value="${esc(u.name)}"></label>
+        <div class="bf-grid">
+          <label class="bf-lab">Email (login)<input class="bf-input" id="edEmail" value="${esc(u.email)}"></label>
+          <label class="bf-lab">Password<input class="bf-input" id="edPass" value="${esc(u.password)}"></label>
+        </div>
+        ${isStudent?`
+        <label class="bf-lab">Credits<input class="bf-input" id="edCredits" type="number" min="0" value="${u.credits}"></label>
+        <div class="ed-sub">Receipt address</div>
+        <label class="bf-lab">Street &amp; no.<input class="bf-input" id="edLine1" value="${esc(b.line1)}"></label>
+        <div class="bf-grid">
+          <label class="bf-lab">Postcode<input class="bf-input" id="edZip" value="${esc(b.postcode)}"></label>
+          <label class="bf-lab">City<input class="bf-input" id="edCity" value="${esc(b.city)}"></label>
+        </div>
+        <label class="bf-lab">Country<input class="bf-input" id="edCountry" value="${esc(b.country||'Österreich')}"></label>
+        `:'<div class="micro" style="text-align:left;">Tutor account — manages the schedule and student credits.</div>'}
+      </div>
+      <div class="ed-actions">
+        <button class="btn" id="edSave"><span class="grainbtn"></span>Save changes</button>
+        <button class="btn ghost" id="edViewAs">View as ${u.name.split(" ")[0]}</button>
+      </div>
+      ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Remove student</button>':''}
+    `;
+    $("#edPhoto").onchange=(e)=>pickPhoto(e,u);
+    if($("#edPhotoClear")) $("#edPhotoClear").onclick=()=>{ u.photo=null; reflectUser(u); renderAdmin(); };
+    $("#edSave").onclick=()=>saveAdminUser(u);
+    $("#edViewAs").onclick=()=>impersonate(u);
+    if($("#edRemove")) $("#edRemove").onclick=()=>removeAdminStudent(u);
+  }
+  function pickPhoto(e,u){ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ u.photo=rd.result; reflectUser(u); renderAdmin(); toast("Photo updated"); }; rd.readAsDataURL(f); }
+  function saveAdminUser(u){
+    u.name=$("#edName").value.trim()||u.name;
+    u.email=$("#edEmail").value.trim().toLowerCase()||u.email;
+    u.password=$("#edPass").value||u.password;
+    if(u.role!=="tutor"){
+      const cr=parseInt($("#edCredits").value,10); if(!isNaN(cr)) setStudentCredits(u.id, cr);
+      u.billing={ line1:$("#edLine1").value.trim(), postcode:$("#edZip").value.trim(), city:$("#edCity").value.trim(), country:$("#edCountry").value.trim()||"Österreich" };
+    }
+    reflectUser(u); renderAdmin();
+    toast("Saved "+u.name);
+  }
+  function reflectUser(u){
+    renderRoster();
+    if(state.currentUser===u.id && u.role!=="tutor"){ $("#acctHello").textContent="Hello, "+u.name.split(" ")[0]+"."; renderBilling(); }
+  }
+  function addAdminStudent(){
+    const id="stu"+Date.now().toString(36);
+    state.students.push({ id, email:id+"@fluent.at", name:"New Student", credits:0, c:["#9aa0a6","#6b7177"], i:"NS", password:"password", photo:null, billing:{ line1:"", postcode:"", city:"", country:"Österreich" }, log:[] });
+    state.adminSel=id; renderAdmin(); renderRoster(); toast("Student added — edit their details");
+  }
+  function removeAdminStudent(u){
+    state.students=state.students.filter(s=>s.id!==u.id);
+    state.bookings=state.bookings.filter(b=>b.studentId!==u.id);
+    if(state.currentUser===u.id) state.currentUser=(state.students[0]||{id:"maya"}).id;
+    state.adminSel=(allAccounts()[0]||{id:"davit"}).id;
+    renderAdmin(); renderRoster(); toast("Student removed");
+  }
+
+  // ---------- Toast ----------
+  function toast(msg) {
+    const w = $("#toastWrap");
+    const el = document.createElement("div"); el.className="toast";
+    el.innerHTML = `<div class="ti">✓</div><div>${msg}</div>`;
+    w.appendChild(el);
+    setTimeout(()=>{ el.style.transition="0.4s"; el.style.opacity="0"; el.style.transform="translateY(10px)"; setTimeout(()=>el.remove(),400); }, 2600);
+  }
+
+  // ---------- Learning files / curriculum ----------
+  const CURRICULUM = [
+    { level:"A1", title:"Beginner", lessons:[
+      { id:"a1-1", t:"Greetings & introductions" },
+      { id:"a1-2", t:"The present simple" },
+      { id:"a1-3", t:"Numbers, dates & telling time" },
+      { id:"a1-4", t:"Everyday objects & places" },
+    ]},
+    { level:"A2", title:"Elementary", lessons:[
+      { id:"a2-1", t:"Past simple & regular verbs" },
+      { id:"a2-2", t:"Comparatives & superlatives" },
+      { id:"a2-3", t:"\u2018Going to\u2019 & future plans" },
+      { id:"a2-4", t:"Food, travel & directions" },
+    ]},
+    { level:"B1", title:"Intermediate", lessons:[
+      { id:"b1-1", t:"Present perfect in context" },
+      { id:"b1-2", t:"First & second conditionals" },
+      { id:"b1-3", t:"Reported speech basics" },
+      { id:"b1-4", t:"Phrasal verbs that matter" },
+    ]},
+    { level:"B2", title:"Upper-intermediate", lessons:[
+      { id:"b2-1", t:"The passive voice" },
+      { id:"b2-2", t:"Relative clauses" },
+      { id:"b2-3", t:"Narrative tenses" },
+      { id:"b2-4", t:"Formal & informal register" },
+    ]},
+    { level:"C1", title:"Advanced", lessons:[
+      { id:"c1-1", t:"Inversion & emphasis" },
+      { id:"c1-2", t:"Hedging & academic style" },
+      { id:"c1-3", t:"Nuanced & idiomatic vocabulary" },
+      { id:"c1-4", t:"Discourse markers & cohesion" },
+    ]},
+  ];
+  function activeSet(s){ if(!s.activeLessons) s.activeLessons=[]; return s.activeLessons; }
+  function isActive(s,id){ return activeSet(s).includes(id); }
+  function toggleLesson(s,id,on){ const set=activeSet(s), has=set.includes(id); if(on==null) on=!has; if(on&&!has) set.push(id); if(!on&&has) set.splice(set.indexOf(id),1); api('POST', '/api/lessons/' + s.id + '/', { lessonId: id, on }); }
+  function toggleLevel(s,level){ const lvl=CURRICULUM.find(x=>x.level===level); if(!lvl) return; const allOn=lvl.lessons.every(l=>isActive(s,l.id)); lvl.lessons.forEach(l=>toggleLesson(s,l.id,!allOn)); }
+  function fileIcon(kind){
+    if(kind==="audio") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="19" cy="16" r="3"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>';
+  }
+  function lessonFiles(t){ return [ {n:t+" \u2014 worksheet", ext:"PDF", kind:"doc"}, {n:t+" \u2014 grammar notes", ext:"PDF", kind:"doc"}, {n:t+" \u2014 listening practice", ext:"MP3", kind:"audio"} ]; }
+  function renderFiles(){
+    const el=$("#filesContent"); if(!el) return;
+    const s=studentById(state.currentUser); if(!s) return;
+    if(activeSet(s).length===0){ el.innerHTML = `<div class="panel" style="padding:42px 30px; text-align:center;"><div class="empty-list" style="font-style:normal;">No lessons unlocked yet \u2014 your tutor will activate materials for you as you progress.</div></div>`; return; }
+    el.innerHTML = CURRICULUM.map(lvl=>{
+      const act = lvl.lessons.filter(l=>isActive(s,l.id)).length;
+      return `<div class="lvl-sec">
+        <div class="lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="lvl-name">${lvl.title}</span><span class="lvl-count">${act} / ${lvl.lessons.length} unlocked</span></div>
+        <div class="lesson-list">${lvl.lessons.map(l=>lessonRow(s,l)).join("")}</div>
+      </div>`;
+    }).join("");
+    el.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open"));
+  }
+  function lessonRow(s,l){
+    if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${l.t}</span><span class="les-tag">Locked</span></div></div>`;
+    const files=lessonFiles(l.t);
+    return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${l.t}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="les-files">${files.map(f=>`<a class="file-row" href="#" onclick="return false;"><span class="file-ic ${f.kind}">${fileIcon(f.kind)}</span><span class="file-n">${f.n}</span><span class="file-ext">${f.ext}</span></a>`).join("")}</div></div>`;
+  }
+  function curriculumMgrHtml(s){
+    return CURRICULUM.map(lvl=>{
+      const allOn=lvl.lessons.every(l=>isActive(s,l.id));
+      return `<div class="cm-lvl">
+        <div class="cm-lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="cm-lvl-name">${lvl.title}</span><button class="cm-all" data-lvl-all="${lvl.level}">${allOn?"Clear all":"Unlock all"}</button></div>
+        <div class="cm-lessons">${lvl.lessons.map(l=>{
+          const on=isActive(s,l.id);
+          return `<button class="cm-les ${on?'on':''}" data-lesson="${l.id}"><span class="cm-toggle"></span><span class="cm-les-t">${l.t}</span></button>`;
+        }).join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  // ---------- Practice mini-games ----------
+  let gameState = null;
+  function shuffleArr(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function norm(s){ return (s||"").trim().toLowerCase().replace(/\s+/g," ").replace(/[.!?]$/,""); }
+
+  const PAST_TENSE = [
+    { s:"Yesterday, Maya {} to the bakery on the corner.", verb:"go", a:["went"] },
+    { s:"They {} a wonderful film last night.", verb:"watch", a:["watched"] },
+    { s:"He {} his keys somewhere in the park.", verb:"lose", a:["lost"] },
+    { s:"We {} dinner together before the show.", verb:"have", a:["had"] },
+    { s:"My grandfather {} four languages fluently.", verb:"speak", a:["spoke"] },
+    { s:"It {} heavily all through the night.", verb:"rain", a:["rained"] },
+    { s:"You {} exactly the right decision.", verb:"make", a:["made"] },
+    { s:"The bus {} almost ten minutes late.", verb:"come", a:["came"] },
+    { s:"She {} the whole letter and then smiled.", verb:"read", a:["read"] },
+    { s:"I {} early because the train was leaving.", verb:"wake up", a:["woke up","woke"] },
+    { s:"The children {} in the garden all afternoon.", verb:"play", a:["played"] },
+    { s:"We {} across the lake before breakfast.", verb:"swim", a:["swam"] },
+    { s:"He {} me a beautiful postcard from Rome.", verb:"send", a:["sent"] },
+    { s:"They {} the new song three times.", verb:"sing", a:["sang"] },
+  ];
+  const GAP_FILL = [
+    { s:"I've been interested {} astronomy since I was a child.", a:"in", opts:["in","on","at","for"] },
+    { s:"She's really good {} solving difficult puzzles.", a:"at", opts:["at","in","with","for"] },
+    { s:"We arrived {} the airport two hours early.", a:"at", opts:["at","to","in","on"] },
+    { s:"He's been living here {} 2019.", a:"since", opts:["since","for","from","during"] },
+    { s:"Could you turn {} the lights before you leave?", a:"off", opts:["off","down","away","out"] },
+    { s:"This little gift is {} you.", a:"for", opts:["for","to","at","of"] },
+    { s:"Let's meet {} Monday morning, then.", a:"on", opts:["on","at","in","by"] },
+    { s:"She has always been afraid {} spiders.", a:"of", opts:["of","from","about","with"] },
+    { s:"I'll be ready {} an hour or so.", a:"in", opts:["in","on","at","by"] },
+    { s:"They've been married {} twelve years.", a:"for", opts:["for","since","from","during"] },
+  ];
+  const SCRAMBLE = [
+    { tokens:["She","has","never","been","to","Japan"] },
+    { tokens:["We","are","going","to","visit","them","tomorrow"] },
+    { tokens:["I","have","been","studying","English","for","years"] },
+    { tokens:["He","did","not","finish","his","homework"] },
+    { tokens:["Would","you","like","some","more","tea"] },
+    { tokens:["They","were","watching","a","film","last","night"] },
+    { tokens:["My","sister","works","at","a","small","hospital"] },
+    { tokens:["Could","you","please","open","the","window"] },
+  ];
+
+  const GAMES = [
+    { id:"past", tag:"Grammar", title:"Past Tense Builder", accent:"var(--c1)",
+      desc:"Type the correct past-tense form of each verb to complete the sentence.",
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 1.5"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 5v4h4"/></svg>',
+      start:()=>quizStart("past", PAST_TENSE, "input") },
+    { id:"gap", tag:"Prepositions", title:"Mind the Gap", accent:"var(--c3)",
+      desc:"Pick the little word that fits — the prepositions and particles that trip everyone up.",
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8H5a3 3 0 0 0 0 6h2M17 8h2a3 3 0 0 1 0 6h-2M9 11h6"/></svg>',
+      start:()=>quizStart("gap", GAP_FILL, "choice") },
+    { id:"order", tag:"Syntax", title:"Word Order", accent:"var(--c2)",
+      desc:"Tap the scrambled words in the right order to rebuild each sentence.",
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="7" height="5" rx="1.5"/><rect x="14" y="5" width="7" height="5" rx="1.5"/><rect x="3" y="14" width="7" height="5" rx="1.5"/><rect x="14" y="14" width="7" height="5" rx="1.5"/></svg>',
+      start:startScramble },
+  ];
+
+  function renderGamesMenu(){
+    const el=$("#gamesMenu"); if(!el) return;
+    $("#gameHost").hidden=true; el.hidden=false; gameState=null;
+    el.innerHTML = GAMES.map(g=>`
+      <button class="game-card" data-g="${g.id}" style="--ga:${g.accent}">
+        <div class="gc-icon">${g.icon}</div>
+        <div class="gc-tag">${g.tag}</div>
+        <div class="gc-title">${g.title}</div>
+        <div class="gc-desc">${g.desc}</div>
+        <div class="gc-best">${bestLine(g.id)}</div>
+      </button>`).join("");
+    el.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>launchGame(b.dataset.g));
+  }
+  function bestLine(id){ const b=(state.gameBest||{})[id]; return b!=null?("Best score "+b+"%"):"Not played yet"; }
+  function launchGame(id){ const g=GAMES.find(x=>x.id===id); if(!g) return; $("#gamesMenu").hidden=true; $("#gameHost").hidden=false; $("#gameTitleMini").textContent=g.title; g.start(); }
+  function exitGame(){ gameState=null; renderGamesMenu(); }
+  function resultMsg(p){ if(p===100) return "Flawless — you've really got this!"; if(p>=75) return "Great work — almost perfect."; if(p>=50) return "Good effort. Keep practising!"; return "Practice makes progress — try again!"; }
+  function quizProgress(){ const gs=gameState; return `<span>Question ${gs.i+1} of ${gs.items.length}</span><span class="gp-score">${gs.score} correct</span>`; }
+
+  function quizStart(gameId, items, mode){
+    gameState = { gameId, mode, items: shuffleArr(items).slice(0, Math.min(8, items.length)), i:0, score:0 };
+    quizQuestion();
+  }
+  function quizQuestion(){
+    const gs=gameState, it=gs.items[gs.i];
+    $("#gameProgress").innerHTML = quizProgress();
+    const stage=$("#gameStage");
+    const sentence = it.s.replace("{}", '<span class="q-blank"></span>');
+    if(gs.mode==="input"){
+      stage.innerHTML = `<div class="q-sentence">${sentence}</div>
+        <div class="q-hint">verb: <b>${it.verb}</b></div>
+        <div class="q-input-row"><input class="bf-input q-input" id="qInput" placeholder="past tense form…" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="qCheck"><span class="grainbtn"></span>Check</button></div>
+        <div class="q-feedback" id="qFeedback"></div>`;
+      const inp=$("#qInput"); inp.focus();
+      inp.addEventListener("keydown", e=>{ if(e.key==="Enter") quizCheckInput(); });
+      $("#qCheck").onclick = quizCheckInput;
+    } else {
+      stage.innerHTML = `<div class="q-sentence">${sentence}</div>
+        <div class="q-options" id="qOptions"></div>
+        <div class="q-feedback" id="qFeedback"></div>`;
+      const wrap=$("#qOptions");
+      shuffleArr(it.opts).forEach(o=>{ const b=document.createElement("button"); b.className="q-opt"; b.textContent=o; b.onclick=()=>quizCheckChoice(b,o); wrap.appendChild(b); });
+    }
+  }
+  function quizCheckInput(){
+    const it=gameState.items[gameState.i], val=norm($("#qInput").value); if(!val) return;
+    const ok = it.a.some(a=>norm(a)===val);
+    const inp=$("#qInput"); inp.disabled=true; inp.classList.add(ok?"correct":"wrong");
+    const c=$("#qCheck"); if(c) c.style.display="none";
+    quizReveal(ok, it.a[0]);
+  }
+  function quizCheckChoice(btn,o){
+    const it=gameState.items[gameState.i], ok = o===it.a;
+    $("#qOptions").querySelectorAll(".q-opt").forEach(b=>{ b.disabled=true; if(b.textContent===it.a) b.classList.add("correct"); });
+    if(!ok) btn.classList.add("wrong");
+    quizReveal(ok, it.a);
+  }
+  function quizReveal(ok, correct){
+    const gs=gameState; if(ok) gs.score++;
+    const last = gs.i+1>=gs.items.length;
+    $("#qFeedback").innerHTML = (ok?'<div class="fb ok">✓ Nice!</div>':'<div class="fb no">Not quite — the answer is <b>'+correct+'</b></div>')
+      + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"See results":"Next question"}</button>`;
+    $("#qNext").onclick=()=>{ gs.i++; if(gs.i<gs.items.length) quizQuestion(); else quizEnd(); };
+  }
+  function startScramble(){ gameState={ gameId:"order", items:shuffleArr(SCRAMBLE).slice(0,6), i:0, score:0 }; scrambleQuestion(); }
+  function scrambleQuestion(){
+    const gs=gameState, it=gs.items[gs.i];
+    gs.scoredThis=false;
+    let pool = shuffleArr(it.tokens.map((w,idx)=>({w,idx})));
+    if(pool.every((t,idx)=>t.idx===idx) && pool.length>1){ const x=pool.shift(); pool.push(x); }
+    gs.pool=pool; gs.built=[];
+    $("#gameProgress").innerHTML = quizProgress();
+    $("#gameStage").innerHTML = `<div class="q-hint" style="margin-top:0;">Tap the words in the correct order.</div>
+      <div class="scramble-answer" id="scrAns"></div>
+      <div class="scramble-pool" id="scrPool"></div>
+      <div class="q-feedback" id="qFeedback"></div>`;
+    scrambleRender();
+  }
+  function scrambleRender(){
+    const gs=gameState, ansEl=$("#scrAns"), poolEl=$("#scrPool"); ansEl.innerHTML=""; poolEl.innerHTML="";
+    gs.built.forEach((t,pos)=>{ const b=document.createElement("button"); b.className="word-chip in"; b.textContent=t.w; b.onclick=()=>{ if(gs.scoredThis) return; gs.built.splice(pos,1); gs.pool.push(t); scrambleRender(); }; ansEl.appendChild(b); });
+    gs.pool.forEach((t,pos)=>{ const b=document.createElement("button"); b.className="word-chip"; b.textContent=t.w; b.onclick=()=>{ gs.pool.splice(pos,1); gs.built.push(t); scrambleRender(); }; poolEl.appendChild(b); });
+    const fb=$("#qFeedback");
+    if(gs.pool.length===0){
+      const it=gs.items[gs.i], ok = gs.built.every((t,idx)=> t.w===it.tokens[idx]);
+      if(ok && !gs.scoredThis){ gs.score++; gs.scoredThis=true; }
+      const last = gs.i+1>=gs.items.length;
+      fb.innerHTML = (ok?'<div class="fb ok">✓ Perfect order!</div>':'<div class="fb no">Not quite — correct: <b>'+it.tokens.join(" ")+'</b></div>')
+        + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"See results":"Next sentence"}</button>`;
+      $("#qNext").onclick=()=>{ gs.i++; if(gs.i<gs.items.length) scrambleQuestion(); else quizEnd(); };
+    } else { fb.innerHTML=""; }
+  }
+  function quizEnd(){
+    const gs=gameState, pct=Math.round(gs.score/gs.items.length*100);
+    state.gameBest=state.gameBest||{}; if(state.gameBest[gs.gameId]==null || pct>state.gameBest[gs.gameId]) state.gameBest[gs.gameId]=pct;
+    $("#gameProgress").innerHTML="";
+    $("#gameStage").innerHTML = `<div class="game-result">
+      <div class="gr-score">${gs.score}<span>/${gs.items.length}</span></div>
+      <div class="gr-msg">${resultMsg(pct)}</div>
+      <div class="gr-actions"><button class="btn" id="grAgain"><span class="grainbtn"></span>Play again</button><button class="btn ghost" id="grMenu">All games</button></div>
+    </div>`;
+    $("#grAgain").onclick=()=>launchGame(gs.gameId);
+    $("#grMenu").onclick=exitGame;
+  }
+
+  // ---------- View switching ----------
+  function setView(v) {
+    state.view = v;
+    if(v==="book") renderWeek();
+    if(v==="teacher"){ renderTeacherWeek(); renderRoster(); }
+    if(v==="admin") renderAdmin();
+    if(v==="games") renderGamesMenu();
+    if(v==="files") renderFiles();
+    if(v==="students") renderRoster();
+    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
+    document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
+    $("#creditsPill").style.display = (state.role==="student") ? "" : "none";
+    $("#main").scrollTop = 0;
+  }
+
+  // ---------- Auth / roles ----------
+  function setIdentity(u){
+    const st=avatarStyle(u);
+    const ma=$("#meAvatar"); ma.style.cssText=st; ma.textContent=u.i;
+    const um=$("#umAvatar"); um.style.cssText=st+";width:40px;height:40px;"; um.textContent=u.i;
+    $("#umName").textContent=u.name; $("#umMail").textContent=u.email;
+  }
+  const TAB_ROLES = { book:["student"], account:["student"], games:["student"], files:["student"], teacher:["tutor"], students:["tutor"], admin:["admin"] };
+  function showTabsForRole(role){ document.querySelectorAll(".tab").forEach(t=>{ t.style.display=(TAB_ROLES[t.dataset.view]||[]).includes(role)?"":"none"; }); }
+  function resetTransient(){
+    state.selected=null; state.managing=null; state.justBooked=null; state.justAction="booked";
+    gameState=null; state.studentQuery="";
+    if($("#studentSearch")) $("#studentSearch").value="";
+    state.rescheduling=null; state.teacherSel=null; state.teacherManage=null; state.teacherStudent=null; state.editAvail=false;
+    state.weekOffset=0; state.tWeekOffset=0;
+    const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability'; }
+    $("#userMenu").hidden=true;
+    ["#studentModal","#receiptModal","#buyModal"].forEach(id=>{ const e=$(id); if(e) e.hidden=true; });
+  }
+  function applyStudent(id){
+    resetTransient();
+    state.role="student"; state.currentUser=id;
+    const s=studentById(id); state.credits=s.credits;
+    showTabsForRole("student"); setIdentity(s);
+    $("#acctHello").textContent = "Hello, "+s.name.split(" ")[0]+".";
+    updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderBilling();
+    setView("book");
+  }
+  function applyTutor(){
+    resetTransient();
+    state.role="tutor"; showTabsForRole("tutor"); setIdentity(tutorUser);
+    renderTeacherWeek(); renderTeacherSummary(); renderRoster();
+    setView("teacher");
+  }
+  function applyAdmin(){
+    resetTransient();
+    state.role="admin"; state.adminSel="davit"; showTabsForRole("admin"); setIdentity(ADMIN);
+    renderAdmin();
+    setView("admin");
+  }
+  function loginAs(acct){ if(acct.role==="admin") applyAdmin(); else if(acct.role==="tutor") applyTutor(); else applyStudent(acct.id); }
+  function authErr(m){ $("#authErr").textContent=m; }
+  function doLogin(){
+    const email=($("#authEmail").value||"").trim().toLowerCase();
+    const pass=$("#authPass").value||"";
+    if(!email){ authErr("Enter your email"); return; }
+    api('POST', '/api/login/', { email, password: pass }).then(r => {
+      if (!r) { authErr("Login failed. Check your connection."); return; }
+      if (r.error) { authErr(r.error); return; }
+      authErr("");
+      window.location.reload();
+    });
+  }
+  function logout(){
+    api('POST', '/api/logout/');
+    resetTransient();
+    $("#authEmail").value=""; $("#authPass").value=""; authErr("");
+    state.impersonating=false; updateImpBanner();
+    document.querySelector(".app").style.display="none";
+    $("#authScreen").hidden=false;
+  }
+  function finishLogin(fn){ $("#authScreen").hidden=true; document.querySelector(".app").style.display=""; fn(); }
+  // logout() is defined above with doLogin()
+  function impersonate(acct){ state.impersonating=true; state.impersonatedName=acct.name; loginAs(acct); updateImpBanner(); $("#userMenu").hidden=true; $("#main").scrollTop=0; }
+  function exitImpersonation(){ state.impersonating=false; updateImpBanner(); applyAdmin(); }
+  function updateImpBanner(){ const b=$("#impBanner"); if(!b) return; if(state.impersonating){ b.hidden=false; $("#impName").textContent=state.impersonatedName||""; } else { b.hidden=true; } }
+  document.querySelectorAll(".tab").forEach(b=> b.onclick = ()=>setView(b.dataset.view));
+  $("#creditsPill").onclick = ()=>setView("account");
+  $("#goBook").onclick = ()=>setView("book");
+  $("#gameExit").onclick = exitGame;
+  if($("#studentSearch")) $("#studentSearch").oninput = (e)=>{ state.studentQuery=e.target.value; renderRoster(); };
+
+  $("#prevWeek").onclick = ()=>{ if(state.weekOffset>0){state.weekOffset--; renderWeek();} };
+  $("#nextWeek").onclick = ()=>{ if(state.weekOffset<6){state.weekOffset++; renderWeek();} };
+  $("#todayBtn").onclick = ()=>{ state.weekOffset=0; renderWeek(); };
+
+  $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>0){state.tWeekOffset--; renderTeacherWeek();} };
+  $("#tNextWeek").onclick = ()=>{ if(state.tWeekOffset<6){state.tWeekOffset++; renderTeacherWeek();} };
+  $("#tTodayBtn").onclick = ()=>{ state.tWeekOffset=0; renderTeacherWeek(); };
+  $("#availToggle").onclick = ()=>{
+    if(state.editAvail){ exitEditAvail(); return; }
+    state.editAvail = true;
+    state.teacherSel=null; state.teacherManage=null;
+    $("#availToggle").classList.add("active");
+    $("#availToggle").innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Done editing`;
+    renderTeacherWeek(); renderTeacherSummary();
+  };
+
+  $("#studentModal").onclick = closeStudentModal;
+  $("#receiptModal").onclick = closeReceipt;
+  $("#buyModal").onclick = closeBuy;
+  document.addEventListener("keydown", (e)=>{ if(e.key!=="Escape") return; if(!$("#buyModal").hidden) closeBuy(); else if(!$("#receiptModal").hidden) closeReceipt(); else if(!$("#studentModal").hidden) closeStudentModal(); else if(!$("#userMenu").hidden) $("#userMenu").hidden=true; });
+
+  // user menu + auth
+  const userMenu=$("#userMenu");
+  $("#meAvatar").onclick=(e)=>{ e.stopPropagation(); userMenu.hidden=!userMenu.hidden; };
+  document.addEventListener("click",(e)=>{ if(!userMenu.hidden && !e.target.closest(".user-wrap")) userMenu.hidden=true; });
+  $("#logoutBtn").onclick=logout;
+  $("#loginBtn").onclick=doLogin;
+  $("#authPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") doLogin(); });
+  $("#authEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") doLogin(); });
+  $("#billingSave").onclick=saveBilling;
+  $("#adminAddBtn").onclick=addAdminStudent;
+  $("#adminSettingsSave").onclick=saveSettings;
+  $("#impExit").onclick=exitImpersonation;
+  $("#calSyncBtn").onclick=openCalSync;
+  updateImpBanner();
+
+  // ---------- Init ----------
+  state.students.forEach(s=>{ if(!s.notesLog) s.notesLog=[]; if(!s.activeLessons) s.activeLessons=[]; });
+  renderTutors(); renderWeek(); renderSummary();
+  renderPacks(); renderAccount();
+  renderTeacherWeek(); renderTeacherSummary(); renderRoster();
+  updateCredits();
+  if (!DJ.isAuthenticated) {
+    document.querySelector(".app").style.display="none";
+    $("#authScreen").hidden=false;
+  } else {
+    if (DJ.role === "admin") applyAdmin();
+    else if (DJ.role === "tutor") applyTutor();
+    else applyStudent(DJ.currentUserId);
+  }
+})();
+</script>
+</body>
+</html>
