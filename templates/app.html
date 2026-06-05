@@ -570,19 +570,7 @@
     color: var(--ink); font-family: var(--font-body); font-size: 13.5px; border-radius: 9px; cursor: pointer; transition: 0.15s; }
   .um-item:hover { background: rgba(74,54,34,0.06); }
   .um-item svg { color: var(--muted); }
-  .auth-screen { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; }
-  .auth-screen[hidden] { display: none; }
-  .auth-card { width: min(380px, 100%); background: var(--glass); border: 1px solid var(--line); border-radius: 22px;
-    backdrop-filter: blur(18px); box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; }
-  .auth-card .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  .auth-h { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -0.02em; margin: 16px 0 5px; }
-  .auth-sub { font-size: 14px; color: var(--muted); margin-bottom: 22px; }
-  .auth-input { text-align: left; margin-bottom: 14px; cursor: text; color-scheme: light; width: 100%; }
-  .auth-err { color: #b8492c; font-size: 12.5px; text-align: left; margin: -4px 0 12px; min-height: 0; }
-  .auth-err:empty { display: none; }
-  .auth-card .btn { margin-top: 2px; }
-  .auth-hint { font-size: 11.5px; color: var(--faint); line-height: 1.5; margin-top: 14px; }
-  .auth-hint b { color: var(--muted); font-weight: 600; }
+  /* Sign-in lives on its own page now (templates/login.html). */
 
   /* ---------- Buy-credits info ---------- */
   .buy-card { text-align: center; }
@@ -978,23 +966,6 @@
   <div class="modal-overlay" id="studentModal" hidden></div>
   <div class="modal-overlay" id="receiptModal" hidden></div>
   <div class="modal-overlay" id="buyModal" hidden></div>
-  <div class="auth-screen" id="authScreen" hidden>
-    <div class="auth-card">
-      <div class="brand" style="justify-content:center;">
-        <div class="mark"></div>
-        <div class="wordmark">fluent<span>.</span></div>
-      </div>
-      <h2 class="auth-h">Sign in</h2>
-      <p class="auth-sub">Log in to manage your sessions and credits.</p>
-      <label class="field-label" style="text-align:left;">Email</label>
-      <input class="t-select auth-input" id="authEmail" type="email" autocomplete="username" placeholder="you@fluent.at" value="" />
-      <label class="field-label" style="text-align:left;">Password</label>
-      <input class="t-select auth-input" id="authPass" type="password" autocomplete="current-password" placeholder="Your password" value="" />
-      <div class="auth-err" id="authErr"></div>
-      <button class="btn" id="loginBtn"><span class="grainbtn"></span>Log in</button>
-      <div class="auth-hint">Demo logins — <b>maya@fluent.at</b> (student) or <b>davit@fluent.at</b> (tutor). Password: <b>password</b></div>
-    </div>
-  </div>
 
 <script>
 window.DJANGO_DATA = {{ django_data|safe }};
@@ -2417,28 +2388,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
     setView("admin");
   }
   function loginAs(acct){ if(acct.role==="admin") applyAdmin(); else if(acct.role==="tutor") applyTutor(); else applyStudent(acct.id); }
-  function authErr(m){ $("#authErr").textContent=m; }
-  function doLogin(){
-    const email=($("#authEmail").value||"").trim().toLowerCase();
-    const pass=$("#authPass").value||"";
-    if(!email){ authErr("Enter your email"); return; }
-    api('POST', '/api/login/', { email, password: pass }).then(r => {
-      if (!r) { authErr("Login failed. Check your connection."); return; }
-      if (r.error) { authErr(r.error); return; }
-      authErr("");
-      window.location.reload();
-    });
-  }
   function logout(){
-    api('POST', '/api/logout/');
-    resetTransient();
-    $("#authEmail").value=""; $("#authPass").value=""; authErr("");
-    state.impersonating=false; updateImpBanner();
-    document.querySelector(".app").style.display="none";
-    $("#authScreen").hidden=false;
+    // Sign-in lives on its own page (/login/), so clear the server session and
+    // bounce there. .finally guarantees the redirect even if the request fails.
+    api('POST', '/api/logout/').finally(()=>{ window.location.href = "/login/"; });
   }
-  function finishLogin(fn){ $("#authScreen").hidden=true; document.querySelector(".app").style.display=""; fn(); }
-  // logout() is defined above with doLogin()
   function impersonate(acct){ state.impersonating=true; state.impersonatedName=acct.name; loginAs(acct); updateImpBanner(); $("#userMenu").hidden=true; $("#main").scrollTop=0; }
   function exitImpersonation(){ state.impersonating=false; updateImpBanner(); applyAdmin(); }
   function updateImpBanner(){ const b=$("#impBanner"); if(!b) return; if(state.impersonating){ b.hidden=false; $("#impName").textContent=state.impersonatedName||""; } else { b.hidden=true; } }
@@ -2474,9 +2428,6 @@ window.DJANGO_DATA = {{ django_data|safe }};
   $("#meAvatar").onclick=(e)=>{ e.stopPropagation(); userMenu.hidden=!userMenu.hidden; };
   document.addEventListener("click",(e)=>{ if(!userMenu.hidden && !e.target.closest(".user-wrap")) userMenu.hidden=true; });
   $("#logoutBtn").onclick=logout;
-  $("#loginBtn").onclick=doLogin;
-  $("#authPass").addEventListener("keydown",(e)=>{ if(e.key==="Enter") doLogin(); });
-  $("#authEmail").addEventListener("keydown",(e)=>{ if(e.key==="Enter") doLogin(); });
   $("#billingSave").onclick=saveBilling;
   $("#adminAddBtn").onclick=addAdminStudent;
   $("#adminSettingsSave").onclick=saveSettings;
@@ -2495,8 +2446,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   // which left every nav tab visible regardless of role.
   updateCredits();
   if (!DJ.isAuthenticated) {
-    document.querySelector(".app").style.display="none";
-    $("#authScreen").hidden=false;
+    window.location.href = "/login/";
   } else {
     if (DJ.role === "admin") applyAdmin();
     else if (DJ.role === "tutor") applyTutor();
