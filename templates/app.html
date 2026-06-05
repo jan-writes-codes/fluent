@@ -1111,6 +1111,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
   function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
   function keyOf(d){ return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate(); }
+  // Local-time YYYY-MM-DD for the API. Date.toISOString() converts to UTC, which
+  // shifts a local-midnight date to the previous day for positive-UTC-offset
+  // users — saving bookings on the wrong day so they vanish from the calendar.
+  function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   const NOW = new Date(2026,5,1); // Mon Jun 1 2026 — start of a fresh week
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const MONTHS_S = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1127,7 +1131,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function allAccounts(){ return [tutorUser, ...state.students]; }
   function accountByEmail(email){ return [ADMIN, tutorUser, ...state.students].find(u=>u.email.toLowerCase()===email); }
   function accountById(id){ if(id==="davit") return tutorUser; if(id==="admin") return ADMIN; return studentById(id); }
-  function meLog(){ return studentById(state.currentUser).log; }
+  function meLog(){ const s=studentById(state.currentUser); return s ? s.log : []; }
 
   // ---------- Receipts (Austrian, VAT-exempt) ----------
   const SUPPLIER = { name:"Davit Petrosyan e.U.", line2:"Englisch-Privatunterricht", addr:"Lindengasse 12/4", city:"1070 Wien, \u00d6sterreich", email:"davit@fluent.at" };
@@ -1290,7 +1294,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const t=tutorById(b.tutorId);
     b.date=new Date(s.date); b.time=s.time;
     meLog().unshift({ type:"book", label:"Rescheduled with "+t.name, sub:"Now "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate()+" · "+b.time, amt:"" });
-    if (b._pk) api('PUT', '/api/bookings/' + b._pk + '/', { date: b.date.toISOString().split('T')[0], time: b.time });
+    if (b._pk) api('PUT', '/api/bookings/' + b._pk + '/', { date: ymd(b.date), time: b.time });
     state.rescheduling=null; state.selected=null; state.managing=null;
     state.justBooked=b; state.justAction="rescheduled";
     renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
@@ -1540,15 +1544,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
     meLog().unshift({ type:"book", label:"Booked with "+t.name, sub: "Session · "+MONTHS_S[s.date.getMonth()]+" "+s.date.getDate(), amt:"-1" });
     state.selected = null;
     state.justBooked = booking; state.justAction = "booked";
-    updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
-    toast(`Session booked with ${t.name.split(" ")[0]} · ${s.time}`);
+    // Persist first, so a rendering hiccup can never swallow the save.
     api('POST', '/api/bookings/', {
       studentSlug: state.currentUser,
       tutorSlug: s.tutorId,
-      date: s.date.toISOString().split('T')[0],
+      date: ymd(s.date),
       time: s.time,
       title: 'English session',
     }).then(r => { if (r && r.pk) booking._pk = r.pk; });
+    updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
+    toast(`Session booked with ${t.name.split(" ")[0]} · ${s.time}`);
   }
 
   // ---------- Credits ----------
@@ -1664,7 +1669,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
           if(bk){
             const s=studentById(bk.studentId);
             el.className="slot t-booked locked";
-            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}</span>`;
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Booked"}</span>`;
             el.onclick=()=>toast("Booked time can\u2019t be closed");
           } else if(conflict){
             el.className="slot avail avail-blocked";
@@ -1685,7 +1690,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         if(bk){
           const s=studentById(bk.studentId);
           el.className="slot t-booked"+(state.teacherManage===bk?" sel":"");
-          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}</span>`;
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Booked"}</span>`;
           el.onclick=()=>teacherManageSlot(bk);
         } else {
           const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
@@ -1726,7 +1731,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     api('POST', '/api/bookings/', {
       studentSlug: studentId,
       tutorSlug: 'davit',
-      date: date.toISOString().split('T')[0],
+      date: ymd(date),
       time,
       title: comp ? 'Comp session' : 'English session',
     }).then(r => { if (r && r.pk) state.bookings[state.bookings.length-1]._pk = r.pk; });
@@ -1938,6 +1943,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function tutorRow(b, completed){
     const s=studentById(b.studentId);
+    if(!s) return "";  // anonymized/non-roster booking (e.g. a student's "__blocked__" slot)
     return `<div class="li">
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
@@ -2372,6 +2378,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const s=studentById(id); state.credits=s.credits;
     showTabsForRole("student"); setIdentity(s);
     $("#acctHello").textContent = "Hello, "+s.name.split(" ")[0]+".";
+    renderTutors(); renderPacks();
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderBilling();
     setView("book");
   }
@@ -2437,14 +2444,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   // ---------- Init ----------
   state.students.forEach(s=>{ if(!s.notesLog) s.notesLog=[]; if(!s.activeLessons) s.activeLessons=[]; });
-  renderTutors(); renderWeek(); renderSummary();
-  renderPacks(); renderAccount();
-  // Tutor/admin-only views are rendered on demand by applyTutor()/applyAdmin()
-  // (incl. admin impersonation). Rendering them unconditionally here crashes for
-  // students, whose payload carries anonymized "__blocked__" bookings that have
-  // no roster entry — aborting init before the role dispatch below could run,
-  // which left every nav tab visible regardless of role.
-  updateCredits();
+  // Render strictly through the role dispatch below. Each apply*() renders only
+  // the views its role uses, so role-inappropriate code never runs: a student's
+  // anonymized "__blocked__" bookings don't reach the tutor calendar, and a
+  // tutor/admin (who is not in the student roster) never hits student-only paths
+  // like meLog(). A role-blind warm-up here previously threw before the dispatch
+  // ran, which left nav tabs ungated and the header identity stuck on defaults.
   if (!DJ.isAuthenticated) {
     window.location.href = "/login/";
   } else {

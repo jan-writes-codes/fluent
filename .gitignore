@@ -9,3 +9,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Node (frontend test deps)
+node_modules/
