@@ -2,13 +2,35 @@ import json
 from datetime import date
 from functools import wraps
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.http import require_http_methods
 from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
-    CustomTime, StudentNote, ActiveLesson, SiteSettings
+    CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile
 )
+
+# Uploaded lesson materials: an allowed type, reasonably sized.
+MAX_LESSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
+AUDIO_EXTS = {"mp3", "m4a", "wav", "ogg"}
+IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
+DOC_EXTS = {"pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "rtf"}
+ALLOWED_LESSON_EXTS = AUDIO_EXTS | IMAGE_EXTS | DOC_EXTS | {"zip"}
+
+
+def file_ext(name):
+    return name.rsplit(".", 1)[-1].lower() if name and "." in name else ""
+
+
+def file_kind(name):
+    e = file_ext(name)
+    if e in AUDIO_EXTS:
+        return "audio"
+    if e in IMAGE_EXTS:
+        return "image"
+    if e in DOC_EXTS:
+        return "doc"
+    return "file"
 
 
 # ---------------------------------------------------------------------------
@@ -131,12 +153,50 @@ def serialize_receipt(r):
     }
 
 
+def serialize_lesson_file(lf):
+    return {
+        "id": lf.pk,
+        "lessonId": lf.lesson_id,
+        "name": lf.original_name,
+        "ext": file_ext(lf.original_name).upper() or "FILE",
+        "kind": file_kind(lf.original_name),
+        "url": f"/api/lesson-files/download/{lf.pk}/",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def get_settings():
     return SiteSettings.objects.first() or SiteSettings.objects.create()
+
+
+def parse_price(s):
+    """Numeric euros from a price string like '€270' / '270,50' (None if absent)."""
+    import re
+    m = re.search(r"\d+(?:[.,]\d+)?", str(s or ""))
+    return float(m.group(0).replace(",", ".")) if m else None
+
+
+def receipt_unit_price(settings, n):
+    """Per-credit price for a purchase of n credits. If n matches a configured
+    pack, use that pack's total ÷ n so the receipt reflects the package price
+    (e.g. 10 credits -> €270, not 10 × the per-credit rate). Server-authoritative
+    so a client can't dictate the price. Falls back to the per-credit rate."""
+    try:
+        packs = json.loads(settings.packs_json)
+    except (ValueError, TypeError):
+        packs = []
+    for p in packs:
+        try:
+            if int(p.get("n")) == n:
+                amt = parse_price(p.get("price"))
+                if amt and n > 0:
+                    return round(amt / n)
+        except (ValueError, TypeError):
+            continue
+    return settings.credit_price
 
 
 def require_auth(request):
@@ -317,6 +377,17 @@ def app_view(request):
         ids = list(ActiveLesson.objects.filter(student=s).values_list("lesson_id", flat=True))
         active_lessons[s.slug] = ids
 
+    # Lesson PDFs: {lesson_id: [{id,name,url}]}. A student only receives files for
+    # lessons they've unlocked; tutor/admin get the full set to manage.
+    lesson_files = {}
+    if is_student:
+        my_ids = set(active_lessons.get(user.slug, []))
+        lf_qs = LessonFile.objects.filter(lesson_id__in=my_ids) if my_ids else LessonFile.objects.none()
+    else:
+        lf_qs = LessonFile.objects.all()
+    for lf in lf_qs:
+        lesson_files.setdefault(lf.lesson_id, []).append(serialize_lesson_file(lf))
+
     # Settings
     packs = json.loads(settings.packs_json)
     # receiptSeq: compute from max receipt number
@@ -344,6 +415,7 @@ def app_view(request):
         "customTimes": custom_times,
         "studentNotes": student_notes,
         "activeLessons": active_lessons,
+        "lessonFiles": lesson_files,
         "settings": {
             "creditPrice": settings.credit_price,
             "packs": packs,
@@ -481,7 +553,7 @@ def api_credits(request, slug):
         student=student,
         date_str=date_str,
         credits=n,
-        unit_price_cents=settings.credit_price,
+        unit_price_cents=receipt_unit_price(settings, n),
     )
 
     CreditTransaction.objects.create(
@@ -613,6 +685,69 @@ def api_lessons(request, slug):
         return JsonResponse({"ok": True})
     except User.DoesNotExist as e:
         return JsonResponse({"error": str(e)}, status=404)
+
+
+# ---------------------------------------------------------------------------
+# Lesson files API (PDF materials, shared per lesson)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_lesson_files(request, lesson_id):
+    f = request.FILES.get("file")
+    if not f:
+        return JsonResponse({"error": "No file uploaded."}, status=400)
+    name = f.name or "file"
+    if file_ext(name) not in ALLOWED_LESSON_EXTS:
+        return JsonResponse(
+            {"error": "Unsupported file type. Allowed: PDF, Office docs, images, audio, zip."},
+            status=400,
+        )
+    if f.size > MAX_LESSON_FILE_BYTES:
+        return JsonResponse({"error": "File too large (max 25 MB)."}, status=400)
+    lf = LessonFile.objects.create(
+        lesson_id=lesson_id, file=f, original_name=name[:255], uploaded_by=request.user,
+    )
+    return JsonResponse(serialize_lesson_file(lf))
+
+
+@require_http_methods(["DELETE"])
+@require_roles("tutor", "admin")
+def api_lesson_file_detail(request, file_id):
+    try:
+        lf = LessonFile.objects.get(pk=file_id)
+    except LessonFile.DoesNotExist:
+        return JsonResponse({"error": "not found"}, status=404)
+    lf.file.delete(save=False)  # remove the blob from storage too
+    lf.delete()
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["GET"])
+def api_lesson_file_download(request, file_id):
+    # Access-controlled file serving (no public MEDIA URL): students may only
+    # download materials for lessons they have unlocked; tutor/admin always.
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "auth"}, status=401)
+    try:
+        lf = LessonFile.objects.get(pk=file_id)
+    except LessonFile.DoesNotExist:
+        raise Http404
+    if request.user.role == "student" and not ActiveLesson.objects.filter(
+        student=request.user, lesson_id=lf.lesson_id
+    ).exists():
+        return JsonResponse({"error": "forbidden"}, status=403)
+    import mimetypes
+    ctype = mimetypes.guess_type(lf.original_name)[0] or "application/octet-stream"
+    try:
+        resp = FileResponse(lf.file.open("rb"), content_type=ctype)
+    except FileNotFoundError:
+        raise Http404
+    # Sanitize the user-supplied filename before putting it in a header. Served
+    # as an attachment (+ global nosniff) so nothing renders inline.
+    safe = lf.original_name.replace('"', "").replace("\r", "").replace("\n", "") or "lesson"
+    resp["Content-Disposition"] = f'attachment; filename="{safe}"'
+    return resp
 
 
 # ---------------------------------------------------------------------------

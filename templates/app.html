@@ -355,6 +355,18 @@
   .cm-les.on .cm-toggle { background: var(--good); }
   .cm-les.on .cm-toggle::after { left: 16px; }
   .cm-les-t { font-size: 13px; font-weight: 500; line-height: 1.3; }
+  .cm-les-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .cm-les-wrap .cm-les { width: 100%; }
+  .cm-files { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 2px; }
+  .cm-file { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 3px 4px 3px 9px;
+    border-radius: 999px; background: rgba(74,54,34,0.06); max-width: 100%; }
+  .cm-file a { color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+  .cm-file a:hover { text-decoration: underline; }
+  .cm-file-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; border-radius: 50%; }
+  .cm-file-x:hover { color: #b8492c; }
+  .cm-upload { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; color: var(--c1); cursor: pointer;
+    padding: 3px 10px; border-radius: 999px; border: 1px dashed color-mix(in oklch, var(--c1) 45%, transparent); }
+  .cm-upload:hover { background: color-mix(in oklch, var(--c1) 10%, transparent); }
 
   .balance { padding: 28px; position: relative; }
   .balance .ring { position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%;
@@ -990,6 +1002,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
     } catch (e) { return null; }
   }
 
+  // Multipart upload (files). Returns the parsed JSON on success, or {error}.
+  async function apiUpload(url, file) {
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const r = await fetch(url, { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: fd });
+      if (r.status === 401) { logout(); return null; }
+      const data = await r.json().catch(() => null);
+      return r.ok ? data : { error: (data && data.error) || 'Upload failed.' };
+    } catch (e) { return { error: 'Upload failed.' }; }
+  }
+
   const TUTORS = [
     { id: "davit", name: "Davit", role: "English tutor · Conversation & IELTS", c: ["#c2714d","#a85535"], i: "D" },
   ];
@@ -1078,6 +1101,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     })),
     gameBest: {},
     studentQuery: "",
+    lessonFiles: DJ.lessonFiles || {},  // {lesson_id: [{id,name,url}]}
   };
 
   // Credit packs from settings or fallback
@@ -1141,9 +1165,20 @@ window.DJANGO_DATA = {{ django_data|safe }};
   const VAT_EN = "VAT-exempt educational service under Austrian law \u2014 no value-added tax is charged.";
   function money(x){ return x.toFixed(2).replace(".", ","); }
   function fmtAT(d){ return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear(); }
+  // Numeric euros from a price string like "€270" / "270,50" (null if none).
+  function parsePrice(s){ const m=String(s==null?"":s).replace(",",".").match(/\d+(?:\.\d+)?/); return m?parseFloat(m[0]):null; }
+  // Per-credit price for a purchase of n credits: if n matches a pack, use that
+  // pack's total ÷ n so the receipt reflects the package price (e.g. 10 → €270),
+  // not n × the per-credit rate. Falls back to the per-credit receipts rate.
+  function unitForCredits(n){
+    const p = PACKS.find(p => +p.n === +n);
+    if(p){ const amt = parsePrice(p.price); if(amt && n>0) return Math.round(amt/n); }
+    return state.creditPrice;
+  }
   function issueReceipt(s, n, dateStr){
     const no = "RE-"+NOW.getFullYear()+"-"+String(state.receiptSeq++).padStart(4,"0");
-    const r = { no, dateStr: dateStr || fmtAT(NOW), studentName: s.name, studentId: s.id, billing: (s.billing?{...s.billing}:null), credits: n, unit: state.creditPrice, net: n*state.creditPrice, total: n*state.creditPrice };
+    const unit = unitForCredits(n);
+    const r = { no, dateStr: dateStr || fmtAT(NOW), studentName: s.name, studentId: s.id, billing: (s.billing?{...s.billing}:null), credits: n, unit, net: n*unit, total: n*unit };
     state.receipts.push(r);
     return r;
   }
@@ -1901,6 +1936,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="section-h" style="margin:22px 2px 8px;"><h2>Learning files <span class="lbl-only">· A1–C1</span></h2></div>
         <div class="micro" style="text-align:left; margin:0 2px 12px;">Toggle the lessons ${escHtml(s.name.split(' ')[0])} can access in their Learning tab.</div>
         <div class="curric-mgr">${curriculumMgrHtml(s)}</div>
+        <button class="btn ghost" id="prevToggle" style="margin-top:14px;">Preview ${escHtml(s.name.split(' ')[0])}’s Learning tab</button>
+        <div class="learn-preview" id="learnPreview" hidden style="margin-top:6px;"></div>
         <div class="section-h" style="margin:22px 2px 6px;"><h2>Transaction history</h2></div>
         <div class="activity modal-txns">${txnHtml(s.log)}</div>
       </div>`;
@@ -1909,8 +1946,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#studentModal").querySelectorAll("[data-madd]").forEach(btn=> btn.onclick=()=>topUp(s, +btn.dataset.madd, true));
     $("#snoteAdd").onclick=()=>addStudentNote(s);
     $("#snoteInput").addEventListener("keydown", e=>{ if(e.key==="Enter") addStudentNote(s); });
-    $("#studentModal").querySelectorAll("[data-lesson]").forEach(b=> b.onclick=()=>{ toggleLesson(s, b.dataset.lesson); renderStudentModal(); });
+    $("#studentModal").querySelectorAll(".cm-les[data-lesson]").forEach(b=> b.onclick=()=>{ toggleLesson(s, b.dataset.lesson); renderStudentModal(); });
     $("#studentModal").querySelectorAll("[data-lvl-all]").forEach(b=> b.onclick=()=>{ toggleLevel(s, b.dataset.lvlAll); renderStudentModal(); });
+    $("#studentModal").querySelectorAll("[data-upload]").forEach(inp=> inp.onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; uploadLessonFile(inp.dataset.upload, f, ()=>renderStudentModal()); });
+    $("#studentModal").querySelectorAll("[data-rmfile]").forEach(b=> b.onclick=()=>{ removeLessonFile(b.dataset.lesson, +b.dataset.rmfile, ()=>renderStudentModal()); });
+    const prevToggle=$("#prevToggle");
+    if(prevToggle) prevToggle.onclick=()=>{
+      const p=$("#learnPreview"), show=p.hidden;
+      if(show){ p.innerHTML=lessonPreviewHtml(s); p.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open")); }
+      p.hidden=!show;
+      prevToggle.textContent = show ? "Hide preview" : ("Preview "+s.name.split(' ')[0]+"’s Learning tab");
+    };
     bindReceiptLinks($("#studentModal"));
     if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
   }
@@ -1984,6 +2030,15 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function esc(s){ return String(s==null?"":s).replace(/"/g,"&quot;"); }
   function escHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); if($("#adminPrice")) $("#adminPrice").value=state.creditPrice; }
+  // Auto-derived "per session" label = total price ÷ credits. Blank (never a
+  // ZeroDivision/NaN) when credits or price are missing.
+  function packEach(n, price){
+    const credits = parseInt(n, 10);
+    const amt = parsePrice(price);
+    if(!credits || credits <= 0 || amt == null) return "";
+    const per = amt / credits;
+    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / session";
+  }
   function renderAdminPacks(){
     const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
     PACKS.forEach((p,idx)=>{
@@ -1991,9 +2046,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
       row.innerHTML=`
         <label class="bf-lab">Credits<input class="bf-input" data-pk="${idx}" data-f="n" type="number" min="1" value="${p.n}"></label>
         <label class="bf-lab">Price<input class="bf-input" data-pk="${idx}" data-f="price" value="${esc(p.price)}"></label>
-        <label class="bf-lab">Per session<input class="bf-input" data-pk="${idx}" data-f="each" value="${esc(p.each)}"></label>`;
+        <label class="bf-lab">Per session<input class="bf-input" data-each="${idx}" value="${esc(packEach(p.n, p.price))}" readonly tabindex="-1" aria-readonly="true" style="opacity:0.7; cursor:default;"></label>`;
       el.appendChild(row);
     });
+    // Recompute the read-only per-session live as Credits / Price are typed.
+    const recompute = (idx)=>{
+      const nEl=el.querySelector(`[data-pk="${idx}"][data-f="n"]`);
+      const priceEl=el.querySelector(`[data-pk="${idx}"][data-f="price"]`);
+      const eachEl=el.querySelector(`[data-each="${idx}"]`);
+      if(eachEl) eachEl.value = packEach(nEl.value, priceEl.value);
+    };
+    el.querySelectorAll('[data-pk]').forEach(inp=>{ inp.oninput=()=>recompute(+inp.dataset.pk); });
   }
   function saveSettings(){
     const v=parseInt($("#adminPrice").value,10); if(!isNaN(v)&&v>0) state.creditPrice=v;
@@ -2002,6 +2065,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       if(f==="n"){ const n=parseInt(inp.value,10); if(!isNaN(n)&&n>0) p.n=n; }
       else p[f]=inp.value;
     });
+    // "each" is always derived from price ÷ credits — never hand-entered.
+    PACKS.forEach(p=>{ p.each = packEach(p.n, p.price); });
     api('PUT', '/api/settings/', { creditPrice: state.creditPrice, packs: PACKS });
     renderPacks(); renderAdmin();
     toast("Pricing saved");
@@ -2163,9 +2228,30 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function toggleLevel(s,level){ const lvl=CURRICULUM.find(x=>x.level===level); if(!lvl) return; const allOn=lvl.lessons.every(l=>isActive(s,l.id)); lvl.lessons.forEach(l=>toggleLesson(s,l.id,!allOn)); }
   function fileIcon(kind){
     if(kind==="audio") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="19" cy="16" r="3"/></svg>';
+    if(kind==="image") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>';
   }
-  function lessonFiles(t){ return [ {n:t+" \u2014 worksheet", ext:"PDF", kind:"doc"}, {n:t+" \u2014 grammar notes", ext:"PDF", kind:"doc"}, {n:t+" \u2014 listening practice", ext:"MP3", kind:"audio"} ]; }
+  // Mirror of the server's allowed lesson-material types.
+  const ALLOWED_FILE_EXTS = ["pdf","doc","docx","ppt","pptx","xls","xlsx","txt","rtf","mp3","m4a","wav","ogg","png","jpg","jpeg","gif","webp","zip"];
+  // Real PDFs the tutor uploaded for this lesson (server-backed).
+  function lessonFilesFor(id){ return (state.lessonFiles && state.lessonFiles[id]) || []; }
+  function uploadLessonFile(lessonId, file, after){
+    if(!file) return;
+    const ext=(file.name.split(".").pop()||"").toLowerCase();
+    if(!ALLOWED_FILE_EXTS.includes(ext)){ toast("Unsupported file type"); return; }
+    toast("Uploading "+file.name+"\u2026");
+    apiUpload('/api/lesson-files/'+lessonId+'/', file).then(res=>{
+      if(!res || res.error){ toast(res && res.error ? res.error : "Upload failed"); return; }
+      (state.lessonFiles[lessonId] = state.lessonFiles[lessonId] || []).push(res);
+      toast("Added "+res.name);
+      if(after) after();
+    });
+  }
+  function removeLessonFile(lessonId, fileId, after){
+    api('DELETE', '/api/lesson-files/'+fileId+'/');
+    state.lessonFiles[lessonId] = (state.lessonFiles[lessonId]||[]).filter(f=>f.id!==fileId);
+    if(after) after();
+  }
   function renderFiles(){
     const el=$("#filesContent"); if(!el) return;
     const s=studentById(state.currentUser); if(!s) return;
@@ -2181,9 +2267,24 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
   function lessonRow(s,l){
     if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${l.t}</span><span class="les-tag">Locked</span></div></div>`;
-    const files=lessonFiles(l.t);
+    const files=lessonFilesFor(l.id);
+    const filesHtml = files.length
+      ? files.map(f=>`<a class="file-row" href="${escHtml(f.url)}"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${escHtml(f.name)}</span><span class="file-ext">${escHtml(f.ext||'FILE')}</span></a>`).join("")
+      : `<div class="micro" style="text-align:left;padding:8px 4px;">No materials yet — your tutor hasn’t added files for this lesson.</div>`;
     return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${l.t}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
-      <div class="les-files">${files.map(f=>`<a class="file-row" href="#" onclick="return false;"><span class="file-ic ${f.kind}">${fileIcon(f.kind)}</span><span class="file-n">${f.n}</span><span class="file-ext">${f.ext}</span></a>`).join("")}</div></div>`;
+      <div class="les-files">${filesHtml}</div></div>`;
+  }
+  // Read-only render of a student's Learning tab exactly as they see it — only
+  // the lessons they've unlocked, with their downloadable materials.
+  function lessonPreviewHtml(s){
+    const secs = CURRICULUM.map(lvl=>{
+      const ls = lvl.lessons.filter(l=>isActive(s,l.id));
+      if(!ls.length) return "";
+      return `<div class="lvl-sec" style="margin-top:14px;">
+        <div class="lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="lvl-name">${lvl.title}</span></div>
+        <div class="lesson-list">${ls.map(l=>lessonRow(s,l)).join("")}</div></div>`;
+    }).filter(Boolean).join("");
+    return secs || `<div class="empty-list">No lessons unlocked yet — toggle some above.</div>`;
   }
   function curriculumMgrHtml(s){
     return CURRICULUM.map(lvl=>{
@@ -2192,7 +2293,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="cm-lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="cm-lvl-name">${lvl.title}</span><button class="cm-all" data-lvl-all="${lvl.level}">${allOn?"Clear all":"Unlock all"}</button></div>
         <div class="cm-lessons">${lvl.lessons.map(l=>{
           const on=isActive(s,l.id);
-          return `<button class="cm-les ${on?'on':''}" data-lesson="${l.id}"><span class="cm-toggle"></span><span class="cm-les-t">${l.t}</span></button>`;
+          const files=lessonFilesFor(l.id);
+          const filesHtml = files.map(f=>`<span class="cm-file"><a href="${escHtml(f.url)}" title="Download">${escHtml(f.name)}</a><button class="cm-file-x" data-rmfile="${f.id}" data-lesson="${l.id}" title="Remove" aria-label="Remove file">×</button></span>`).join("");
+          return `<div class="cm-les-wrap">
+            <button class="cm-les ${on?'on':''}" data-lesson="${l.id}"><span class="cm-toggle"></span><span class="cm-les-t">${l.t}</span></button>
+            <div class="cm-files">${filesHtml}<label class="cm-upload">+ File<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip" data-upload="${l.id}" hidden></label></div>
+          </div>`;
         }).join("")}</div>
       </div>`;
     }).join("");

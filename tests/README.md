@@ -33,6 +33,10 @@ python manage.py test core.tests.BookingPersistenceTests   # one class
 | API authorization (RBAC, IDOR, privilege escalation) | `AuthorizationTests.*` |
 | CSRF protection on mutating endpoints | `CsrfTests.*` |
 | Login user-enumeration | `AuthorizationTests.test_login_errors_do_not_enumerate` |
+| Pack purchases bill the package total (not credits × rate) | `PricingReceiptTests.*` |
+| Per-session is auto-derived, read-only, ZeroDivision-safe | `DomPricingTests.*` |
+| Lesson PDFs: tutor upload, access-controlled download, scoping | `LessonFileTests.*` |
+| Students see real lesson download links | `DomLessonTests.*` |
 
 ## Layers
 
