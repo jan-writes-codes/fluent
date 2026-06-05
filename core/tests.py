@@ -36,7 +36,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from .models import User, Booking, Receipt, ActiveLesson, LessonFile
+from .models import User, Booking, Receipt, ActiveLesson, LessonFile, SiteSettings
 
 
 # --------------------------------------------------------------------------- #
@@ -601,7 +601,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, quick_adds=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get("/").content.decode()
@@ -625,6 +625,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--learning")
             if preview:
                 cmd.append("--preview")
+            if quick_adds:
+                cmd.append("--quick-adds")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -722,6 +724,18 @@ class DomLessonTests(_DomProbeBase):
         r = self.run_probe(self.davit, preview=True)
         self.assertEqual(r["initErrors"], [])
         self.assertIn(f"/api/lesson-files/download/{lf.pk}/", r["preview"]["fileLinks"])
+
+
+class DomQuickAddTests(_DomProbeBase):
+    def test_quick_add_buttons_match_admin_packs(self):
+        # Custom packs -> the tutor's +N credit buttons must follow them.
+        SiteSettings.objects.all().delete()
+        SiteSettings.objects.create(credit_price=30, packs_json=json.dumps([
+            {"n": 2, "price": "€60"}, {"n": 4, "price": "€110"}, {"n": 8, "price": "€200"},
+        ]))
+        r = self.run_probe(self.davit, quick_adds=True)
+        self.assertEqual(r["initErrors"], [])
+        self.assertEqual(sorted(set(r["quickAdds"])), [2, 4, 8])
 
 
 class DomBookingTests(_DomProbeBase):
