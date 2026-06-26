@@ -35,7 +35,7 @@ class Command(BaseCommand):
         maya = User.objects.create_user(
             username="maya", email="maya@fluent.at", password="password",
             role="student", slug="maya", initials="MK",
-            credits=8, color1="#c2714d", color2="#a85535",
+            credits=8, color1="#309050", color2="#277a42",
             first_name="Maya", last_name="Karlsson",
             billing_name="Maya Karlsson",
             billing_line1="Mariahilfer Straße 45/12",
@@ -45,7 +45,7 @@ class Command(BaseCommand):
         theo = User.objects.create_user(
             username="theo", email="theo@fluent.at", password="password",
             role="student", slug="theo", initials="TN",
-            credits=3, color1="#8a9a6b", color2="#6f8455",
+            credits=3, color1="#4cb56b", color2="#3a8f52",
             first_name="Theo", last_name="Nguyen",
             billing_name="Theo Nguyen",
             billing_line1="Praterstraße 8/3",
@@ -55,7 +55,7 @@ class Command(BaseCommand):
         ines = User.objects.create_user(
             username="ines", email="ines@fluent.at", password="password",
             role="student", slug="ines", initials="IR",
-            credits=0, color1="#cf9b86", color2="#bd7d6b",
+            credits=0, color1="#7cb342", color2="#5a9e3f",
             first_name="Inés", last_name="Romero",
             billing_name="Inés Romero",
             billing_line1="Getreidegasse 21",
@@ -65,7 +65,7 @@ class Command(BaseCommand):
         omar = User.objects.create_user(
             username="omar", email="omar@fluent.at", password="password",
             role="student", slug="omar", initials="OH",
-            credits=12, color1="#d6a25c", color2="#c0863f",
+            credits=12, color1="#52a86a", color2="#2f8a4d",
             first_name="Omar", last_name="Haddad",
             billing_name="Omar Haddad",
             billing_line1="Herrengasse 12",
@@ -75,7 +75,7 @@ class Command(BaseCommand):
         lena = User.objects.create_user(
             username="lena", email="lena@fluent.at", password="password",
             role="student", slug="lena", initials="LF",
-            credits=1, color1="#7fa0b0", color2="#5f8294",
+            credits=1, color1="#6bbf86", color2="#3f9a5e",
             first_name="Lena", last_name="Fischer",
             billing_name="Lena Fischer",
             billing_line1="Maria-Theresien-Str. 18",
@@ -87,7 +87,7 @@ class Command(BaseCommand):
         davit = User.objects.create_user(
             username="davit", email="davit@fluent.at", password="password",
             role="tutor", slug="davit", initials="DV",
-            color1="#c2714d", color2="#a85535",
+            color1="#309050", color2="#277a42",
             first_name="Davit", last_name="Petrosyan",
             receipt_seq=1000,
         )
@@ -96,7 +96,7 @@ class Command(BaseCommand):
         admin_user = User.objects.create_user(
             username="admin", email="admin@fluent.at", password="password",
             role="admin", slug="admin", initials="AD",
-            color1="#8a7cb0", color2="#5f5188",
+            color1="#3aa55c", color2="#277a42",
             first_name="Studio", last_name="Admin",
             receipt_seq=1000,
         )
