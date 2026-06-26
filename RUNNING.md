@@ -15,6 +15,10 @@ python manage.py runserver
 
 Then open http://127.0.0.1:8000/.
 
+The public marketing **landing page** is served at `/` (the site's front door).
+Its "Stunde buchen" / "Erste Stunde buchen" CTAs lead into the booking app at
+`/app/`, which gates on login.
+
 ## Demo logins (password is `password` for all)
 
 | Email              | Role    | Lands on        |
@@ -32,7 +36,8 @@ Then open http://127.0.0.1:8000/.
 - **`core/models.py`** — `User` (custom, role + credits + billing), `Booking`,
   `CreditTransaction`, `Receipt`, `AvailabilityOverride`, `CustomTime`,
   `StudentNote`, `ActiveLesson`, `SiteSettings`.
-- **`core/views.py`** — `app_view` renders `templates/app.html`, injecting all
+- **`core/views.py`** — `landing_view` renders the public `templates/landing.html`
+  marketing page at `/`. `app_view` renders `templates/app.html` at `/app/`, injecting all
   the data the SPA needs as `window.DJANGO_DATA`. The remaining views are a small
   JSON API (login/logout, booking CRUD, credits + receipts, billing, availability,
   custom times, notes, lessons, admin user CRUD, settings).

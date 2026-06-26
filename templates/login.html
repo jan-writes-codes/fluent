@@ -159,7 +159,7 @@
     if (!r) { authErr("Login failed. Check your connection."); return; }
     if (r.error) { authErr(r.error); return; }
     // Success — land on the app.
-    window.location.href = "/";
+    window.location.href = "/app/";
   }
 
   $("#authForm").addEventListener("submit", (e) => { e.preventDefault(); doLogin(); });

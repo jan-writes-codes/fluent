@@ -107,8 +107,17 @@ class FluentDataMixin:
 # Login page + auto-redirect
 # --------------------------------------------------------------------------- #
 class LoginPageTests(FluentDataMixin, TestCase):
+    def test_landing_page_is_public_home(self):
+        # The marketing landing page is the site's front door — public, at "/".
+        resp = self.client.get(reverse("landing"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(reverse("landing"), "/")
+        self.assertContains(resp, "fluent")
+        # CTAs funnel visitors into the booking app.
+        self.assertContains(resp, 'href="/app/"')
+
     def test_anonymous_app_redirects_to_login(self):
-        resp = self.client.get("/")
+        resp = self.client.get(reverse("app"))
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.headers["Location"], reverse("login"))
 
@@ -126,7 +135,7 @@ class LoginPageTests(FluentDataMixin, TestCase):
 
     def test_authenticated_app_renders(self):
         self.client.force_login(self.maya)
-        resp = self.client.get("/")
+        resp = self.client.get(reverse("app"))
         self.assertEqual(resp.status_code, 200)
 
     def test_api_login_success_then_logout(self):
@@ -138,10 +147,10 @@ class LoginPageTests(FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["role"], "tutor")
         # session is live: app renders
-        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertEqual(self.client.get(reverse("app")).status_code, 200)
         # logout, then app bounces to login again
         self.client.post("/api/logout/")
-        self.assertEqual(self.client.get("/").headers["Location"], reverse("login"))
+        self.assertEqual(self.client.get(reverse("app")).headers["Location"], reverse("login"))
 
     def test_api_login_bad_password(self):
         resp = self.client.post(
@@ -187,7 +196,7 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
     def test_tutor_sees_students_booking(self):
         self._book("maya", "davit", "2026-06-08", "09:30")
         self.client.force_login(self.davit)
-        payload = extract_payload(self.client.get("/").content.decode())
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
         match = [
             b for b in payload["bookings"]
             if b["studentId"] == "maya" and b["date"] == "2026-06-08" and b["time"] == "09:30"
@@ -197,7 +206,7 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
     def test_other_student_sees_booking_anonymized(self):
         self._book("maya", "davit", "2026-06-08", "09:30")
         self.client.force_login(self.ines)
-        payload = extract_payload(self.client.get("/").content.decode())
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
         # The slot is blocked for ines...
         blocked = [
             b for b in payload["bookings"]
@@ -222,7 +231,7 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.client.force_login(self.ines)
-        payload = extract_payload(self.client.get("/").content.decode())
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
         match = [
             b for b in payload["bookings"]
             if b["studentId"] == "ines" and b["date"] == "2026-06-09" and b["time"] == "14:30"
@@ -236,7 +245,7 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
 class RoleScopingTests(FluentDataMixin, TestCase):
     def _payload_for(self, user):
         self.client.force_login(user)
-        html = self.client.get("/").content.decode()
+        html = self.client.get(reverse("app")).content.decode()
         return extract_payload(html), extract_data_role(html)
 
     def test_student_payload_is_self_only(self):
@@ -296,7 +305,7 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         )
         self.assertEqual(login.status_code, 200)
         self.assertEqual(login.json()["role"], "student")
-        self.assertEqual(fresh.get("/").status_code, 200)
+        self.assertEqual(fresh.get(reverse("app")).status_code, 200)
 
     def test_billing_name_change_updates_initials(self):
         self.client.force_login(self.maya)
@@ -553,12 +562,12 @@ class LessonFileTests(FluentDataMixin, TestCase):
         self._upload()
         # maya (a1-1 unlocked) receives the file
         self.client.force_login(self.maya)
-        payload = extract_payload(self.client.get("/").content.decode())
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
         self.assertIn("a1-1", payload["lessonFiles"])
         self.assertEqual(payload["lessonFiles"]["a1-1"][0]["name"], "worksheet.pdf")
         # ines (locked) does not
         self.client.force_login(self.ines)
-        payload = extract_payload(self.client.get("/").content.decode())
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
         self.assertNotIn("a1-1", payload.get("lessonFiles", {}))
 
     def test_tutor_deletes_file(self):
@@ -604,7 +613,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
     def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
-        html = self.client.get("/").content.decode()
+        html = self.client.get(reverse("app")).content.decode()
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as fh:
             fh.write(html)
             path = fh.name
