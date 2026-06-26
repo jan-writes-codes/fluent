@@ -291,6 +291,12 @@ def receipt_html(r_data, settings):
 # Main app view
 # ---------------------------------------------------------------------------
 
+def landing_view(request):
+    # Public marketing landing page — the site's front door. No auth required;
+    # its CTAs funnel visitors into the booking app (which gates on login).
+    return render(request, "landing.html")
+
+
 def login_view(request):
     # Standalone sign-in page. Authenticated users have no business here.
     if request.user.is_authenticated:
