@@ -125,7 +125,7 @@ class LoginPageTests(FluentDataMixin, TestCase):
         resp = self.client.get(reverse("login"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'id="authForm"')
-        self.assertContains(resp, "Sign in")
+        self.assertContains(resp, "Anmelden")
 
     def test_authenticated_login_redirects_to_app(self):
         self.client.force_login(self.maya)
