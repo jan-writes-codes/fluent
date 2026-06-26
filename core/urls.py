@@ -5,6 +5,8 @@ urlpatterns = [
     path('', views.landing_view, name='landing'),
     path('app/', views.app_view, name='app'),
     path('login/', views.login_view, name='login'),
+    path('impressum/', views.impressum_view, name='impressum'),
+    path('datenschutz/', views.datenschutz_view, name='datenschutz'),
     path('api/login/', views.api_login),
     path('api/logout/', views.api_logout),
     path('api/bookings/', views.api_bookings),
