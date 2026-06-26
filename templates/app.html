@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Fluent — English Tutoring</title>
+<title>The Green Pencil — Englisch-Nachhilfe</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesque:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -11,23 +11,23 @@
 <meta name="csrf-token" content="{{ csrf_token }}">
 <style>
   :root {
-    --bg: #ece0cb;
-    --bg-2: #e3d4bb;
-    --ink: #3b2f24;
-    --muted: #897a64;
-    --faint: #ab9c84;
-    --line: rgba(74,54,34,0.18);
-    --line-2: rgba(74,54,34,0.10);
-    --glass: rgba(250,244,233,0.58);
-    --glass-2: rgba(250,244,233,0.5);
-    --c1: #c2714d;  /* terracotta */
-    --c2: #d6a25c;  /* honey ochre */
-    --c3: #8a9a6b;  /* sage */
+    --bg: #f5f2ea;
+    --bg-2: #efe8da;
+    --ink: #243528;
+    --muted: #6e7d6e;
+    --faint: #9aa897;
+    --line: rgba(36,53,40,0.16);
+    --line-2: rgba(36,53,40,0.09);
+    --glass: rgba(251,248,241,0.60);
+    --glass-2: rgba(251,248,241,0.50);
+    --c1: #309050;  /* grass green - exact logo */
+    --c2: #d0925a;  /* warm apricot accent */
+    --c3: #277a42;  /* forest green */
     --accent: var(--c1);
-    --good: #6f8f57;  /* meadow */
-    --grain: 0.25;
+    --good: #3aa55c;  /* booked / success green */
+    --grain: 0.22;
     --radius: 18px;
-    --shadow: 0 26px 60px -34px rgba(80,52,28,0.5);
+    --shadow: 0 26px 60px -34px rgba(31,60,34,0.45);
     --font-display: "Bricolage Grotesque", "Hanken Grotesque", ui-sans-serif, system-ui, sans-serif;
     --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
     font-synthesis: none;
@@ -49,11 +49,11 @@
   .blob.b1 { width: 60vw; height: 60vw; left: -14vw; top: -22vw;
     background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); animation: drift1 26s ease-in-out infinite; }
   .blob.b2 { width: 52vw; height: 52vw; right: -12vw; top: -10vw;
-    background: radial-gradient(circle at 60% 40%, var(--c2), transparent 60%); animation: drift2 32s ease-in-out infinite; }
+    background: radial-gradient(circle at 60% 40%, #f4dade, transparent 60%); animation: drift2 32s ease-in-out infinite; }
   .blob.b3 { width: 58vw; height: 58vw; right: 6vw; bottom: -28vw;
-    background: radial-gradient(circle at 50% 50%, var(--c3), transparent 60%); opacity: 0.5; animation: drift3 30s ease-in-out infinite; }
+    background: radial-gradient(circle at 50% 50%, #f2c9a1, transparent 60%); opacity: 0.5; animation: drift3 30s ease-in-out infinite; }
   .blob.b4 { width: 40vw; height: 40vw; left: 6vw; bottom: -22vw;
-    background: radial-gradient(circle at 50% 50%, #cf9b86, transparent 62%); opacity: 0.46; animation: drift1 36s ease-in-out infinite reverse; }
+    background: radial-gradient(circle at 50% 50%, #4cb56b, transparent 62%); opacity: 0.46; animation: drift1 36s ease-in-out infinite reverse; }
   @keyframes drift1 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(6vw,4vw) scale(1.08);} }
   @keyframes drift2 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(-5vw,5vw) scale(1.05);} }
   @keyframes drift3 { 0%,100%{ transform: translate(0,0) scale(1);} 50%{ transform: translate(4vw,-4vw) scale(1.1);} }
@@ -64,7 +64,7 @@
     mix-blend-mode: multiply; animation: jitter 0.6s steps(2) infinite; }
   @keyframes jitter { 0%{transform:translate(0,0)} 50%{transform:translate(-3%, 2%)} 100%{transform:translate(2%,-3%)} }
   .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
-    background: radial-gradient(125% 95% at 50% 0%, transparent 58%, rgba(92,60,32,0.15) 100%); }
+    background: radial-gradient(125% 95% at 50% 0%, transparent 58%, rgba(31,60,34,0.15) 100%); }
 
   /* ---------- App shell ---------- */
   .app { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; }
@@ -74,19 +74,21 @@
     padding: 16px 30px;
     border-bottom: 1px solid var(--line-2);
     backdrop-filter: blur(14px);
-    background: linear-gradient(180deg, rgba(250,244,233,0.72), rgba(250,244,233,0.22));
+    background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22));
     position: relative; z-index: 30;
   }
-  .brand { display: flex; align-items: center; gap: 11px; }
-  .mark { width: 30px; height: 30px; border-radius: 9px; position: relative;
-    background: conic-gradient(from 200deg, var(--c1), var(--c2), var(--c3), var(--c1));
-    box-shadow: 0 0 22px -2px color-mix(in oklch, var(--accent) 70%, transparent); }
-  .mark::after { content:""; position:absolute; inset: 7px; border-radius: 4px; background: var(--bg); }
-  .mark::before { content:""; position:absolute; inset:0; border-radius:9px;
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
+    display: grid; place-items: center;
+    background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%);
+    box-shadow: 0 12px 26px -10px rgba(58,165,92,0.55); }
+  .mark::before { content:""; position:absolute; inset:0; border-radius:12px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
     mix-blend-mode: overlay; }
-  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
-  .wordmark span { color: var(--muted); font-weight: 400; }
+  .mark img { width: 18px; height: auto; position: relative; transform: translateY(-1px); filter: brightness(0) invert(1); }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; line-height: 1; white-space: nowrap; }
+  .wordmark span { color: var(--accent); }
+  .wordmark .sub { display: block; font-family: var(--font-body); font-size: 10px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-top: 4px; }
 
   nav.tabs { display: flex; gap: 4px; margin-left: 4px; }
   nav.tabs button {
@@ -187,8 +189,8 @@
     text-align: center; transition: 0.14s; position: relative; }
   .slot:hover:not(.booked):not(.off) { border-color: color-mix(in oklch, var(--accent) 60%, transparent);
     background: color-mix(in oklch, var(--accent) 16%, transparent); transform: translateY(-1px); }
-  .slot.sel { border-color: transparent; color: #fbf4e8; font-weight: 600;
-    background: linear-gradient(120deg, var(--c1), #b15f39); box-shadow: 0 10px 22px -10px rgba(150,80,45,0.55); }
+  .slot.sel { border-color: transparent; color: #fbf8f1; font-weight: 600;
+    background: linear-gradient(120deg, var(--c1), #277a42); box-shadow: 0 10px 22px -10px rgba(31,122,67,0.55); }
   .slot.booked { color: var(--good); background: color-mix(in oklch, var(--good) 12%, transparent);
     border-color: color-mix(in oklch, var(--good) 35%, transparent); cursor: default; }
   .slot.booked::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%;
@@ -220,9 +222,9 @@
   .cost .v { font-family: var(--font-display); font-weight: 700; font-size: 20px; display:flex; align-items:center; gap:8px; }
 
   .btn { font-family: var(--font-body); font-weight: 600; font-size: 15px; border: 0; border-radius: 14px; cursor: pointer;
-    padding: 15px; width: 100%; color: #fbf4e8; position: relative; overflow: hidden; transition: 0.18s; letter-spacing: -0.01em;
-    background: linear-gradient(120deg, var(--c1), #b15f39 95%); }
-  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 14px 34px -14px rgba(150,80,45,0.5); }
+    padding: 15px; width: 100%; color: #fbf8f1; position: relative; overflow: hidden; transition: 0.18s; letter-spacing: -0.01em;
+    background: linear-gradient(120deg, var(--c1), #277a42 95%); }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 14px 34px -14px rgba(31,122,67,0.5); }
   .btn:active { transform: translateY(0); }
   .btn.ghost { background: rgba(255,255,255,0.05); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
   .btn.ghost:hover { background: rgba(255,255,255,0.09); box-shadow: inset 0 0 0 1px var(--line); }
@@ -233,7 +235,7 @@
   .btn svg { vertical-align: -2px; }
   .sum-confirm { text-align: center; padding: 8px 6px 6px; }
   .confirm-badge { width: 54px; height: 54px; border-radius: 50%; margin: 6px auto 16px; display: grid; place-items: center;
-    font-size: 25px; color: #fbf4e8; background: linear-gradient(120deg, var(--good), var(--c2));
+    font-size: 25px; color: #fbf8f1; background: linear-gradient(120deg, var(--good), var(--c2));
     box-shadow: 0 12px 26px -10px rgba(111,143,87,0.6); animation: pop 0.45s cubic-bezier(.2,.9,.3,1.4); }
   @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
   .confirm-h { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.01em; margin-bottom: 7px; }
@@ -248,7 +250,7 @@
   .games-menu { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; margin-top: 26px; }
   .game-card { text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; cursor: pointer;
     background: var(--glass); backdrop-filter: blur(6px); transition: 0.16s; font-family: var(--font-body); color: var(--ink); position: relative; overflow: hidden; }
-  .game-card:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--ga, var(--c1)) 55%, transparent); box-shadow: 0 18px 40px -26px rgba(80,52,28,0.6); }
+  .game-card:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--ga, var(--c1)) 55%, transparent); box-shadow: 0 18px 40px -26px rgba(31,60,34,0.6); }
   .gc-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 14px;
     background: color-mix(in oklch, var(--ga) 16%, transparent); color: var(--ga); }
   .gc-icon svg { width: 24px; height: 24px; }
@@ -276,7 +278,7 @@
   .q-input-row .btn { width: auto; padding-left: 22px; padding-right: 22px; flex-shrink: 0; }
   .q-options { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 24px; max-width: 460px; }
   .q-opt { font-family: var(--font-body); font-size: 16px; font-weight: 500; padding: 15px; border-radius: 13px;
-    border: 1px solid var(--line); background: rgba(250,244,233,0.5); color: var(--ink); cursor: pointer; transition: 0.14s; }
+    border: 1px solid var(--line); background: rgba(251,248,241,0.5); color: var(--ink); cursor: pointer; transition: 0.14s; }
   .q-opt:hover:not(:disabled) { border-color: color-mix(in oklch, var(--c1) 55%, transparent); transform: translateY(-1px); }
   .q-opt:disabled { cursor: default; }
   .q-opt.correct { background: color-mix(in oklch, var(--good) 18%, transparent); border-color: var(--good); color: #46603a; font-weight: 600; }
@@ -288,8 +290,8 @@
   .fb.no { color: #c0593c; font-weight: 500; }
   .fb.no b { font-weight: 700; }
   .scramble-answer { display: flex; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 12px; margin-top: 18px;
-    border: 1.5px dashed var(--line); border-radius: 13px; background: rgba(250,244,233,0.35); }
-  .scramble-answer:empty::after { content: "Tap words below to build the sentence…"; color: var(--faint); font-size: 13.5px; font-style: italic; }
+    border: 1.5px dashed var(--line); border-radius: 13px; background: rgba(251,248,241,0.35); }
+  .scramble-answer:empty::after { content: "Wörter unten antippen, um den Satz zu bauen…"; color: var(--faint); font-size: 13.5px; font-style: italic; }
   .scramble-pool { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
   .word-chip { font-family: var(--font-body); font-size: 15.5px; padding: 9px 15px; border-radius: 10px; cursor: pointer; transition: 0.13s;
     border: 1px solid var(--line); background: var(--glass); color: var(--ink); }
@@ -305,10 +307,10 @@
   /* ---------- Learning files ---------- */
   .lvl-sec { margin-top: 26px; }
   .lvl-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .lvl-badge { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; color: #fbf4e8;
+  .lvl-badge { font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em; color: #fbf8f1;
     width: 38px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
-  .lvl-badge.a1 { background: #6f8f57; } .lvl-badge.a2 { background: #8a9a6b; }
-  .lvl-badge.b1 { background: #d6a25c; } .lvl-badge.b2 { background: #c2714d; } .lvl-badge.c1 { background: #a85535; }
+  .lvl-badge.a1 { background: #3aa55c; } .lvl-badge.a2 { background: #4cb56b; }
+  .lvl-badge.b1 { background: #7cb342; } .lvl-badge.b2 { background: #309050; } .lvl-badge.c1 { background: #277a42; }
   .lvl-name { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--ink); }
   .lvl-count { margin-left: auto; font-size: 12px; color: var(--faint); }
   .lesson-list { display: flex; flex-direction: column; gap: 9px; }
@@ -329,7 +331,7 @@
   .les-files { max-height: 0; overflow: hidden; transition: max-height 0.28s ease; }
   .lesson.open .les-files { max-height: 240px; }
   .file-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px 11px 18px; border-top: 1px solid var(--line-2); text-decoration: none; color: var(--ink); transition: 0.13s; }
-  .file-row:hover { background: rgba(74,54,34,0.04); }
+  .file-row:hover { background: rgba(36,53,40,0.04); }
   .file-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;
     background: color-mix(in oklch, var(--c1) 13%, transparent); color: var(--c1); }
   .file-ic svg { width: 16px; height: 16px; }
@@ -347,10 +349,10 @@
   .cm-lessons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   @media (max-width: 560px) { .cm-lessons { grid-template-columns: 1fr; } }
   .cm-les { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px; cursor: pointer; text-align: left;
-    border: 1px solid var(--line); background: rgba(250,244,233,0.4); color: var(--muted); font-family: var(--font-body); transition: 0.14s; }
+    border: 1px solid var(--line); background: rgba(251,248,241,0.4); color: var(--muted); font-family: var(--font-body); transition: 0.14s; }
   .cm-les:hover { border-color: color-mix(in oklch, var(--c1) 35%, transparent); }
-  .cm-toggle { width: 32px; height: 18px; border-radius: 10px; background: rgba(74,54,34,0.2); position: relative; flex-shrink: 0; transition: 0.16s; }
-  .cm-toggle::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fbf4e8; top: 2px; left: 2px; transition: 0.16s; }
+  .cm-toggle { width: 32px; height: 18px; border-radius: 10px; background: rgba(36,53,40,0.2); position: relative; flex-shrink: 0; transition: 0.16s; }
+  .cm-toggle::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: #fbf8f1; top: 2px; left: 2px; transition: 0.16s; }
   .cm-les.on { background: color-mix(in oklch, var(--good) 13%, transparent); border-color: color-mix(in oklch, var(--good) 40%, transparent); color: var(--ink); }
   .cm-les.on .cm-toggle { background: var(--good); }
   .cm-les.on .cm-toggle::after { left: 16px; }
@@ -359,7 +361,7 @@
   .cm-les-wrap .cm-les { width: 100%; }
   .cm-files { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 2px; }
   .cm-file { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 3px 4px 3px 9px;
-    border-radius: 999px; background: rgba(74,54,34,0.06); max-width: 100%; }
+    border-radius: 999px; background: rgba(36,53,40,0.06); max-width: 100%; }
   .cm-file a { color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
   .cm-file a:hover { text-decoration: underline; }
   .cm-file-x { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; border-radius: 50%; }
@@ -373,7 +375,7 @@
     background: radial-gradient(circle, color-mix(in oklch, var(--accent) 45%, transparent), transparent 65%); filter: blur(20px); }
   .balance .ey { font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
   .balance .big { font-family: var(--font-display); font-weight: 800; font-size: clamp(50px, 9vw, 78px); line-height: 1; letter-spacing: -0.04em; margin: 10px 0 2px;
-    background: linear-gradient(135deg, #5e3a24, var(--c1) 56%, #d08a3f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    background: linear-gradient(135deg, #277a42, var(--c1) 56%, #4cb56b); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .balance .unit { font-size: 14px; color: var(--muted); }
   .balance .meta { display: flex; gap: 26px; margin-top: 24px; }
   .balance .meta .m .mv { font-family: var(--font-display); font-weight: 600; font-size: 22px; }
@@ -390,7 +392,7 @@
     background: rgba(255,255,255,0.05); }
   .pack.feat { border-color: color-mix(in oklch, var(--accent) 55%, transparent); background: color-mix(in oklch, var(--accent) 12%, transparent); }
   .pack .tag { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 3px 9px; border-radius: 999px; background: linear-gradient(120deg, var(--c1), var(--c2)); color: #fbf4e8; font-weight: 700; }
+    padding: 3px 9px; border-radius: 999px; background: linear-gradient(120deg, var(--c1), var(--c2)); color: #fbf8f1; font-weight: 700; }
   .pack .pc { font-family: var(--font-display); font-weight: 700; font-size: 30px; }
   .pack .pl { font-size: 11px; color: var(--muted); margin-top: -2px; }
   .pack .pp { margin-top: 12px; font-size: 15px; font-weight: 600; }
@@ -406,7 +408,7 @@
   .li .info .t { font-size: 14.5px; font-weight: 500; }
   .li .info .s { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
   .li .tail { font-size: 12px; color: var(--faint); text-align: right; flex-shrink: 0; display: flex; align-items: center; gap: 9px; }
-  .ics-mini { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: rgba(74,54,34,0.04);
+  .ics-mini { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: rgba(36,53,40,0.04);
     color: var(--ink); cursor: pointer; display: grid; place-items: center; transition: 0.15s; }
   .ics-mini:hover { background: color-mix(in oklch, var(--accent) 16%, transparent); border-color: color-mix(in oklch, var(--accent) 50%, transparent); transform: translateY(-1px); }
 
@@ -414,18 +416,18 @@
   .manage-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-bottom: 14px; }
   .manage-actions { display: flex; gap: 10px; margin-bottom: 12px; }
   .manage-actions .btn { padding: 13px; font-size: 14px; }
-  .btn.danger-btn { background: linear-gradient(120deg, #c0532f, #a23a22); color: #fbf4e8; }
+  .btn.danger-btn { background: linear-gradient(120deg, #c0532f, #a23a22); color: #fbf8f1; }
   .btn.danger-btn:hover { filter: brightness(1.07); box-shadow: 0 14px 30px -14px rgba(150,50,30,0.5); }
   .btn-text { display: block; width: 100%; background: transparent; border: 0; color: var(--muted); font-family: var(--font-body);
     font-size: 13px; padding: 9px; cursor: pointer; transition: 0.15s; border-radius: 9px; margin-top: 2px; }
-  .btn-text:hover { color: var(--ink); background: rgba(74,54,34,0.05); }
+  .btn-text:hover { color: var(--ink); background: rgba(36,53,40,0.05); }
   .lock-note { display: flex; gap: 11px; align-items: flex-start; padding: 14px; border-radius: 13px; margin-bottom: 14px;
     background: color-mix(in oklch, #c0532f 9%, transparent); border: 1px solid color-mix(in oklch, #c0532f 26%, transparent); }
   .lock-note svg { color: #bb4a2c; flex-shrink: 0; margin-top: 1px; }
   .lock-note span { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .lock-note b { color: var(--ink); font-weight: 600; }
   .reschedule-move { display: flex; flex-direction: column; gap: 7px; padding: 14px 16px; border-radius: 14px;
-    border: 1px solid var(--line-2); background: rgba(250,244,233,0.4); margin-bottom: 14px; }
+    border: 1px solid var(--line-2); background: rgba(251,248,241,0.4); margin-bottom: 14px; }
   .reschedule-move .rm-old, .reschedule-move .rm-new { display: flex; flex-direction: column; }
   .reschedule-move span { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
   .reschedule-move b { font-size: 14px; font-weight: 600; margin-top: 2px; }
@@ -445,11 +447,11 @@
   .resched-banner .banner-x:hover { background: color-mix(in oklch, var(--c1) 18%, transparent); }
   .li-actions { display: flex; gap: 6px; align-items: center; }
   .mini-btn { font-family: var(--font-body); font-size: 11.5px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line);
-    background: rgba(74,54,34,0.04); color: var(--ink); cursor: pointer; transition: 0.15s; }
+    background: rgba(36,53,40,0.04); color: var(--ink); cursor: pointer; transition: 0.15s; }
   .mini-btn:hover { background: color-mix(in oklch, var(--accent) 14%, transparent); border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
   .mini-btn.danger:hover { background: color-mix(in oklch, #c0532f 14%, transparent); border-color: color-mix(in oklch, #c0532f 50%, transparent); color: #a23a22; }
   .lock-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--faint); padding: 5px 9px;
-    border-radius: 8px; background: rgba(74,54,34,0.05); border: 1px solid var(--line-2); }
+    border-radius: 8px; background: rgba(36,53,40,0.05); border: 1px solid var(--line-2); }
 
   /* ---------- Teacher portal ---------- */
   .teach-grid { display: grid; grid-template-columns: 1fr 340px; gap: 22px; margin-top: 26px; align-items: start; }
@@ -463,12 +465,12 @@
   .slot.t-booked .ts-name { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink); }
   .slot .ts-dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .slot.t-open.sel .ts-time, .slot.t-open.sel .ts-add,
-  .slot.t-booked.sel .ts-time, .slot.t-booked.sel .ts-name { color: #fbf4e8; }
+  .slot.t-booked.sel .ts-time, .slot.t-booked.sel .ts-name { color: #fbf8f1; }
 
   .weeknav .avail-toggle { width: auto; padding: 0 13px; height: 34px; border-radius: 10px; border: 1px solid var(--line);
     background: rgba(255,255,255,0.02); color: var(--muted); font-family: var(--font-body); font-size: 13px; cursor: pointer;
     transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; line-height: 1; }
-  .weeknav .avail-toggle:hover { background: rgba(74,54,34,0.06); color: var(--ink); }
+  .weeknav .avail-toggle:hover { background: rgba(36,53,40,0.06); color: var(--ink); }
   .weeknav .avail-toggle.active { background: color-mix(in oklch, var(--c1) 16%, transparent); border-color: color-mix(in oklch, var(--c1) 45%, transparent); color: var(--ink); }
   .slot.avail { display: flex; flex-direction: column; gap: 1px; align-items: flex-start; text-align: left; padding: 7px 10px; }
   .slot.avail .av-state { font-size: 10px; }
@@ -485,7 +487,7 @@
   .slot.t-booked.locked { cursor: default; opacity: 0.85; }
 
   .field-label { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
-  .t-select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: rgba(250,244,233,0.5);
+  .t-select { width: 100%; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: rgba(251,248,241,0.5);
     border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; cursor: pointer; margin-bottom: 12px; }
   .t-select:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
   .custom-add { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-2); }
@@ -509,18 +511,18 @@
   .rc-lbl { font-size: 10.5px; color: var(--faint); letter-spacing: 0.04em; }
   .rc-actions { display: flex; gap: 6px; flex-shrink: 0; }
   @media (max-width: 600px) { .rc-actions { display: none; } }
-  .rost:hover { background: rgba(74,54,34,0.035); }
+  .rost:hover { background: rgba(36,53,40,0.035); }
 
   /* ---------- Student history modal ---------- */
-  .modal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(40,26,12,0.55); backdrop-filter: blur(7px);
+  .modal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(20,40,24,0.55); backdrop-filter: blur(7px);
     display: grid; place-items: center; padding: 24px; animation: fade 0.22s ease; }
   .modal-overlay[hidden] { display: none; }
   .modal-card { width: min(460px, 100%); max-height: 84vh; overflow-y: auto; background: var(--bg-2); border: 1px solid var(--line);
     border-radius: 20px; padding: 26px; box-shadow: var(--shadow); position: relative; }
   .modal-card .nm { font-family: var(--font-display); font-weight: 600; font-size: 18px; display: flex; align-items: center; gap: 9px; }
   .modal-x { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line);
-    background: rgba(74,54,34,0.05); color: var(--ink); font-size: 18px; cursor: pointer; line-height: 1; transition: 0.15s; }
-  .modal-x:hover { background: rgba(74,54,34,0.1); }
+    background: rgba(36,53,40,0.05); color: var(--ink); font-size: 18px; cursor: pointer; line-height: 1; transition: 0.15s; }
+  .modal-x:hover { background: rgba(36,53,40,0.1); }
   .modal-add { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-radius: 14px;
     background: color-mix(in oklch, var(--c1) 9%, transparent); border: 1px solid color-mix(in oklch, var(--c1) 24%, transparent); }
   .ma-label { font-size: 13px; font-weight: 500; }
@@ -580,7 +582,7 @@
   .um-mail { font-size: 12px; color: var(--muted); }
   .um-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 0; background: transparent;
     color: var(--ink); font-family: var(--font-body); font-size: 13.5px; border-radius: 9px; cursor: pointer; transition: 0.15s; }
-  .um-item:hover { background: rgba(74,54,34,0.06); }
+  .um-item:hover { background: rgba(36,53,40,0.06); }
   .um-item svg { color: var(--muted); }
   /* Sign-in lives on its own page now (templates/login.html). */
 
@@ -591,20 +593,20 @@
   .buy-h { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; margin-bottom: 8px; }
   .buy-p { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin-bottom: 16px; }
   .buy-contact { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; margin-bottom: 18px;
-    background: rgba(74,54,34,0.05); border: 1px solid var(--line-2); font-size: 13px; }
+    background: rgba(36,53,40,0.05); border: 1px solid var(--line-2); font-size: 13px; }
   .buy-contact svg { color: var(--muted); }
   a.btn { display: block; text-align: center; text-decoration: none; }
   .buy-card .btn.ghost { margin-top: 10px; }
   .cal-url { display: flex; gap: 8px; margin-bottom: 16px; }
   .cal-url input { flex: 1; min-width: 0; font-family: var(--font-body); font-size: 12.5px; color: var(--ink);
-    background: rgba(74,54,34,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; text-overflow: ellipsis; }
+    background: rgba(36,53,40,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; text-overflow: ellipsis; }
   .cal-url .mini-btn { flex-shrink: 0; }
   .time-edit { display: flex; align-items: center; gap: 12px; }
   .time-edit .bf-input { width: auto; flex: 0 0 auto; color-scheme: light; }
   .time-end { font-size: 12.5px; color: var(--muted); }
   .join-btn { margin-top: 14px; }
   .join-mini { font-family: var(--font-body); font-size: 11.5px; font-weight: 500; padding: 5px 11px; border-radius: 8px; text-decoration: none;
-    background: linear-gradient(120deg, var(--c1), #b15f39); color: #fbf4e8; white-space: nowrap; transition: 0.15s; }
+    background: linear-gradient(120deg, var(--c1), #277a42); color: #fbf8f1; white-space: nowrap; transition: 0.15s; }
   .join-mini:hover { filter: brightness(1.07); }
 
   /* ---------- Impersonation banner ---------- */
@@ -622,7 +624,7 @@
   .billing-form, .ed-fields { display: flex; flex-direction: column; gap: 12px; }
   .bf-lab { display: flex; flex-direction: column; gap: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
   .bf-input { font-family: var(--font-body); font-size: 14px; letter-spacing: normal; text-transform: none; color: var(--ink);
-    background: rgba(250,244,233,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; }
+    background: rgba(251,248,241,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 11px 12px; }
   .bf-input:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
   .bf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
@@ -632,17 +634,17 @@
   .search-wrap svg { position: absolute; left: 14px; width: 17px; height: 17px; color: var(--faint); pointer-events: none; }
   .search-input { width: 100%; font-family: var(--font-body); font-size: 14.5px; color: var(--ink); padding: 12px 14px 12px 40px;
     border: 1px solid var(--line); border-radius: 12px; background: var(--glass); transition: 0.15s; }
-  .search-input:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); background: rgba(250,244,233,0.7); }
+  .search-input:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); background: rgba(251,248,241,0.7); }
   .search-input::placeholder { color: var(--faint); }
   .students-count { font-size: 13px; color: var(--muted); white-space: nowrap; }
   .notes-block { margin: 16px 0 4px; }
   .notes-ta { width: 100%; min-height: 74px; resize: vertical; font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
-    background: rgba(250,244,233,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; line-height: 1.5; }
+    background: rgba(251,248,241,0.5); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; line-height: 1.5; }
   .notes-ta::placeholder { color: var(--faint); }
   .notes-ta:focus { outline: none; border-color: color-mix(in oklch, var(--c1) 55%, transparent); }
   .note-line { font-size: 12px; color: var(--muted); margin-top: 5px; font-style: italic; line-height: 1.45;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .notes-ta.private { background: color-mix(in oklch, var(--c1) 7%, rgba(250,244,233,0.5)); }
+  .notes-ta.private { background: color-mix(in oklch, var(--c1) 7%, rgba(251,248,241,0.5)); }
   .lbl-only { color: var(--c1); font-weight: 600; }
   .snote-add { display: flex; gap: 8px; margin-bottom: 8px; }
   .snote-input { flex: 1; }
@@ -659,7 +661,7 @@
   .admin-list { display: flex; flex-direction: column; }
   .admin-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px; border: 0; background: transparent;
     border-radius: 12px; cursor: pointer; transition: 0.15s; color: var(--ink); font-family: var(--font-body); }
-  .admin-item:hover { background: rgba(74,54,34,0.05); }
+  .admin-item:hover { background: rgba(36,53,40,0.05); }
   .admin-item.sel { background: color-mix(in oklch, var(--c1) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--c1) 35%, transparent); }
   .ai-info { min-width: 0; }
   .ai-name { font-size: 14px; font-weight: 600; }
@@ -679,7 +681,7 @@
   .apack-row { display: grid; grid-template-columns: 0.7fr 1fr 1fr; gap: 10px; }
   .li .tail .pill2 { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 500;
     background: color-mix(in oklch, var(--c3) 14%, transparent); color: var(--c3); border: 1px solid color-mix(in oklch, var(--c3) 30%, transparent); }
-  .li .tail .pill2.done { background: rgba(74,54,34,0.06); color: var(--faint); border-color: var(--line-2); }
+  .li .tail .pill2.done { background: rgba(36,53,40,0.06); color: var(--faint); border-color: var(--line-2); }
   .empty-list { color: var(--faint); font-size: 13px; padding: 22px 4px; text-align: center; }
 
   .activity .ai { display:flex; align-items:center; gap: 12px; padding: 11px 4px; border-top: 1px solid var(--line-2); font-size: 13.5px; }
@@ -695,10 +697,10 @@
   /* ---------- Toast ---------- */
   .toast-wrap { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 50; display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .toast { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-radius: 14px;
-    background: rgba(250,244,233,0.95); border: 1px solid var(--line); backdrop-filter: blur(16px); box-shadow: var(--shadow);
+    background: rgba(251,248,241,0.95); border: 1px solid var(--line); backdrop-filter: blur(16px); box-shadow: var(--shadow);
     font-size: 14px; animation: toastin 0.4s cubic-bezier(.2,.9,.3,1.3); }
   @keyframes toastin { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: none; } }
-  .toast .ti { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(120deg, var(--good), var(--c2)); color: #fbf4e8; font-weight: 800; }
+  .toast .ti { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(120deg, var(--good), var(--c2)); color: #fbf8f1; font-weight: 800; }
 
   .fineprint { text-align: center; color: var(--faint); font-size: 12px; margin-top: 40px; opacity: 0.7; }
 </style>
@@ -716,38 +718,38 @@
   <div class="app" data-role="{{ role }}">
     <div class="imp-banner" id="impBanner" hidden>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span>Viewing as <b id="impName"></b> — exactly what they see.</span>
-      <button id="impExit">Exit to admin</button>
+      <span>Angemeldet als <b id="impName"></b> — genau ihre Ansicht.</span>
+      <button id="impExit">Zurück zum Admin</button>
     </div>
     <header class="top">
       <div class="brand">
-        <div class="mark"></div>
-        <div class="wordmark">fluent<span>.</span></div>
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
       </div>
       <nav class="tabs">
         <button class="tab active" data-view="book">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
-          Book
+          Buchen
         </button>
         <button class="tab" data-view="account">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
-          Account
+          Konto
         </button>
         <button class="tab" data-view="games">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="6.5" width="19" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="14" r="1"/></svg>
-          Practice
+          Üben
         </button>
         <button class="tab" data-view="files">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          Learning
+          Lernen
         </button>
         <button class="tab" data-view="teacher">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3.5" width="18" height="13" rx="2"/><path d="M3 20.5h18M9 16.5v4M15 16.5v4"/><path d="M7.5 9.5l2.4 2.4L16 6.5"/></svg>
-          Tutor portal
+          Tutor-Portal
         </button>
         <button class="tab" data-view="students">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6.2a3 3 0 0 1 0 5.6M18 19c0-2.3-1-4-2.6-4.6"/></svg>
-          Students
+          Schüler
         </button>
         <button class="tab" data-view="admin">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.3 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -755,19 +757,19 @@
         </button>
       </nav>
       <div class="spacer"></div>
-      <div class="credits-pill" id="creditsPill" title="View your credits">
-        <span class="lbl">Credits</span>
+      <div class="credits-pill" id="creditsPill" title="Dein Guthaben ansehen">
+        <span class="lbl">Guthaben</span>
         <span class="num" id="creditsNum">8</span>
         <span class="coin"><span id="coinNum">8</span></span>
       </div>
       <div class="user-wrap">
-        <button class="avatar" id="meAvatar" style="background: conic-gradient(from 140deg, #d6a25c, #c2714d, #8a9a6b, #d6a25c);">MK</button>
+        <button class="avatar" id="meAvatar" style="background: conic-gradient(from 140deg, #7cb342, #309050, #4cb56b, #7cb342);">MK</button>
         <div class="user-menu" id="userMenu" hidden>
           <div class="um-head">
-            <div class="avatar" id="umAvatar" style="background: conic-gradient(from 140deg, #d6a25c, #c2714d, #8a9a6b, #d6a25c); width:40px; height:40px;">MK</div>
+            <div class="avatar" id="umAvatar" style="background: conic-gradient(from 140deg, #7cb342, #309050, #4cb56b, #7cb342); width:40px; height:40px;">MK</div>
             <div><div class="um-name" id="umName">Maya Karlsson</div><div class="um-mail" id="umMail">maya@fluent.at</div></div>
           </div>
-          <button class="um-item" id="logoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Log out</button>
+          <button class="um-item" id="logoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Abmelden</button>
         </div>
       </div>
     </header>
@@ -775,20 +777,20 @@
     <main id="main">
       <section class="view active" id="view-book">
         <div class="wrap">
-          <div class="eyebrow">Live availability · 50-minute sessions</div>
-          <h1 class="title">Book your next English session.</h1>
-          <p class="sub">Pick a tutor, choose an open slot, and lock it in. Each session is 50 minutes and costs one credit.</p>
+          <div class="eyebrow">Live-Verfügbarkeit · 50-Minuten-Stunden</div>
+          <h1 class="title">Buch deine nächste Englischstunde.</h1>
+          <p class="sub">Wähle einen Tutor, ein freies Zeitfenster und buche es. Jede Stunde dauert 50 Minuten und kostet ein Guthaben.</p>
 
           <div class="book-grid">
             <div class="panel" style="grid-column: 1;">
               <div class="tutors" id="tutors"></div>
               <div class="resched-banner" id="reschedBanner" hidden></div>
               <div class="cal-head">
-                <div class="month" id="monthLabel">June 2026</div>
+                <div class="month" id="monthLabel">Juni 2026</div>
                 <div class="weeknav">
-                  <button class="today" id="todayBtn">This week</button>
-                  <button id="prevWeek" aria-label="Previous week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
-                  <button id="nextWeek" aria-label="Next week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                  <button class="today" id="todayBtn">Diese Woche</button>
+                  <button id="prevWeek" aria-label="Vorherige Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                  <button id="nextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
                 </div>
               </div>
               <div class="cal-scroll">
@@ -800,65 +802,65 @@
               <div class="panel sum-card" id="sumCard">
                 <div class="sum-empty" id="sumEmpty">
                   <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M12 13v4M10 15h4" stroke="var(--c3)"/></svg></div>
-                  <h3>No slot selected</h3>
-                  <p>Tap an open time on the calendar to see session details and confirm your booking.</p>
+                  <h3>Noch nichts gewählt</h3>
+                  <p>Tippe links auf ein freies Zeitfenster, um Details zu sehen und deine Buchung zu bestätigen.</p>
                 </div>
               </div>
             </aside>
           </div>
-          <div class="fineprint">Times shown in your local timezone · GMT+1. Free reschedule or cancellation up to 24 hours before — inside 24h the credit is forfeited.</div>
+          <div class="fineprint">Zeiten in deiner lokalen Zeitzone · GMT+1. Kostenlos umbuchen oder stornieren bis 24 Stunden vorher — innerhalb von 24 h verfällt das Guthaben.</div>
         </div>
       </section>
 
       <!-- ===================== ACCOUNT VIEW ===================== -->
       <section class="view" id="view-account">
         <div class="wrap">
-          <div class="eyebrow">Your account</div>
-          <h1 class="title" id="acctHello">Hello, Maya.</h1>
-          <p class="sub">Manage your credits, top up your balance, and keep an eye on your upcoming sessions.</p>
+          <div class="eyebrow">Dein Konto</div>
+          <h1 class="title" id="acctHello">Hallo, Maya.</h1>
+          <p class="sub">Verwalte dein Guthaben, lade deinen Stand auf und behalte deine nächsten Stunden im Blick.</p>
 
           <div class="acct-grid">
             <div class="panel balance">
               <div class="ring"></div>
-              <div class="ey">Credit balance</div>
+              <div class="ey">Guthaben</div>
               <div class="big" id="balanceBig">8</div>
-              <div class="unit">credits available · 1 credit = one 50-min session</div>
+              <div class="unit">Guthaben verfügbar · 1 Guthaben = eine 50-Minuten-Stunde</div>
               <div class="meta">
-                <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Upcoming</div></div>
-                <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Completed</div></div>
+                <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Geplant</div></div>
+                <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Abgeschlossen</div></div>
               </div>
             </div>
 
             <div class="panel" style="padding: 24px;">
-              <div class="section-h"><h2>Top up credits</h2></div>
+              <div class="section-h"><h2>Guthaben aufladen</h2></div>
               <div class="packs" id="packs"></div>
-              <div class="micro" style="margin-top:16px;">Credits never expire. Packs are purchased through your tutor — tap one to get in touch.</div>
+              <div class="micro" style="margin-top:16px;">Guthaben verfällt nie. Pakete werden über deinen Tutor gekauft — tippe eines an, um Kontakt aufzunehmen.</div>
             </div>
           </div>
 
           <div class="acct-grid" style="margin-top: 22px;">
             <div class="panel" style="padding: 24px;">
-              <div class="section-h"><h2>Upcoming sessions</h2><span class="lnk" id="goBook">+ Book another</span></div>
+              <div class="section-h"><h2>Nächste Stunden</h2><span class="lnk" id="goBook">+ Weitere buchen</span></div>
               <div class="list" id="upcomingList"></div>
             </div>
 
             <div class="panel activity" style="padding: 24px;">
-              <div class="section-h"><h2>Recent activity</h2></div>
+              <div class="section-h"><h2>Letzte Aktivität</h2></div>
               <div id="activityList"></div>
             </div>
           </div>
 
           <div class="panel" style="padding: 24px; margin-top: 22px;" data-comment-anchor="52dba6f243-div">
-            <div class="section-h"><h2>Receipt address</h2><span class="lnk" id="billingSave">Save changes</span></div>
+            <div class="section-h"><h2>Rechnungsadresse</h2><span class="lnk" id="billingSave">Änderungen speichern</span></div>
             <div class="billing-form">
-              <label class="bf-lab">Full name<input class="bf-input" id="bfName" /></label>
-              <label class="bf-lab">Street &amp; no.<input class="bf-input" id="bfLine1" /></label>
+              <label class="bf-lab">Vollständiger Name<input class="bf-input" id="bfName" /></label>
+              <label class="bf-lab">Straße &amp; Nr.<input class="bf-input" id="bfLine1" /></label>
               <div class="bf-grid">
-                <label class="bf-lab">Postcode<input class="bf-input" id="bfZip" /></label>
-                <label class="bf-lab">City<input class="bf-input" id="bfCity" /></label>
+                <label class="bf-lab">PLZ<input class="bf-input" id="bfZip" /></label>
+                <label class="bf-lab">Stadt<input class="bf-input" id="bfCity" /></label>
               </div>
-              <label class="bf-lab">Country<input class="bf-input" id="bfCountry" /></label>
-              <div class="micro" style="text-align:left; margin-top:4px;">Used as the billing address on the VAT receipts your tutor issues.</div>
+              <label class="bf-lab">Land<input class="bf-input" id="bfCountry" /></label>
+              <div class="micro" style="text-align:left; margin-top:4px;">Wird als Rechnungsadresse auf den Belegen deines Tutors verwendet.</div>
             </div>
           </div>
         </div>
@@ -867,13 +869,13 @@
       <!-- ===================== PRACTICE GAMES ===================== -->
       <section class="view" id="view-games" data-screen-label="Practice">
         <div class="wrap">
-          <div class="eyebrow">Practice · between sessions</div>
-          <h1 class="title">Play &amp; practise.</h1>
-          <p class="sub">Quick English games to keep sharp between lessons — no credits needed.</p>
+          <div class="eyebrow">Üben · zwischen den Stunden</div>
+          <h1 class="title">Spielen &amp; üben.</h1>
+          <p class="sub">Kurze Englisch-Spiele, um zwischen den Stunden fit zu bleiben — ganz ohne Guthaben.</p>
           <div class="games-menu" id="gamesMenu"></div>
           <div class="game-host" id="gameHost" hidden>
             <div class="game-bar">
-              <button class="btn-text" id="gameExit" style="margin:0;">← All games</button>
+              <button class="btn-text" id="gameExit" style="margin:0;">← Alle Spiele</button>
               <div class="game-title-mini" id="gameTitleMini"></div>
             </div>
             <div class="panel game-panel"><div id="gameProgress"></div><div id="gameStage"></div></div>
@@ -884,9 +886,9 @@
       <!-- ===================== LEARNING FILES ===================== -->
       <section class="view" id="view-files" data-screen-label="Learning">
         <div class="wrap">
-          <div class="eyebrow">Learning files · your curriculum</div>
-          <h1 class="title">Your learning files.</h1>
-          <p class="sub">Worksheets and materials your tutor has unlocked for you, organised by level. Locked lessons open up as you progress.</p>
+          <div class="eyebrow">Lernmaterialien · dein Lehrplan</div>
+          <h1 class="title">Deine Lernmaterialien.</h1>
+          <p class="sub">Arbeitsblätter und Materialien, die dein Tutor für dich freigeschaltet hat — nach Niveau geordnet. Gesperrte Lektionen öffnen sich, sobald du weiterkommst.</p>
           <div id="filesContent"></div>
         </div>
       </section>
@@ -894,19 +896,19 @@
       <!-- ===================== TEACHER PORTAL ===================== -->
       <section class="view" id="view-teacher" data-screen-label="Tutor portal">
         <div class="wrap">
-          <div class="eyebrow">Tutor portal · Davit</div>
-          <h1 class="title">Your studio.</h1>
-          <p class="sub">Add students into open times on your calendar and manage your sessions. Credits, notes and learning files live in the <b>Students</b> tab.</p>
+          <div class="eyebrow">Tutor-Portal · Davit</div>
+          <h1 class="title">Dein Studio.</h1>
+          <p class="sub">Trage Schüler in freie Zeiten in deinem Kalender ein und verwalte deine Stunden. Guthaben, Notizen und Lernmaterialien findest du im Tab <b>Schüler</b>.</p>
 
           <div class="teach-grid">
             <div class="panel">
               <div class="cal-head">
-                <div class="month" id="tMonthLabel">June 2026</div>
+                <div class="month" id="tMonthLabel">Juni 2026</div>
                 <div class="weeknav">
-                  <button class="avail-toggle" id="availToggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability</button>
-                  <button class="today" id="tTodayBtn">This week</button>
-                  <button id="tPrevWeek" aria-label="Previous week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
-                  <button id="tNextWeek" aria-label="Next week"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+                  <button class="avail-toggle" id="availToggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten</button>
+                  <button class="today" id="tTodayBtn">Diese Woche</button>
+                  <button id="tPrevWeek" aria-label="Vorherige Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+                  <button id="tNextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
                 </div>
               </div>
               <div class="cal-scroll"><div class="days-row" id="tDaysRow"></div></div>
@@ -917,25 +919,25 @@
             </aside>
           </div>
 
-          <div class="section-h" style="margin-top:34px;"><h2>Upcoming sessions</h2><span class="lnk" id="calSyncBtn">↻ Subscribe / sync calendar</span></div>
+          <div class="section-h" style="margin-top:34px;"><h2>Nächste Stunden</h2><span class="lnk" id="calSyncBtn">↻ Kalender abonnieren / sync</span></div>
           <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorUpcoming"></div></div>
 
-          <div class="section-h" style="margin-top:34px;"><h2>Completed sessions</h2></div>
+          <div class="section-h" style="margin-top:34px;"><h2>Abgeschlossene Stunden</h2></div>
           <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorCompleted"></div></div>
-          <div class="fineprint">Adding a student to a slot deducts one of their credits (or books a comp session if they have none). Removing a booking returns the credit.</div>
+          <div class="fineprint">Einen Schüler einzutragen zieht ein Guthaben ab (oder bucht eine Gratis-Stunde, wenn keins vorhanden ist). Eine Buchung zu entfernen gibt das Guthaben zurück.</div>
         </div>
       </section>
 
       <!-- ===================== STUDENTS (tutor) ===================== -->
       <section class="view" id="view-students" data-screen-label="Students">
         <div class="wrap">
-          <div class="eyebrow">Tutor portal · your students</div>
-          <h1 class="title">Your students.</h1>
-          <p class="sub">Tap any student to manage their credits, notes, learning files and history.</p>
+          <div class="eyebrow">Tutor-Portal · deine Schüler</div>
+          <h1 class="title">Deine Schüler.</h1>
+          <p class="sub">Tippe einen Schüler an, um Guthaben, Notizen, Lernmaterialien und Verlauf zu verwalten.</p>
           <div class="students-bar">
             <div class="search-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input id="studentSearch" class="search-input" type="search" placeholder="Search students…" autocomplete="off">
+              <input id="studentSearch" class="search-input" type="search" placeholder="Schüler suchen…" autocomplete="off">
             </div>
             <div class="students-count" id="studentsCount"></div>
           </div>
@@ -946,28 +948,28 @@
       <!-- ===================== ADMIN PORTAL ===================== -->
       <section class="view" id="view-admin" data-screen-label="Admin">
         <div class="wrap">
-          <div class="eyebrow">Admin · user management</div>
-          <h1 class="title">Manage users.</h1>
-          <p class="sub">Select any tutor or student to edit their name, photo, address and login — or open their account to see exactly what they see.</p>
+          <div class="eyebrow">Admin · Benutzerverwaltung</div>
+          <h1 class="title">Benutzer verwalten.</h1>
+          <p class="sub">Wähle einen Tutor oder Schüler, um Name, Foto, Adresse und Login zu bearbeiten — oder öffne das Konto, um genau ihre Ansicht zu sehen.</p>
 
           <div class="admin-grid">
             <div class="panel" style="padding: 8px;">
               <div class="admin-list" id="adminList"></div>
-              <button class="btn ghost" id="adminAddBtn" style="margin:8px; width:calc(100% - 16px);">+ Add student</button>
+              <button class="btn ghost" id="adminAddBtn" style="margin:8px; width:calc(100% - 16px);">+ Schüler hinzufügen</button>
             </div>
             <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
           </div>
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
-            <div class="section-h"><h2>Pricing</h2></div>
+            <div class="section-h"><h2>Preise</h2></div>
             <div class="bf-grid">
-              <label class="bf-lab">Per-credit price (€) · receipts<input class="bf-input" id="adminPrice" type="number" min="1" /></label>
+              <label class="bf-lab">Preis pro Guthaben (€) · Belege<input class="bf-input" id="adminPrice" type="number" min="1" /></label>
               <div></div>
             </div>
-            <div class="ed-sub">Credit packs shown to students</div>
+            <div class="ed-sub">Guthaben-Pakete für Schüler</div>
             <div class="admin-packs" id="adminPacks"></div>
-            <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Save pricing</button>
-            <div class="micro" style="text-align:left; margin-top:10px;">Per-credit price applies to VAT receipts; packs are what students see under “Top up credits”.</div>
+            <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Preise speichern</button>
+            <div class="micro" style="text-align:left; margin-top:10px;">Der Preis pro Guthaben gilt für die Belege; Pakete sehen die Schüler unter „Guthaben aufladen“.</div>
           </div>
         </div>
       </section>
@@ -1014,7 +1016,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
 
   const TUTORS = [
-    { id: "davit", name: "Davit", role: "English tutor · Conversation & IELTS", c: ["#c2714d","#a85535"], i: "D" },
+    { id: "davit", name: "Davit", role: "Englisch-Tutor · Konversation & IELTS", c: ["#309050","#277a42"], i: "D" },
   ];
   const tutorUser = (DJ.tutors && DJ.tutors[0]) ? {
     id: DJ.tutors[0].slug,
@@ -1024,7 +1026,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     i: DJ.tutors[0].initials,
     c: [DJ.tutors[0].color1, DJ.tutors[0].color2],
     photo: DJ.tutors[0].photo || null,
-  } : { id:"davit", role:"tutor", name:"Davit Petrosyan", email:"davit@fluent.at", i:"DV", c:["#c2714d","#a85535"], photo:null };
+  } : { id:"davit", role:"tutor", name:"Davit Petrosyan", email:"davit@fluent.at", i:"DV", c:["#309050","#277a42"], photo:null };
   const ADMIN = (DJ.role === "admin" && DJ.currentUser) ? {
     id: DJ.currentUser.slug,
     role: "admin",
@@ -1036,12 +1038,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
   } : { id:"admin", role:"admin", name:"Studio Admin", email:"admin@fluent.at", i:"AD", c:["#8a7cb0","#5f5188"], photo:null };
 
   const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=30){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
-  const DOW = ["Mon","Tue","Wed","Thu","Fri"];
+  const DOW = ["Mo","Di","Mi","Do","Fr"];
 
   let PACKS = [
-    { n: 1,  price: "€32", each: "€32 / session", feat: false },
-    { n: 5,  price: "€145", each: "€29 / session", feat: true, tag: "Popular" },
-    { n: 10, price: "€270", each: "€27 / session", feat: false },
+    { n: 1,  price: "€32", each: "€32 / Stunde", feat: false },
+    { n: 5,  price: "€145", each: "€29 / Stunde", feat: true, tag: "Beliebt" },
+    { n: 10, price: "€270", each: "€27 / Stunde", feat: false },
   ];
 
   // deterministic availability per tutor/day/time
@@ -1140,8 +1142,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
   // users — saving bookings on the wrong day so they vanish from the calendar.
   function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   const NOW = new Date(2026,5,1); // Mon Jun 1 2026 — start of a fresh week
-  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const MONTHS_S = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const MONTHS_S = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 
   // ---------- Element refs ----------
   const $ = (s) => document.querySelector(s);
@@ -1189,7 +1191,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function receiptDocHtml(r){
     return `<div class="receipt-doc">
       <div class="r-top">
-        <div class="r-brand"><div class="mark"></div><div><b>fluent.</b><span>English tutoring</span></div></div>
+        <div class="r-brand"><div class="mark"></div><div><b>the green pencil</b><span>Englisch-Nachhilfe</span></div></div>
         <div class="r-meta"><div class="r-h">Beleg · Receipt</div><div>Nr. ${r.no}</div><div>${r.dateStr}</div></div>
       </div>
       <div class="r-parties">
@@ -1228,7 +1230,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function closeReceipt(){ $("#receiptModal").hidden=true; }
   function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; s.credits=Math.max(0, val); if(id===state.currentUser){ state.credits=s.credits; updateCredits(); } }
   function addStudentCredits(id, n){ const s=studentById(id); if(!s) return; setStudentCredits(id, s.credits + n); }
-  function avatarStyle(t){ if(t && t.photo) return `background-image:url('${t.photo}'); background-size:cover; background-position:center; color:transparent;`; const c=(t&&t.c)||["#c2714d","#a85535"]; return `background: conic-gradient(from 140deg, ${c[0]}, ${c[1]}, ${c[0]});`; }
+  function avatarStyle(t){ if(t && t.photo) return `background-image:url('${t.photo}'); background-size:cover; background-position:center; color:transparent;`; const c=(t&&t.c)||["#309050","#277a42"]; return `background: conic-gradient(from 140deg, ${c[0]}, ${c[1]}, ${c[0]});`; }
 
   // ---------- Render tutors ----------
   function renderTutors() {
@@ -1251,8 +1253,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       if (state.rescheduling) {
         _rb.hidden = false;
         _rb.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.9"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
-          <span>Rescheduling <b>${state.rescheduling.title}</b> — pick a new open time below.</span>
-          <button class="banner-x" id="bannerCancel">Cancel</button>`;
+          <span>Umbuchung von <b>${state.rescheduling.title}</b> — wähle unten eine neue freie Zeit.</span>
+          <button class="banner-x" id="bannerCancel">Abbrechen</button>`;
         _rb.querySelector("#bannerCancel").onclick = cancelReschedule;
       } else { _rb.hidden = true; }
     }
@@ -1290,7 +1292,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         el.textContent = time;
         if (booked) {
           if (!state.rescheduling) {
-            el.title = "Manage this booking";
+            el.title = "Buchung verwalten";
             el.style.cursor = "pointer";
             el.onclick = () => openManage(state.bookings.find(x => x.studentId===state.currentUser && x.tutorId===state.tutor && sameDay(x.date,date) && x.time===time));
           }
@@ -1299,14 +1301,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
         }
         slots.appendChild(el);
       });
-      if (!any) { const n = document.createElement("div"); n.className="no-slot"; n.textContent = isPast? "—" : "Full"; slots.appendChild(n); }
+      if (!any) { const n = document.createElement("div"); n.className="no-slot"; n.textContent = isPast? "—" : "Voll"; slots.appendChild(n); }
       col.appendChild(slots);
       daysRow.appendChild(col);
     }
   }
 
   function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
-  const DOW_FULL = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  const DOW_FULL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
 
   function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
 
@@ -1322,7 +1324,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function openManage(b){ if(!b) return; state.selected=null; state.justBooked=null; state.rescheduling=null; state.managing=b; setView("book"); renderWeek(); renderSummary(); document.querySelector("#main").scrollTop=0; }
 
-  function startReschedule(b){ state.managing=null; state.justBooked=null; state.selected=null; state.rescheduling=b; setView("book"); renderWeek(); renderSummary(); document.querySelector("#main").scrollTop=0; toast("Pick a new time for your session"); }
+  function startReschedule(b){ state.managing=null; state.justBooked=null; state.selected=null; state.rescheduling=b; setView("book"); renderWeek(); renderSummary(); document.querySelector("#main").scrollTop=0; toast("Wähle eine neue Zeit für deine Stunde"); }
 
   function cancelReschedule(){ const b=state.rescheduling; state.rescheduling=null; state.selected=null; state.managing=b; renderWeek(); renderSummary(); }
 
@@ -1330,12 +1332,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const b=state.rescheduling, s=state.selected; if(!b||!s) return;
     const t=tutorById(b.tutorId);
     b.date=new Date(s.date); b.time=s.time;
-    meLog().unshift({ type:"book", label:"Rescheduled with "+t.name, sub:"Now "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate()+" · "+b.time, amt:"" });
+    meLog().unshift({ type:"book", label:"Umgebucht mit "+t.name, sub:"Jetzt "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate()+" · "+b.time, amt:"" });
     if (b._pk) api('PUT', '/api/bookings/' + b._pk + '/', { date: ymd(b.date), time: b.time });
     state.rescheduling=null; state.selected=null; state.managing=null;
     state.justBooked=b; state.justAction="rescheduled";
     renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
-    toast("Session rescheduled to "+b.time);
+    toast("Stunde umgebucht auf "+b.time);
   }
 
   function cancelBooking(b){
@@ -1344,12 +1346,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
     state.bookings.splice(i,1);
     if(refund){ state.credits+=1; }
     const t=tutorById(b.tutorId);
-    meLog().unshift({ type: refund?"buy":"done", label: refund?"Cancelled \u2014 credit refunded":"Cancelled (within 24h)", sub: t.name+" \u00b7 "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate(), amt: refund?"+1":"" });
+    meLog().unshift({ type: refund?"buy":"done", label: refund?"Storniert \u2014 Guthaben erstattet":"Storniert (innerhalb 24 h)", sub: t.name+" \u00b7 "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate(), amt: refund?"+1":"" });
     if (b._pk) api('DELETE', '/api/bookings/' + b._pk + '/');
     if (refund) { const _s = studentById(b.studentId); if (_s) _s.credits += 1; }
     state.managing=null; state.selected=null; state.justBooked=null;
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
-    toast(refund ? "Session cancelled \u00b7 1 credit refunded" : "Session cancelled");
+    toast(refund ? "Stunde storniert \u00b7 1 Guthaben erstattet" : "Stunde storniert");
   }
 
   // ---------- Calendar (.ics) export ----------
@@ -1364,10 +1366,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
     return [
       "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//English Tutoring//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
       "BEGIN:VEVENT","UID:fluent-"+b.tutorId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
-      "SUMMARY:English session with "+t.name,
-      "DESCRIPTION:50-minute 1-on-1 English tutoring ("+t.role+") with "+t.name+" on Fluent.",
-      "LOCATION:"+(b.callLink||"Fluent video call"),"STATUS:CONFIRMED",
-      "BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:Your Fluent session starts in 30 minutes","END:VALARM",
+      "SUMMARY:Englischstunde mit "+t.name,
+      "DESCRIPTION:50-minütige Englisch-Einzelstunde ("+t.role+") mit "+t.name+".",
+      "LOCATION:"+(b.callLink||"Videocall"),"STATUS:CONFIRMED",
+      "BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:Deine Stunde beginnt in 30 Minuten","END:VALARM",
       "END:VEVENT","END:VCALENDAR"
     ].join("\r\n");
   }
@@ -1380,12 +1382,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
     a.download = "fluent-"+t.name.split(" ")[0].toLowerCase()+"-"+icsStamp(b.date,b.time)+".ics";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url), 1500);
-    toast("Calendar invite (.ics) downloaded");
+    toast("Kalender-Einladung (.ics) heruntergeladen");
   }
   function icsEsc(t){ return String(t==null?"":t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
   function buildIcsAll(){
     const evs = state.bookings.filter(b=>b.tutorId==="davit").sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
-    const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//Tutor Schedule//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEsc("Fluent — Davit’s sessions"),"REFRESH-INTERVAL;VALUE=DURATION:PT1H","X-PUBLISHED-TTL:PT1H"];
+    const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//Tutor Schedule//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEsc("The Green Pencil — Davits Stunden"),"REFRESH-INTERVAL;VALUE=DURATION:PT1H","X-PUBLISHED-TTL:PT1H"];
     evs.forEach(b=>{
       const s=studentById(b.studentId);
       const [h,m]=b.time.split(":").map(Number);
@@ -1393,9 +1395,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const dt=icsStamp(b.date,b.time);
       const dtEnd=end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate())+"T"+pad2(end.getHours())+pad2(end.getMinutes())+"00";
       lines.push("BEGIN:VEVENT","UID:fluent-"+b.studentId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
-        "SUMMARY:"+icsEsc((b.title||"English session")+" — "+(s?s.name:"")),
-        "DESCRIPTION:"+icsEsc(b.notes||"50-minute 1-on-1 session"),
-        "LOCATION:"+icsEsc(b.callLink||"Fluent video call"),"STATUS:CONFIRMED","END:VEVENT");
+        "SUMMARY:"+icsEsc((b.title||"Englischstunde")+" — "+(s?s.name:"")),
+        "DESCRIPTION:"+icsEsc(b.notes||"50-minütige Einzelstunde"),
+        "LOCATION:"+icsEsc(b.callLink||"Videocall"),"STATUS:CONFIRMED","END:VEVENT");
     });
     lines.push("END:VCALENDAR");
     return lines.join("\r\n");
@@ -1404,7 +1406,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const blob=new Blob([buildIcsAll()],{type:"text/calendar;charset=utf-8"});
     const url=URL.createObjectURL(blob); const a=document.createElement("a");
     a.href=url; a.download="fluent-davit-schedule.ics"; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500); toast("Full schedule (.ics) downloaded");
+    setTimeout(()=>URL.revokeObjectURL(url),1500); toast("Gesamter Kalender (.ics) heruntergeladen");
   }
   const CAL_FEED = "webcal://calendar.fluent.app/feeds/davit-7f3a9c.ics";
   function openCalSync(){
@@ -1413,17 +1415,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
     m.innerHTML=`<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8.5 15.5a3 3 0 1 0 3-3"/></svg></div>
-      <h3 class="buy-h">Subscribe to your schedule</h3>
-      <p class="buy-p">Add this live feed once — new bookings, reschedules and cancellations sync to your calendar automatically, no re-downloading.</p>
-      <div class="cal-url"><input id="calUrl" readonly value="${CAL_FEED}"><button class="mini-btn" id="calCopy">Copy</button></div>
-      <a class="btn" href="${CAL_FEED}">Subscribe · Apple &amp; Outlook</a>
-      <a class="btn ghost" href="${gcal}" target="_blank" rel="noopener">Add to Google Calendar</a>
-      <button class="btn-text" id="calDownload">Or download a one-off .ics</button>
+      <h3 class="buy-h">Kalender abonnieren</h3>
+      <p class="buy-p">Füge diesen Live-Feed einmal hinzu — neue Buchungen, Umbuchungen und Stornierungen synchronisieren sich automatisch, ganz ohne erneuten Download.</p>
+      <div class="cal-url"><input id="calUrl" readonly value="${CAL_FEED}"><button class="mini-btn" id="calCopy">Kopieren</button></div>
+      <a class="btn" href="${CAL_FEED}">Abonnieren · Apple &amp; Outlook</a>
+      <a class="btn ghost" href="${gcal}" target="_blank" rel="noopener">Zu Google Kalender hinzufügen</a>
+      <button class="btn-text" id="calDownload">Oder einmalig .ics herunterladen</button>
     </div>`;
     m.hidden=false;
     $("#buyCard").onclick=(e)=>e.stopPropagation();
     $("#buyX").onclick=closeBuy;
-    $("#calCopy").onclick=()=>{ const i=$("#calUrl"); i.select(); let done=false; try{ const p=navigator.clipboard&&navigator.clipboard.writeText(i.value); if(p&&p.then){ p.then(()=>{}).catch(()=>{ try{document.execCommand("copy");}catch(e){} }); done=true; } }catch(e){} if(!done){ try{document.execCommand("copy");}catch(e){} } toast("Subscription link copied"); };
+    $("#calCopy").onclick=()=>{ const i=$("#calUrl"); i.select(); let done=false; try{ const p=navigator.clipboard&&navigator.clipboard.writeText(i.value); if(p&&p.then){ p.then(()=>{}).catch(()=>{ try{document.execCommand("copy");}catch(e){} }); done=true; } }catch(e){} if(!done){ try{document.execCommand("copy");}catch(e){} } toast("Abo-Link kopiert"); };
     $("#calDownload").onclick=downloadIcsAll;
   }
 
@@ -1435,30 +1437,30 @@ window.DJANGO_DATA = {{ django_data|safe }};
       if (state.selected) {
         const d = state.selected.date;
         sumCard.innerHTML = `
-          <div class="manage-eyebrow">Reschedule session</div>
+          <div class="manage-eyebrow">Stunde umbuchen</div>
           <div class="reschedule-move">
-            <div class="rm-old"><span>From</span><b>${fmtLong(b.date)} · ${b.time}</b></div>
+            <div class="rm-old"><span>Von</span><b>${fmtLong(b.date)} · ${b.time}</b></div>
             <svg class="rm-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="2"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
-            <div class="rm-new"><span>To</span><b>${fmtLong(d)} · ${state.selected.time}</b></div>
+            <div class="rm-new"><span>Nach</span><b>${fmtLong(d)} · ${state.selected.time}</b></div>
           </div>
-          <div class="micro" style="margin:0 0 16px;">No credit charged — you're moving an existing session.</div>
-          <button class="btn" id="reschConfirm"><span class="grainbtn"></span>Confirm new time</button>
-          <button class="btn ghost" id="reschCancel" style="margin-top:10px;">Cancel rescheduling</button>
+          <div class="micro" style="margin:0 0 16px;">Kein Guthaben fällig — du verschiebst eine bestehende Stunde.</div>
+          <button class="btn" id="reschConfirm"><span class="grainbtn"></span>Neue Zeit bestätigen</button>
+          <button class="btn ghost" id="reschCancel" style="margin-top:10px;">Umbuchung abbrechen</button>
         `;
         $("#reschConfirm").onclick = confirmReschedule;
         $("#reschCancel").onclick = cancelReschedule;
       } else {
         sumCard.innerHTML = `
-          <div class="manage-eyebrow">Reschedule session</div>
+          <div class="manage-eyebrow">Stunde umbuchen</div>
           <div class="sum-head">
             <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
-            <div><div class="nm">${b.title}</div><div class="rl">Currently ${fmtLong(b.date)} · ${b.time}</div></div>
+            <div><div class="nm">${b.title}</div><div class="rl">Aktuell ${fmtLong(b.date)} · ${b.time}</div></div>
           </div>
           <div class="pick-prompt">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.7"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            <span>Tap any open slot on the calendar to move this session.</span>
+            <span>Tippe ein freies Zeitfenster im Kalender an, um diese Stunde zu verschieben.</span>
           </div>
-          <button class="btn ghost" id="reschCancel">Cancel rescheduling</button>
+          <button class="btn ghost" id="reschCancel">Umbuchung abbrechen</button>
         `;
         $("#reschCancel").onclick = cancelReschedule;
       }
@@ -1472,16 +1474,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
       sumCard.innerHTML = `
         <div class="sum-confirm">
           <div class="confirm-badge">✓</div>
-          <h3 class="confirm-h">${resched ? "Rescheduled!" : "You’re booked!"}</h3>
-          <p class="confirm-p">${fmtLong(b.date)}<br/>${b.time} – ${endTime(b.time)} with ${t.name}</p>
+          <h3 class="confirm-h">${resched ? "Umgebucht!" : "Gebucht!"}</h3>
+          <p class="confirm-p">${fmtLong(b.date)}<br/>${b.time} – ${endTime(b.time)} mit ${t.name}</p>
         </div>
         <button class="btn" id="icsBtn">
           <span class="grainbtn"></span>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
-          ${resched ? "Update calendar" : "Add to calendar"}
+          ${resched ? "Kalender aktualisieren" : "Zum Kalender hinzufügen"}
         </button>
-        <button class="btn ghost" id="bookMoreBtn" style="margin-top:10px;">Done</button>
-        <div class="micro">Downloads an <b style='color:var(--c1)'>.ics</b> file — opens in Apple Calendar, Google Calendar or Outlook.</div>
+        <button class="btn ghost" id="bookMoreBtn" style="margin-top:10px;">Fertig</button>
+        <div class="micro">Lädt eine <b style='color:var(--c1)'>.ics</b>-Datei — öffnet sich in Apple Kalender, Google Kalender oder Outlook.</div>
       `;
       $("#icsBtn").onclick = ()=>downloadIcs(b);
       $("#bookMoreBtn").onclick = ()=>{ state.justBooked=null; renderSummary(); };
@@ -1492,40 +1494,40 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if (state.managing) {
       const b = state.managing, t = tutorById(b.tutorId), mod = canModify(b);
       sumCard.innerHTML = `
-        <div class="manage-eyebrow">Manage booking</div>
+        <div class="manage-eyebrow">Buchung verwalten</div>
         <div class="sum-head">
           <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
           <div><div class="nm">${b.title}</div><div class="rl">with ${t.name}</div></div>
         </div>
         <div class="sum-rows">
-          <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(b.date)}</span></div>
-          <div class="sum-row"><span class="k">Time</span><span class="v hl">${b.time} – ${endTime(b.time)}</span></div>
-          <div class="sum-row"><span class="k">Duration</span><span class="v">50 minutes</span></div>
+          <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(b.date)}</span></div>
+          <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${b.time} – ${endTime(b.time)}</span></div>
+          <div class="sum-row"><span class="k">Dauer</span><span class="v">50 Minuten</span></div>
         </div>
-        ${b.callLink?`<a class="btn join-btn" href="${escHtml(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Join call</a>`:`<div class="micro" style="text-align:left;margin:2px 0 0;">Your tutor will post the call link here before the session.</div>`}
+        ${b.callLink?`<a class="btn join-btn" href="${escHtml(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:2px 0 0;">Dein Tutor stellt den Call-Link vor der Stunde hier ein.</div>`}
         <div class="notes-block">
-          <label class="field-label">What to discuss</label>
-          <textarea class="notes-ta" id="noteTA" placeholder="Topics, questions or goals for this session…">${escHtml(b.notes)}</textarea>
-          <div class="micro" style="text-align:left;margin:6px 0 0;">Shared with your tutor.</div>
+          <label class="field-label">Themen für die Stunde</label>
+          <textarea class="notes-ta" id="noteTA" placeholder="Themen, Fragen oder Ziele für diese Stunde…">${escHtml(b.notes)}</textarea>
+          <div class="micro" style="text-align:left;margin:6px 0 0;">Für deinen Tutor sichtbar.</div>
         </div>
         ${mod ? `
           <div class="manage-actions">
-            <button class="btn ghost" id="reschBtn">Reschedule</button>
-            <button class="btn danger-btn" id="cancelBtn"><span class="grainbtn"></span>Cancel</button>
+            <button class="btn ghost" id="reschBtn">Umbuchen</button>
+            <button class="btn danger-btn" id="cancelBtn"><span class="grainbtn"></span>Stornieren</button>
           </div>
-          <div class="micro">More than 24h away — reschedule for free, or cancel to get your <b style='color:var(--c1)'>1 credit</b> back.</div>
+          <div class="micro">Mehr als 24 h entfernt — kostenlos umbuchen oder stornieren und dein <b style='color:var(--c1)'>1 Guthaben</b> zurückbekommen.</div>
         ` : `
           <div class="lock-note">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-            <span><b>Within 24 hours of your session.</b> It can no longer be rescheduled or cancelled — the credit is forfeited if you don’t attend.</span>
+            <span><b>Weniger als 24 Stunden vor der Stunde.</b> Sie kann nicht mehr umgebucht oder storniert werden — das Guthaben verfällt, wenn du nicht teilnimmst.</span>
           </div>
           <div class="manage-actions">
-            <button class="btn ghost" disabled>Reschedule</button>
-            <button class="btn ghost" disabled>Cancel</button>
+            <button class="btn ghost" disabled>Umbuchen</button>
+            <button class="btn ghost" disabled>Stornieren</button>
           </div>
         `}
-        <button class="btn-text" id="manageIcs">Add to calendar (.ics)</button>
-        <button class="btn-text" id="manageBack">← Back to calendar</button>
+        <button class="btn-text" id="manageIcs">Zum Kalender (.ics)</button>
+        <button class="btn-text" id="manageBack">← Zurück zum Kalender</button>
       `;
       if (mod) {
         $("#reschBtn").onclick = ()=>startReschedule(b);
@@ -1540,8 +1542,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if (!state.selected) {
       sumCard.innerHTML = `<div class="sum-empty">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M12 13v4M10 15h4" stroke="var(--c3)"/></svg></div>
-        <h3>No slot selected</h3>
-        <p>Tap an open time on the calendar to see session details and confirm your booking.</p>
+        <h3>Noch nichts gewählt</h3>
+        <p>Tippe links auf ein freies Zeitfenster, um Details zu sehen und deine Buchung zu bestätigen.</p>
       </div>`;
       return;
     }
@@ -1551,22 +1553,22 @@ window.DJANGO_DATA = {{ django_data|safe }};
     sumCard.innerHTML = `
       <div class="sum-head">
         <div class="avatar" style="${avatarStyle(t)}">${t.i}</div>
-        <div><div class="nm">${t.name}</div><div class="rl">${t.role} tutor</div></div>
+        <div><div class="nm">${t.name}</div><div class="rl">${t.role}</div></div>
       </div>
       <div class="sum-rows">
-        <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(d)}</span></div>
-        <div class="sum-row"><span class="k">Time</span><span class="v hl">${state.selected.time} – ${endTime(state.selected.time)}</span></div>
-        <div class="sum-row"><span class="k">Duration</span><span class="v">50 minutes</span></div>
-        <div class="sum-row"><span class="k">Format</span><span class="v">1-on-1 · Video</span></div>
+        <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(d)}</span></div>
+        <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${state.selected.time} – ${endTime(state.selected.time)}</span></div>
+        <div class="sum-row"><span class="k">Dauer</span><span class="v">50 Minuten</span></div>
+        <div class="sum-row"><span class="k">Format</span><span class="v">Einzel · Video</span></div>
       </div>
       <div class="cost">
-        <span class="k">Cost</span>
-        <span class="v">1 <span style="font-size:13px;color:var(--muted);font-weight:400;">credit</span></span>
+        <span class="k">Kosten</span>
+        <span class="v">1 <span style="font-size:13px;color:var(--muted);font-weight:400;">Guthaben</span></span>
       </div>
       <button class="btn" id="confirmBtn" ${noCredit?"disabled":""}>
-        <span class="grainbtn"></span>${noCredit ? "Not enough credits" : "Confirm booking"}
+        <span class="grainbtn"></span>${noCredit ? "Nicht genug Guthaben" : "Jetzt buchen"}
       </button>
-      <div class="micro">${noCredit ? "Top up in your Account to book this session." : "You have <b style='color:var(--c1)'>"+state.credits+"</b> credits · this uses 1. Free reschedule or cancellation up to 24h before."}</div>
+      <div class="micro">${noCredit ? "Lade in deinem Konto auf, um diese Stunde zu buchen." : "Du hast <b style='color:var(--c1)'>"+state.credits+"</b> Guthaben · das nutzt 1. Kostenlos umbuchen oder stornieren bis 24 h vorher."}</div>
     `;
     const cb = $("#confirmBtn");
     if (cb && !noCredit) cb.onclick = confirmBooking;
@@ -1576,9 +1578,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const s = state.selected; if (!s) return;
     const t = tutorById(s.tutorId);
     state.credits -= 1;
-    const booking = { studentId: state.currentUser, tutorId: s.tutorId, date: new Date(s.date), time: s.time, title: "English session" };
+    const booking = { studentId: state.currentUser, tutorId: s.tutorId, date: new Date(s.date), time: s.time, title: "Englischstunde" };
     state.bookings.push(booking);
-    meLog().unshift({ type:"book", label:"Booked with "+t.name, sub: "Session · "+MONTHS_S[s.date.getMonth()]+" "+s.date.getDate(), amt:"-1" });
+    meLog().unshift({ type:"book", label:"Gebucht mit "+t.name, sub: "Stunde · "+MONTHS_S[s.date.getMonth()]+" "+s.date.getDate(), amt:"-1" });
     state.selected = null;
     state.justBooked = booking; state.justAction = "booked";
     // Persist first, so a rendering hiccup can never swallow the save.
@@ -1587,10 +1589,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
       tutorSlug: s.tutorId,
       date: ymd(s.date),
       time: s.time,
-      title: 'English session',
+      title: 'Englischstunde',
     }).then(r => { if (r && r.pk) booking._pk = r.pk; });
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
-    toast(`Session booked with ${t.name.split(" ")[0]} · ${s.time}`);
+    toast(`Stunde gebucht mit ${t.name.split(" ")[0]} · ${s.time}`);
   }
 
   // ---------- Credits ----------
@@ -1609,7 +1611,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const d = document.createElement("div");
       d.className = "pack" + (p.feat?" feat":"");
       d.innerHTML = `${p.tag?`<span class="tag">${p.tag}</span>`:""}
-        <div class="pc">${p.n}</div><div class="pl">credit${p.n>1?"s":""}</div>
+        <div class="pc">${p.n}</div><div class="pl">Guthaben</div>
         <div class="pp">${p.price}</div><div class="pe">${p.each}</div>`;
       d.onclick = () => openBuyInfo(p);
       el.appendChild(d);
@@ -1620,11 +1622,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg></div>
-      <h3 class="buy-h">Credits are added by your tutor</h3>
-      <p class="buy-p">To get the <b>${p.n}-credit pack</b> (<b>${p.price}</b>), message Davit. He adds the credits to your balance and an Austrian VAT receipt is issued to you automatically.</p>
+      <h3 class="buy-h">Guthaben fügt dein Tutor hinzu</h3>
+      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) schreib Davit. Er fügt das Guthaben zu deinem Stand hinzu und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       <div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>davit@fluent.at</span></div>
-      <a class="btn" id="buyMail" href="mailto:davit@fluent.at?subject=${encodeURIComponent('Credit top-up — '+p.n+'-credit pack')}&body=${encodeURIComponent('Hi Davit, I\u2019d like to buy the '+p.n+'-credit pack ('+p.price+'). Thanks!')}"><span class="grainbtn"></span>Message tutor</a>
-      <button class="btn ghost" id="buyClose">Close</button>
+      <a class="btn" id="buyMail" href="mailto:davit@fluent.at?subject=${encodeURIComponent('Guthaben aufladen — '+p.n+'er-Paket')}&body=${encodeURIComponent('Hallo Davit, ich m\u00f6chte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}"><span class="grainbtn"></span>Tutor schreiben</a>
+      <button class="btn ghost" id="buyClose">Schließen</button>
     </div>`;
     m.hidden=false;
     $("#buyCard").onclick=(e)=>e.stopPropagation();
@@ -1635,7 +1637,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function renderUpcoming() {
     const el = $("#upcomingList"); el.innerHTML="";
     const up = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).sort((a,b)=>a.date-b.date);
-    if (!up.length) { el.innerHTML = `<div class="empty-list">No upcoming sessions yet — book one from the calendar.</div>`; return; }
+    if (!up.length) { el.innerHTML = `<div class="empty-list">Noch keine geplanten Stunden — buche eine über den Kalender.</div>`; return; }
     up.forEach(b => {
       const t = tutorById(b.tutorId);
       const row = document.createElement("div"); row.className="li";
@@ -1645,12 +1647,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="avatar" style="${avatarStyle(t)};width:38px;height:38px;font-size:13px;">${t.i}</div>
         <div class="info"><div class="t">${b.title}</div><div class="s">${t.name} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
         <div class="tail">
-          ${b.callLink?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener" title="Join call">Join</a>`:""}
-          <button class="ics-mini" title="Add to calendar (.ics)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></button>
+          ${b.callLink?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener" title="Zum Call">Call</a>`:""}
+          <button class="ics-mini" title="Zum Kalender (.ics)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></button>
           <div class="li-actions">
             ${mod
-              ? `<button class="mini-btn resch">Reschedule</button><button class="mini-btn danger cancel">Cancel</button>`
-              : `<span class="lock-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> within 24h</span>`}
+              ? `<button class="mini-btn resch">Umbuchen</button><button class="mini-btn danger cancel">Stornieren</button>`
+              : `<span class="lock-chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> in < 24 h</span>`}
           </div>
         </div>`;
       row.querySelector(".ics-mini").onclick = ()=>downloadIcs(b);
@@ -1665,10 +1667,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
   const TXN_ICONS = {
     book: { bg:"linear-gradient(120deg,var(--c1),var(--c2))", t:"📅" },
     buy:  { bg:"linear-gradient(120deg,var(--good),var(--c2))", t:"＋" },
-    done: { bg:"rgba(74,54,34,0.12)", t:"✓" },
+    done: { bg:"rgba(36,53,40,0.12)", t:"✓" },
   };
   function txnHtml(log) {
-    if (!log || !log.length) return `<div class="empty-list">No transactions yet.</div>`;
+    if (!log || !log.length) return `<div class="empty-list">Noch keine Vorgänge.</div>`;
     return log.map(a => {
       const ic = TXN_ICONS[a.type] || TXN_ICONS.done;
       const amtCls = a.amt.startsWith("+")?"plus":(a.amt.startsWith("-")?"minus":"");
@@ -1706,16 +1708,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
           if(bk){
             const s=studentById(bk.studentId);
             el.className="slot t-booked locked";
-            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Booked"}</span>`;
-            el.onclick=()=>toast("Booked time can\u2019t be closed");
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Gebucht"}</span>`;
+            el.onclick=()=>toast("Gebuchte Zeit kann nicht geschlossen werden");
           } else if(conflict){
             el.className="slot avail avail-blocked";
-            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">Booked nearby</span>`;
-            el.onclick=()=>toast("Within 50 min of a booking");
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">Buchung in der Nähe</span>`;
+            el.onclick=()=>toast("Innerhalb von 50 Min. einer Buchung");
           } else {
             const on=slotOpen(date,time);
             el.className="slot avail "+(on?"avail-on":"avail-off");
-            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">${on?"Available":"Off"}</span>`;
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">${on?"Verfügbar":"Zu"}</span>`;
             el.onclick=()=>toggleAvail(date,time);
           }
           slots.appendChild(el);
@@ -1727,12 +1729,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
         if(bk){
           const s=studentById(bk.studentId);
           el.className="slot t-booked"+(state.teacherManage===bk?" sel":"");
-          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Booked"}</span>`;
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Gebucht"}</span>`;
           el.onclick=()=>teacherManageSlot(bk);
         } else {
           const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
           el.className="slot t-open"+(isSel?" sel":"");
-          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ add student</span>`;
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Schüler</span>`;
           el.onclick=()=>teacherSelectSlot(date,time);
         }
         slots.appendChild(el);
@@ -1745,36 +1747,36 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function teacherSelectSlot(date,time){ state.teacherManage=null; state.teacherSel={ dateKey:keyOf(date), date:new Date(date), time }; renderTeacherWeek(); renderTeacherSummary(); }
   function teacherManageSlot(bk){ state.teacherSel=null; state.teacherManage=bk; renderTeacherWeek(); renderTeacherSummary(); }
   function toggleAvail(date,time){ const dk=keyOf(date), k=dk+"|"+time; const newOpen = !slotOpen(date,time); state.availability[k] = newOpen; api('POST', '/api/availability/', { date: dk, time, isOpen: newOpen }); renderTeacherWeek(); renderWeek(); }
-  function exitEditAvail(){ state.editAvail=false; const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability`; } renderTeacherWeek(); renderTeacherSummary(); renderWeek(); }
+  function exitEditAvail(){ state.editAvail=false; const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten`; } renderTeacherWeek(); renderTeacherSummary(); renderWeek(); }
   function addCustomTime(i, time){
-    if(!/^\d{1,2}:\d{2}$/.test(time||"")){ toast("Enter a valid time"); return; }
+    if(!/^\d{1,2}:\d{2}$/.test(time||"")){ toast("Gib eine gültige Zeit ein"); return; }
     const ws=addDays(startOfWeek(NOW), state.tWeekOffset*7);
     const date=addDays(ws, i), dk=keyOf(date);
-    if(bookingConflict(date,time)){ toast("That overlaps a booking — pick another time"); return; }
+    if(bookingConflict(date,time)){ toast("Das überschneidet eine Buchung — wähle eine andere Zeit"); return; }
     state.customTimes[dk]=state.customTimes[dk]||[];
     if(!state.customTimes[dk].includes(time) && !TIMES.includes(time)) state.customTimes[dk].push(time);
     state.availability[dk+"|"+time]=true;
     api('POST', '/api/custom-times/', { date: dk, time });
     renderTeacherWeek(); renderTeacherSummary(); renderWeek();
-    toast("Added "+time+" on "+DOW[i]+" "+date.getDate());
+    toast(time+" am "+DOW[i]+" "+date.getDate()+" hinzugefügt");
   }
 
   function teacherAssign(date, time, studentId){
     const s=studentById(studentId); if(!s) return;
     const comp = s.credits<=0;
     if(!comp) setStudentCredits(studentId, s.credits-1);
-    s.log.unshift({ type:"book", label: comp?"Comp session booked by tutor":"Session booked by tutor", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt: comp?"":"-1" });
-    state.bookings.push({ studentId, tutorId:"davit", date:new Date(date), time, title: comp?"Comp session":"English session" });
+    s.log.unshift({ type:"book", label: comp?"Gratis-Stunde vom Tutor gebucht":"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt: comp?"":"-1" });
+    state.bookings.push({ studentId, tutorId:"davit", date:new Date(date), time, title: comp?"Gratis-Stunde":"Englischstunde" });
     api('POST', '/api/bookings/', {
       studentSlug: studentId,
       tutorSlug: 'davit',
       date: ymd(date),
       time,
-      title: comp ? 'Comp session' : 'English session',
+      title: comp ? 'Gratis-Stunde' : 'Englischstunde',
     }).then(r => { if (r && r.pk) state.bookings[state.bookings.length-1]._pk = r.pk; });
     state.teacherSel=null; state.teacherManage=null;
     renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
-    toast(`${s.name.split(" ")[0]} added · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
+    toast(`${s.name.split(" ")[0]} eingetragen · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
   }
 
   function teacherRemove(bk){
@@ -1783,10 +1785,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
     state.bookings.splice(i,1);
     if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/');
     addStudentCredits(bk.studentId, 1);
-    s.log.unshift({ type:"buy", label:"Booking removed by tutor", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · credit returned", amt:"+1" });
+    s.log.unshift({ type:"buy", label:"Buchung vom Tutor entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Guthaben zurück", amt:"+1" });
     state.teacherManage=null; state.teacherSel=null;
     renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
-    toast(`Removed ${s.name.split(" ")[0]} · 1 credit returned`);
+    toast(`${s.name.split(" ")[0]} entfernt · 1 Guthaben zurück`);
   }
 
   function renderTeacherSummary(){
@@ -1795,21 +1797,21 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const ws = addDays(startOfWeek(NOW), state.tWeekOffset*7);
       const dayOpts = DOW.map((d,i)=>{ const dt=addDays(ws,i); return `<option value="${i}">${d} ${dt.getDate()}</option>`; }).join("");
       card.innerHTML=`
-        <div class="manage-eyebrow">Edit availability</div>
+        <div class="manage-eyebrow">Verfügbarkeit bearbeiten</div>
         <div class="pick-prompt">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--c1)" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
-          <span>Tap any time to switch it <b>Available</b> or <b>Off</b>. Booked sessions stay locked.</span>
+          <span>Tippe eine Zeit an, um sie auf <b>Verfügbar</b> oder <b>Zu</b> zu schalten. Gebuchte Stunden bleiben gesperrt.</span>
         </div>
         <div class="custom-add">
-          <label class="field-label">Add a custom start time</label>
+          <label class="field-label">Eigene Startzeit hinzufügen</label>
           <div class="ca-row">
             <select class="t-select ca-day" id="caDay">${dayOpts}</select>
             <input type="time" class="t-select ca-time" id="caTime" value="09:15" step="300" min="07:00" max="21:00" />
           </div>
-          <div class="micro" style="text-align:left;margin:0 0 14px;">Any start time — as long as its 50 minutes don’t overlap a booking.</div>
-          <button class="btn" id="caAdd"><span class="grainbtn"></span>Add start time</button>
+          <div class="micro" style="text-align:left;margin:0 0 14px;">Jede Startzeit — solange die 50 Minuten keine Buchung überschneiden.</div>
+          <button class="btn" id="caAdd"><span class="grainbtn"></span>Startzeit hinzufügen</button>
         </div>
-        <button class="btn ghost" id="availDone" style="margin-top:10px;">Done editing</button>
+        <button class="btn ghost" id="availDone" style="margin-top:10px;">Fertig</button>
       `;
       $("#caAdd").onclick=()=>addCustomTime(+$("#caDay").value, $("#caTime").value);
       $("#availDone").onclick=exitEditAvail;
@@ -1817,23 +1819,23 @@ window.DJANGO_DATA = {{ django_data|safe }};
     }
     if(state.teacherSel){
       const sel=state.teacherSel;
-      const opts=state.students.map(s=>`<option value="${s.id}">${s.name} — ${s.credits} credit${s.credits!==1?"s":""}</option>`).join("");
+      const opts=state.students.map(s=>`<option value="${s.id}">${s.name} — ${s.credits} Guthaben</option>`).join("");
       card.innerHTML=`
-        <div class="manage-eyebrow">Add student to slot</div>
+        <div class="manage-eyebrow">Schüler eintragen</div>
         <div class="sum-rows" style="margin-bottom:16px;">
-          <div class="sum-row"><span class="k">Date</span><span class="v">${fmtLong(sel.date)}</span></div>
-          <div class="sum-row"><span class="k">Time</span><span class="v hl">${sel.time} – ${endTime(sel.time)}</span></div>
+          <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(sel.date)}</span></div>
+          <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${sel.time} – ${endTime(sel.time)}</span></div>
         </div>
-        <label class="field-label">Student</label>
+        <label class="field-label">Schüler</label>
         <select class="t-select" id="assignSel">${opts}</select>
         <div class="assign-note" id="assignNote"></div>
-        <button class="btn" id="assignBtn"><span class="grainbtn"></span>Add to slot</button>
-        <button class="btn-text" id="assignCancel">Cancel</button>
+        <button class="btn" id="assignBtn"><span class="grainbtn"></span>Eintragen</button>
+        <button class="btn-text" id="assignCancel">Abbrechen</button>
       `;
       const selEl=$("#assignSel");
       const note=()=>{ const s=studentById(selEl.value); $("#assignNote").innerHTML = s.credits>0
-        ? `Books the session and deducts <b style='color:var(--c1)'>1 credit</b> from ${s.name.split(" ")[0]} (→ ${s.credits-1}).`
-        : `<span class="warn">${s.name.split(" ")[0]} has 0 credits — this will be booked as a comp session.</span>`; };
+        ? `Bucht die Stunde und zieht <b style='color:var(--c1)'>1 Guthaben</b> von ${s.name.split(" ")[0]} ab (→ ${s.credits-1}).`
+        : `<span class="warn">${s.name.split(" ")[0]} hat 0 Guthaben — das wird als Gratis-Stunde gebucht.</span>`; };
       selEl.onchange=note; note();
       $("#assignBtn").onclick=()=>teacherAssign(sel.date, sel.time, selEl.value);
       $("#assignCancel").onclick=()=>{ state.teacherSel=null; renderTeacherWeek(); renderTeacherSummary(); };
@@ -1842,25 +1844,25 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(state.teacherManage){
       const bk=state.teacherManage, s=studentById(bk.studentId);
       card.innerHTML=`
-        <div class="manage-eyebrow">Booked slot</div>
+        <div class="manage-eyebrow">Gebuchte Zeit</div>
         <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${s.name}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div></div></div>
-        <label class="field-label">Session title</label>
+        <label class="field-label">Titel der Stunde</label>
         <input class="bf-input" id="tTitle" value="${escHtml(bk.title)}">
-        <label class="field-label" style="margin-top:12px;">Start time <span class="lbl-only">· 50 min</span></label>
+        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· 50 Min.</span></label>
         <div class="time-edit">
           <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00">
-          <span class="time-end" id="tTimeEnd">ends ${endTime(bk.time)}</span>
+          <span class="time-end" id="tTimeEnd">endet ${endTime(bk.time)}</span>
         </div>
-        <label class="field-label" style="margin-top:12px;">Call link <span class="lbl-only">· Zoom, Teams…</span></label>
-        <input class="bf-input" id="tCallLink" type="url" placeholder="https://… paste meeting link" value="${escHtml(bk.callLink)}">
-        <label class="field-label" style="margin-top:12px;">What to discuss</label>
-        <textarea class="notes-ta" id="tNoteTA" placeholder="Notes shared with ${escHtml(s.name.split(' ')[0])}…">${escHtml(bk.notes)}</textarea>
-        <label class="field-label" style="margin-top:12px;">Private session notes <span class="lbl-only">· only you</span></label>
-        <textarea class="notes-ta private" id="tPrivTA" placeholder="Private notes on how the session went…">${escHtml(bk.tutorNotes)}</textarea>
-        <button class="btn" id="tNoteSave" style="margin-top:12px;"><span class="grainbtn"></span>Save details</button>
-        <button class="btn danger-btn" id="tRemove" style="margin-top:10px;"><span class="grainbtn"></span>Remove from slot</button>
-        <button class="btn-text" id="tBack">← Back</button>
-        <div class="micro">Removing frees the time and returns <b style='color:var(--c1)'>1 credit</b> to ${s.name.split(" ")[0]}.</div>
+        <label class="field-label" style="margin-top:12px;">Call-Link <span class="lbl-only">· Zoom, Teams…</span></label>
+        <input class="bf-input" id="tCallLink" type="url" placeholder="https://… Meeting-Link einfügen" value="${escHtml(bk.callLink)}">
+        <label class="field-label" style="margin-top:12px;">Themen für die Stunde</label>
+        <textarea class="notes-ta" id="tNoteTA" placeholder="Notizen für ${escHtml(s.name.split(' ')[0])}…">${escHtml(bk.notes)}</textarea>
+        <label class="field-label" style="margin-top:12px;">Private Notizen <span class="lbl-only">· nur du</span></label>
+        <textarea class="notes-ta private" id="tPrivTA" placeholder="Private Notizen zum Verlauf der Stunde…">${escHtml(bk.tutorNotes)}</textarea>
+        <button class="btn" id="tNoteSave" style="margin-top:12px;"><span class="grainbtn"></span>Details speichern</button>
+        <button class="btn danger-btn" id="tRemove" style="margin-top:10px;"><span class="grainbtn"></span>Aus der Zeit entfernen</button>
+        <button class="btn-text" id="tBack">← Zurück</button>
+        <div class="micro">Entfernen gibt die Zeit frei und <b style='color:var(--c1)'>1 Guthaben</b> zurück an ${s.name.split(" ")[0]}.</div>
       `;
       $("#tTitle").oninput=(e)=>{ bk.title=e.target.value; };
       $("#tNoteTA").oninput=(e)=>{ bk.notes=e.target.value; };
@@ -1870,9 +1872,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
       $("#tNoteSave").onclick=()=>{
         const nt=$("#tTimeInput").value;
         if(/^\d{2}:\d{2}$/.test(nt) && nt!==bk.time){
-          if(bookingConflict(bk.date, nt, bk)){ toast("That start time overlaps another booking — not changed"); }
-          else { bk.time=nt; const dk=keyOf(bk.date); if(!dayTimes(bk.date).includes(nt)){ state.customTimes[dk]=state.customTimes[dk]||[]; state.customTimes[dk].push(nt); } toast("Session moved to "+nt); }
-        } else { toast("Session details saved"); }
+          if(bookingConflict(bk.date, nt, bk)){ toast("Diese Startzeit überschneidet eine andere Buchung — nicht geändert"); }
+          else { bk.time=nt; const dk=keyOf(bk.date); if(!dayTimes(bk.date).includes(nt)){ state.customTimes[dk]=state.customTimes[dk]||[]; state.customTimes[dk].push(nt); } toast("Stunde verschoben auf "+nt); }
+        } else { toast("Details gespeichert"); }
         if (bk._pk) api('PUT', '/api/bookings/' + bk._pk + '/', {
           title: bk.title, notes: bk.notes, tutorNotes: bk.tutorNotes, callLink: bk.callLink, time: bk.time
         });
@@ -1884,14 +1886,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     }
     card.innerHTML=`<div class="sum-empty">
       <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M17 8h5M19.5 5.5v5" stroke="var(--c1)"/></svg></div>
-      <h3>Manage your schedule</h3>
-      <p>Tap an <b style="color:var(--c1)">open</b> time to add a student, or a booked time to free it up.</p>
+      <h3>Plane deinen Kalender</h3>
+      <p>Tippe eine <b style="color:var(--c1)">freie</b> Zeit an, um einen Schüler einzutragen, oder eine gebuchte, um sie freizugeben.</p>
     </div>`;
   }
 
   function topUp(s, n, fromModal){
     const r = issueReceipt(s, n);
-    s.log.unshift({ type:"buy", label:"Credits added by tutor", sub:"Today · paid externally", amt:"+"+n, receiptNo: r.no });
+    s.log.unshift({ type:"buy", label:"Guthaben vom Tutor hinzugefügt", sub:"Heute · extern bezahlt", amt:"+"+n, receiptNo: r.no });
     addStudentCredits(s.id, n);
     api('POST', '/api/credits/' + s.id + '/', { n }).then(res => {
       if (res && res.receiptNo) {
@@ -1902,7 +1904,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     renderRoster(); renderAccount();
     if(fromModal) renderStudentModal();
     openReceipt(r);
-    toast(`+${n} credits → ${s.name.split(" ")[0]} · receipt ${r.no}`);
+    toast(`+${n} Guthaben → ${s.name.split(" ")[0]} · Beleg ${r.no}`);
   }
 
   // ---------- Student history modal ----------
@@ -1917,28 +1919,28 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <button class="modal-x" id="modalX" aria-label="Close">×</button>
         <div class="sum-head" style="margin-bottom:18px;">
           <div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${s.i}</div>
-          <div><div class="nm">${s.name}</div><div class="rl">${s.credits} credits · ${upc} upcoming session${upc!==1?"s":""}</div></div>
+          <div><div class="nm">${s.name}</div><div class="rl">${s.credits} Guthaben · ${upc} geplante Stunde${upc!==1?"n":""}</div></div>
         </div>
         <div class="modal-add">
-          <span class="ma-label">Add credits<em>Paid externally</em></span>
+          <span class="ma-label">Guthaben hinzufügen<em>Extern bezahlt</em></span>
           <div class="ma-btns">
             <button class="mini-btn" data-madd="1">+1</button>
             <button class="mini-btn" data-madd="5">+5</button>
             <button class="mini-btn" data-madd="10">+10</button>
           </div>
         </div>
-        <div class="section-h" style="margin:20px 2px 6px;"><h2>Tutor notes</h2></div>
+        <div class="section-h" style="margin:20px 2px 6px;"><h2>Notizen</h2></div>
         <div class="snote-add">
-          <input class="bf-input snote-input" id="snoteInput" placeholder="Add a note about ${escHtml(s.name.split(' ')[0])}…">
-          <button class="mini-btn snote-btn" id="snoteAdd">Add</button>
+          <input class="bf-input snote-input" id="snoteInput" placeholder="Notiz zu ${escHtml(s.name.split(' ')[0])}…">
+          <button class="mini-btn snote-btn" id="snoteAdd">Hinzufügen</button>
         </div>
         <div class="snote-log">${notesLogHtml(s)}</div>
-        <div class="section-h" style="margin:22px 2px 8px;"><h2>Learning files <span class="lbl-only">· A1–C1</span></h2></div>
-        <div class="micro" style="text-align:left; margin:0 2px 12px;">Toggle the lessons ${escHtml(s.name.split(' ')[0])} can access in their Learning tab.</div>
+        <div class="section-h" style="margin:22px 2px 8px;"><h2>Lernmaterialien <span class="lbl-only">· A1–C1</span></h2></div>
+        <div class="micro" style="text-align:left; margin:0 2px 12px;">Schalte die Lektionen frei, auf die ${escHtml(s.name.split(' ')[0])} im Lern-Tab zugreifen kann.</div>
         <div class="curric-mgr">${curriculumMgrHtml(s)}</div>
-        <button class="btn ghost" id="prevToggle" style="margin-top:14px;">Preview ${escHtml(s.name.split(' ')[0])}’s Learning tab</button>
+        <button class="btn ghost" id="prevToggle" style="margin-top:14px;">Vorschau auf ${escHtml(s.name.split(' ')[0])}s Lern-Tab</button>
         <div class="learn-preview" id="learnPreview" hidden style="margin-top:6px;"></div>
-        <div class="section-h" style="margin:22px 2px 6px;"><h2>Transaction history</h2></div>
+        <div class="section-h" style="margin:22px 2px 6px;"><h2>Verlauf</h2></div>
         <div class="activity modal-txns">${txnHtml(s.log)}</div>
       </div>`;
     $("#modalCard").onclick = (e)=>e.stopPropagation();
@@ -1960,22 +1962,22 @@ window.DJANGO_DATA = {{ django_data|safe }};
     bindReceiptLinks($("#studentModal"));
     if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
   }
-  function notesLogHtml(s){ const l=s.notesLog||[]; if(!l.length) return `<div class="empty-list">No notes yet — add the first above.</div>`; return l.map(n=>`<div class="snote"><div class="snote-date">${n.date}</div><div class="snote-text">${escHtml(n.text)}</div></div>`).join(""); }
-  function addStudentNote(s){ const inp=$("#snoteInput"); const t=(inp.value||"").trim(); if(!t) return; s.notesLog=s.notesLog||[]; s.notesLog.unshift({ date:fmtAT(NOW), text:t }); inp.value=""; api('POST', '/api/notes/' + s.id + '/', { text: t }); renderStudentModal(); toast("Note added to "+s.name.split(" ")[0]); }
+  function notesLogHtml(s){ const l=s.notesLog||[]; if(!l.length) return `<div class="empty-list">Noch keine Notizen — oben die erste hinzufügen.</div>`; return l.map(n=>`<div class="snote"><div class="snote-date">${n.date}</div><div class="snote-text">${escHtml(n.text)}</div></div>`).join(""); }
+  function addStudentNote(s){ const inp=$("#snoteInput"); const t=(inp.value||"").trim(); if(!t) return; s.notesLog=s.notesLog||[]; s.notesLog.unshift({ date:fmtAT(NOW), text:t }); inp.value=""; api('POST', '/api/notes/' + s.id + '/', { text: t }); renderStudentModal(); toast("Notiz zu "+s.name.split(" ")[0]+" hinzugefügt"); }
 
   function renderRoster(){
     const el=$("#rosterList"); el.innerHTML="";
     const q=(state.studentQuery||"").trim().toLowerCase();
     const list=state.students.filter(s=> !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
-    const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} of ${state.students.length}` : `${state.students.length} student${state.students.length!==1?"s":""}`;
-    if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">No students match “${escHtml(q)}”.</div>`; renderTutorLists(); return; }
+    const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} von ${state.students.length}` : `${state.students.length} Schüler`;
+    if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">Keine Schüler passen zu „${escHtml(q)}“.</div>`; renderTutorLists(); return; }
     list.forEach(s=>{
       const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
       const card=document.createElement("div"); card.className="rost";
       card.innerHTML=`
         <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${s.i}</div>
-        <div class="rinfo"><div class="rname">${s.name}</div><div class="rsub">${upc} upcoming session${upc!==1?"s":""}</div></div>
-        <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">credits</div></div>
+        <div class="rinfo"><div class="rname">${s.name}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}</div></div>
+        <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Guthaben</div></div>
         <div class="rc-actions">
           <button class="mini-btn" data-add="1">+1</button>
           <button class="mini-btn" data-add="5">+5</button>
@@ -1996,7 +1998,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
       <div class="info"><div class="t">${b.title}</div><div class="s">${s.name} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
-      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Join</a>`:""}${completed?'<span class="pill2 done">Completed</span>':'<span class="pill2">50 min</span>'}</div>
+      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':'<span class="pill2">50 Min.</span>'}</div>
     </div>`;
   }
   function renderTutorLists(){
@@ -2004,8 +2006,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(!up||!done) return;
     const upcoming = state.bookings.filter(b=> b.date>=NOW || sameDay(b.date,NOW)).sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
     const past = state.bookings.filter(b=> b.date<NOW && !sameDay(b.date,NOW)).sort((a,b)=> b.date-a.date || toMin(b.time)-toMin(a.time));
-    up.innerHTML = upcoming.length ? upcoming.map(b=>tutorRow(b,false)).join("") : `<div class="empty-list">No upcoming sessions.</div>`;
-    done.innerHTML = past.length ? past.map(b=>tutorRow(b,true)).join("") : `<div class="empty-list">No completed sessions yet.</div>`;
+    up.innerHTML = upcoming.length ? upcoming.map(b=>tutorRow(b,false)).join("") : `<div class="empty-list">Keine geplanten Stunden.</div>`;
+    done.innerHTML = past.length ? past.map(b=>tutorRow(b,true)).join("") : `<div class="empty-list">Noch keine abgeschlossenen Stunden.</div>`;
   }
 
   // ---------- Billing (student receipt address) ----------
@@ -2020,10 +2022,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const s=studentById(state.currentUser); if(!s) return;
     s.name = $("#bfName").value.trim()||s.name;
     s.billing = { line1:$("#bfLine1").value.trim(), postcode:$("#bfZip").value.trim(), city:$("#bfCity").value.trim(), country:$("#bfCountry").value.trim()||"Österreich" };
-    $("#acctHello").textContent="Hello, "+s.name.split(" ")[0]+".";
+    $("#acctHello").textContent="Hallo, "+s.name.split(" ")[0]+".";
     setIdentity(s); renderAccount();
     api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
-    toast("Receipt details saved");
+    toast("Rechnungsdaten gespeichert");
   }
 
   // ---------- Admin: user management ----------
@@ -2037,16 +2039,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const amt = parsePrice(price);
     if(!credits || credits <= 0 || amt == null) return "";
     const per = amt / credits;
-    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / session";
+    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / Stunde";
   }
   function renderAdminPacks(){
     const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
     PACKS.forEach((p,idx)=>{
       const row=document.createElement("div"); row.className="apack-row";
       row.innerHTML=`
-        <label class="bf-lab">Credits<input class="bf-input" data-pk="${idx}" data-f="n" type="number" min="1" value="${p.n}"></label>
-        <label class="bf-lab">Price<input class="bf-input" data-pk="${idx}" data-f="price" value="${esc(p.price)}"></label>
-        <label class="bf-lab">Per session<input class="bf-input" data-each="${idx}" value="${esc(packEach(p.n, p.price))}" readonly tabindex="-1" aria-readonly="true" style="opacity:0.7; cursor:default;"></label>`;
+        <label class="bf-lab">Guthaben<input class="bf-input" data-pk="${idx}" data-f="n" type="number" min="1" value="${p.n}"></label>
+        <label class="bf-lab">Preis<input class="bf-input" data-pk="${idx}" data-f="price" value="${esc(p.price)}"></label>
+        <label class="bf-lab">Pro Stunde<input class="bf-input" data-each="${idx}" value="${esc(packEach(p.n, p.price))}" readonly tabindex="-1" aria-readonly="true" style="opacity:0.7; cursor:default;"></label>`;
       el.appendChild(row);
     });
     // Recompute the read-only per-session live as Credits / Price are typed.
@@ -2069,7 +2071,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     PACKS.forEach(p=>{ p.each = packEach(p.n, p.price); });
     api('PUT', '/api/settings/', { creditPrice: state.creditPrice, packs: PACKS });
     renderPacks(); renderAdmin();
-    toast("Pricing saved");
+    toast("Preise gespeichert");
   }
   function renderAdminList(){
     const el=$("#adminList"); if(!el) return; el.innerHTML="";
@@ -2077,7 +2079,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const item=document.createElement("button");
       item.className="admin-item"+(u.id===state.adminSel?" sel":"");
       item.innerHTML=`<div class="avatar" style="${avatarStyle(u)};width:36px;height:36px;font-size:12px;">${u.i}</div>
-        <div class="ai-info"><div class="ai-name">${u.name}</div><div class="ai-role">${u.role==="tutor"?"Tutor":"Student"} · ${u.email}</div></div>`;
+        <div class="ai-info"><div class="ai-name">${u.name}</div><div class="ai-role">${u.role==="tutor"?"Tutor":"Schüler"} · ${u.email}</div></div>`;
       item.onclick=()=>{ state.adminSel=u.id; renderAdmin(); };
       el.appendChild(item);
     });
@@ -2091,35 +2093,35 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <div class="ed-head">
         <div class="avatar ed-avatar" style="${avatarStyle(u)};width:64px;height:64px;font-size:22px;">${u.i}</div>
         <div class="ed-photo-actions">
-          <div class="ed-who"><div class="ed-name">${u.name}</div><div class="ed-role">${isStudent?"Student":"Tutor"}</div></div>
+          <div class="ed-who"><div class="ed-name">${u.name}</div><div class="ed-role">${isStudent?"Schüler":"Tutor"}</div></div>
           <div class="ed-photo-btns">
-            <label class="mini-btn">Upload photo<input type="file" id="edPhoto" accept="image/*" hidden></label>
-            ${u.photo?'<button class="mini-btn" id="edPhotoClear">Remove</button>':''}
+            <label class="mini-btn">Foto hochladen<input type="file" id="edPhoto" accept="image/*" hidden></label>
+            ${u.photo?'<button class="mini-btn" id="edPhotoClear">Entfernen</button>':''}
           </div>
         </div>
       </div>
       <div class="ed-fields">
-        <label class="bf-lab">Display name<input class="bf-input" id="edName" value="${esc(u.name)}"></label>
+        <label class="bf-lab">Anzeigename<input class="bf-input" id="edName" value="${esc(u.name)}"></label>
         <div class="bf-grid">
-          <label class="bf-lab">Email (login)<input class="bf-input" id="edEmail" value="${esc(u.email)}"></label>
-          <label class="bf-lab">Password<input class="bf-input" id="edPass" value="${esc(u.password)}"></label>
+          <label class="bf-lab">E-Mail (Login)<input class="bf-input" id="edEmail" value="${esc(u.email)}"></label>
+          <label class="bf-lab">Passwort<input class="bf-input" id="edPass" value="${esc(u.password)}"></label>
         </div>
         ${isStudent?`
-        <label class="bf-lab">Credits<input class="bf-input" id="edCredits" type="number" min="0" value="${u.credits}"></label>
-        <div class="ed-sub">Receipt address</div>
-        <label class="bf-lab">Street &amp; no.<input class="bf-input" id="edLine1" value="${esc(b.line1)}"></label>
+        <label class="bf-lab">Guthaben<input class="bf-input" id="edCredits" type="number" min="0" value="${u.credits}"></label>
+        <div class="ed-sub">Rechnungsadresse</div>
+        <label class="bf-lab">Straße &amp; Nr.<input class="bf-input" id="edLine1" value="${esc(b.line1)}"></label>
         <div class="bf-grid">
-          <label class="bf-lab">Postcode<input class="bf-input" id="edZip" value="${esc(b.postcode)}"></label>
-          <label class="bf-lab">City<input class="bf-input" id="edCity" value="${esc(b.city)}"></label>
+          <label class="bf-lab">PLZ<input class="bf-input" id="edZip" value="${esc(b.postcode)}"></label>
+          <label class="bf-lab">Stadt<input class="bf-input" id="edCity" value="${esc(b.city)}"></label>
         </div>
-        <label class="bf-lab">Country<input class="bf-input" id="edCountry" value="${esc(b.country||'Österreich')}"></label>
-        `:'<div class="micro" style="text-align:left;">Tutor account — manages the schedule and student credits.</div>'}
+        <label class="bf-lab">Land<input class="bf-input" id="edCountry" value="${esc(b.country||'Österreich')}"></label>
+        `:'<div class="micro" style="text-align:left;">Tutor-Konto — verwaltet den Kalender und das Guthaben der Schüler.</div>'}
       </div>
       <div class="ed-actions">
-        <button class="btn" id="edSave"><span class="grainbtn"></span>Save changes</button>
-        <button class="btn ghost" id="edViewAs">View as ${u.name.split(" ")[0]}</button>
+        <button class="btn" id="edSave"><span class="grainbtn"></span>Änderungen speichern</button>
+        <button class="btn ghost" id="edViewAs">Ansehen als ${u.name.split(" ")[0]}</button>
       </div>
-      ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Remove student</button>':''}
+      ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Schüler entfernen</button>':''}
     `;
     $("#edPhoto").onchange=(e)=>pickPhoto(e,u);
     if($("#edPhotoClear")) $("#edPhotoClear").onclick=()=>{ u.photo=null; reflectUser(u); renderAdmin(); };
@@ -2135,7 +2137,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#edViewAs").onclick=()=>impersonate(u);
     if($("#edRemove")) $("#edRemove").onclick=()=>removeAdminStudent(u);
   }
-  function pickPhoto(e,u){ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ u.photo=rd.result; reflectUser(u); renderAdmin(); toast("Photo updated"); }; rd.readAsDataURL(f); }
+  function pickPhoto(e,u){ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ u.photo=rd.result; reflectUser(u); renderAdmin(); toast("Foto aktualisiert"); }; rd.readAsDataURL(f); }
   function saveAdminUser(u){
     u.name=$("#edName").value.trim()||u.name;
     u.email=$("#edEmail").value.trim().toLowerCase()||u.email;
@@ -2151,24 +2153,24 @@ window.DJANGO_DATA = {{ django_data|safe }};
     // lived in the browser, so the account couldn't actually be logged into.
     api('PUT', '/api/users/'+u.id+'/', payload);
     reflectUser(u); renderAdmin();
-    toast("Saved "+u.name);
+    toast(u.name+" gespeichert");
   }
   function reflectUser(u){
     renderRoster();
-    if(state.currentUser===u.id && u.role!=="tutor"){ $("#acctHello").textContent="Hello, "+u.name.split(" ")[0]+"."; renderBilling(); }
+    if(state.currentUser===u.id && u.role!=="tutor"){ $("#acctHello").textContent="Hallo, "+u.name.split(" ")[0]+"."; renderBilling(); }
   }
   function addAdminStudent(){
     // Create the account on the server first so it has a real slug and can be
     // logged into; then mirror it into local state using the server's response.
     api('POST', '/api/users/').then(r=>{
-      if(!r || !r.slug){ toast("Couldn't add student — try again"); return; }
+      if(!r || !r.slug){ toast("Schüler konnte nicht hinzugefügt werden — bitte erneut versuchen"); return; }
       state.students.push({
         id:r.slug, slug:r.slug, email:r.email, name:r.name, credits:r.credits||0,
         c:[r.color1, r.color2], i:r.initials||"NS", password:"password", photo:r.photo||null,
         billing:r.billing||{ line1:"", postcode:"", city:"", country:"Österreich" },
         log:[], notesLog:[], activeLessons:[],
       });
-      state.adminSel=r.slug; renderAdmin(); renderRoster(); toast("Student added — edit their details");
+      state.adminSel=r.slug; renderAdmin(); renderRoster(); toast("Schüler hinzugefügt — Details bearbeiten");
     });
   }
   function removeAdminStudent(u){
@@ -2177,7 +2179,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     state.bookings=state.bookings.filter(b=>b.studentId!==u.id);
     if(state.currentUser===u.id) state.currentUser=(state.students[0]||{id:"maya"}).id;
     state.adminSel=(allAccounts()[0]||{id:"davit"}).id;
-    renderAdmin(); renderRoster(); toast("Student removed");
+    renderAdmin(); renderRoster(); toast("Schüler entfernt");
   }
 
   // ---------- Toast ----------
@@ -2191,31 +2193,31 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   // ---------- Learning files / curriculum ----------
   const CURRICULUM = [
-    { level:"A1", title:"Beginner", lessons:[
+    { level:"A1", title:"Anfänger", lessons:[
       { id:"a1-1", t:"Greetings & introductions" },
       { id:"a1-2", t:"The present simple" },
       { id:"a1-3", t:"Numbers, dates & telling time" },
       { id:"a1-4", t:"Everyday objects & places" },
     ]},
-    { level:"A2", title:"Elementary", lessons:[
+    { level:"A2", title:"Grundstufe", lessons:[
       { id:"a2-1", t:"Past simple & regular verbs" },
       { id:"a2-2", t:"Comparatives & superlatives" },
       { id:"a2-3", t:"\u2018Going to\u2019 & future plans" },
       { id:"a2-4", t:"Food, travel & directions" },
     ]},
-    { level:"B1", title:"Intermediate", lessons:[
+    { level:"B1", title:"Mittelstufe", lessons:[
       { id:"b1-1", t:"Present perfect in context" },
       { id:"b1-2", t:"First & second conditionals" },
       { id:"b1-3", t:"Reported speech basics" },
       { id:"b1-4", t:"Phrasal verbs that matter" },
     ]},
-    { level:"B2", title:"Upper-intermediate", lessons:[
+    { level:"B2", title:"Obere Mittelstufe", lessons:[
       { id:"b2-1", t:"The passive voice" },
       { id:"b2-2", t:"Relative clauses" },
       { id:"b2-3", t:"Narrative tenses" },
       { id:"b2-4", t:"Formal & informal register" },
     ]},
-    { level:"C1", title:"Advanced", lessons:[
+    { level:"C1", title:"Fortgeschritten", lessons:[
       { id:"c1-1", t:"Inversion & emphasis" },
       { id:"c1-2", t:"Hedging & academic style" },
       { id:"c1-3", t:"Nuanced & idiomatic vocabulary" },
@@ -2238,12 +2240,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function uploadLessonFile(lessonId, file, after){
     if(!file) return;
     const ext=(file.name.split(".").pop()||"").toLowerCase();
-    if(!ALLOWED_FILE_EXTS.includes(ext)){ toast("Unsupported file type"); return; }
-    toast("Uploading "+file.name+"\u2026");
+    if(!ALLOWED_FILE_EXTS.includes(ext)){ toast("Dateityp nicht unterstützt"); return; }
+    toast(file.name+" wird hochgeladen\u2026");
     apiUpload('/api/lesson-files/'+lessonId+'/', file).then(res=>{
-      if(!res || res.error){ toast(res && res.error ? res.error : "Upload failed"); return; }
+      if(!res || res.error){ toast(res && res.error ? res.error : "Upload fehlgeschlagen"); return; }
       (state.lessonFiles[lessonId] = state.lessonFiles[lessonId] || []).push(res);
-      toast("Added "+res.name);
+      toast(res.name+" hinzugefügt");
       if(after) after();
     });
   }
@@ -2255,7 +2257,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function renderFiles(){
     const el=$("#filesContent"); if(!el) return;
     const s=studentById(state.currentUser); if(!s) return;
-    if(activeSet(s).length===0){ el.innerHTML = `<div class="panel" style="padding:42px 30px; text-align:center;"><div class="empty-list" style="font-style:normal;">No lessons unlocked yet \u2014 your tutor will activate materials for you as you progress.</div></div>`; return; }
+    if(activeSet(s).length===0){ el.innerHTML = `<div class="panel" style="padding:42px 30px; text-align:center;"><div class="empty-list" style="font-style:normal;">Noch keine Lektionen freigeschaltet \u2014 dein Tutor schaltet Materialien frei, sobald du weiterkommst.</div></div>`; return; }
     el.innerHTML = CURRICULUM.map(lvl=>{
       const act = lvl.lessons.filter(l=>isActive(s,l.id)).length;
       return `<div class="lvl-sec">
@@ -2266,11 +2268,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
     el.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open"));
   }
   function lessonRow(s,l){
-    if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${l.t}</span><span class="les-tag">Locked</span></div></div>`;
+    if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${l.t}</span><span class="les-tag">Gesperrt</span></div></div>`;
     const files=lessonFilesFor(l.id);
     const filesHtml = files.length
       ? files.map(f=>`<a class="file-row" href="${escHtml(f.url)}"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${escHtml(f.name)}</span><span class="file-ext">${escHtml(f.ext||'FILE')}</span></a>`).join("")
-      : `<div class="micro" style="text-align:left;padding:8px 4px;">No materials yet — your tutor hasn’t added files for this lesson.</div>`;
+      : `<div class="micro" style="text-align:left;padding:8px 4px;">Noch keine Materialien — dein Tutor hat für diese Lektion noch keine Dateien hinzugefügt.</div>`;
     return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${l.t}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
       <div class="les-files">${filesHtml}</div></div>`;
   }
@@ -2284,20 +2286,20 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="lvl-name">${lvl.title}</span></div>
         <div class="lesson-list">${ls.map(l=>lessonRow(s,l)).join("")}</div></div>`;
     }).filter(Boolean).join("");
-    return secs || `<div class="empty-list">No lessons unlocked yet — toggle some above.</div>`;
+    return secs || `<div class="empty-list">Noch keine Lektionen freigeschaltet — oben welche aktivieren.</div>`;
   }
   function curriculumMgrHtml(s){
     return CURRICULUM.map(lvl=>{
       const allOn=lvl.lessons.every(l=>isActive(s,l.id));
       return `<div class="cm-lvl">
-        <div class="cm-lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="cm-lvl-name">${lvl.title}</span><button class="cm-all" data-lvl-all="${lvl.level}">${allOn?"Clear all":"Unlock all"}</button></div>
+        <div class="cm-lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="cm-lvl-name">${lvl.title}</span><button class="cm-all" data-lvl-all="${lvl.level}">${allOn?"Alle entfernen":"Alle freischalten"}</button></div>
         <div class="cm-lessons">${lvl.lessons.map(l=>{
           const on=isActive(s,l.id);
           const files=lessonFilesFor(l.id);
-          const filesHtml = files.map(f=>`<span class="cm-file"><a href="${escHtml(f.url)}" title="Download">${escHtml(f.name)}</a><button class="cm-file-x" data-rmfile="${f.id}" data-lesson="${l.id}" title="Remove" aria-label="Remove file">×</button></span>`).join("");
+          const filesHtml = files.map(f=>`<span class="cm-file"><a href="${escHtml(f.url)}" title="Herunterladen">${escHtml(f.name)}</a><button class="cm-file-x" data-rmfile="${f.id}" data-lesson="${l.id}" title="Entfernen" aria-label="Datei entfernen">×</button></span>`).join("");
           return `<div class="cm-les-wrap">
             <button class="cm-les ${on?'on':''}" data-lesson="${l.id}"><span class="cm-toggle"></span><span class="cm-les-t">${l.t}</span></button>
-            <div class="cm-files">${filesHtml}<label class="cm-upload">+ File<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip" data-upload="${l.id}" hidden></label></div>
+            <div class="cm-files">${filesHtml}<label class="cm-upload">+ Datei<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip" data-upload="${l.id}" hidden></label></div>
           </div>`;
         }).join("")}</div>
       </div>`;
@@ -2349,16 +2351,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
   ];
 
   const GAMES = [
-    { id:"past", tag:"Grammar", title:"Past Tense Builder", accent:"var(--c1)",
-      desc:"Type the correct past-tense form of each verb to complete the sentence.",
+    { id:"past", tag:"Grammatik", title:"Zeiten üben", accent:"var(--c1)",
+      desc:"Setze die richtige Vergangenheitsform jedes Verbs ein, um den Satz zu vervollständigen.",
       icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v4l2.5 1.5"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 5v4h4"/></svg>',
       start:()=>quizStart("past", PAST_TENSE, "input") },
-    { id:"gap", tag:"Prepositions", title:"Mind the Gap", accent:"var(--c3)",
-      desc:"Pick the little word that fits — the prepositions and particles that trip everyone up.",
+    { id:"gap", tag:"Präpositionen", title:"Lückentext", accent:"var(--c3)",
+      desc:"Wähle das passende kleine Wort — die Präpositionen und Partikel, die alle stolpern lassen.",
       icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8H5a3 3 0 0 0 0 6h2M17 8h2a3 3 0 0 1 0 6h-2M9 11h6"/></svg>',
       start:()=>quizStart("gap", GAP_FILL, "choice") },
-    { id:"order", tag:"Syntax", title:"Word Order", accent:"var(--c2)",
-      desc:"Tap the scrambled words in the right order to rebuild each sentence.",
+    { id:"order", tag:"Satzbau", title:"Satz-Puzzle", accent:"var(--c2)",
+      desc:"Tippe die durcheinandergewürfelten Wörter in der richtigen Reihenfolge an, um den Satz zu bauen.",
       icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="7" height="5" rx="1.5"/><rect x="14" y="5" width="7" height="5" rx="1.5"/><rect x="3" y="14" width="7" height="5" rx="1.5"/><rect x="14" y="14" width="7" height="5" rx="1.5"/></svg>',
       start:startScramble },
   ];
@@ -2376,11 +2378,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
       </button>`).join("");
     el.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>launchGame(b.dataset.g));
   }
-  function bestLine(id){ const b=(state.gameBest||{})[id]; return b!=null?("Best score "+b+"%"):"Not played yet"; }
+  function bestLine(id){ const b=(state.gameBest||{})[id]; return b!=null?("Bestwert "+b+" %"):"Noch nicht gespielt"; }
   function launchGame(id){ const g=GAMES.find(x=>x.id===id); if(!g) return; $("#gamesMenu").hidden=true; $("#gameHost").hidden=false; $("#gameTitleMini").textContent=g.title; g.start(); }
   function exitGame(){ gameState=null; renderGamesMenu(); }
-  function resultMsg(p){ if(p===100) return "Flawless — you've really got this!"; if(p>=75) return "Great work — almost perfect."; if(p>=50) return "Good effort. Keep practising!"; return "Practice makes progress — try again!"; }
-  function quizProgress(){ const gs=gameState; return `<span>Question ${gs.i+1} of ${gs.items.length}</span><span class="gp-score">${gs.score} correct</span>`; }
+  function resultMsg(p){ if(p===100) return "Makellos — das sitzt!"; if(p>=75) return "Stark — fast perfekt."; if(p>=50) return "Gut gemacht. Bleib dran!"; return "Übung macht den Meister — versuch es nochmal!"; }
+  function quizProgress(){ const gs=gameState; return `<span>Frage ${gs.i+1} von ${gs.items.length}</span><span class="gp-score">${gs.score} richtig</span>`; }
 
   function quizStart(gameId, items, mode){
     gameState = { gameId, mode, items: shuffleArr(items).slice(0, Math.min(8, items.length)), i:0, score:0 };
@@ -2393,8 +2395,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const sentence = it.s.replace("{}", '<span class="q-blank"></span>');
     if(gs.mode==="input"){
       stage.innerHTML = `<div class="q-sentence">${sentence}</div>
-        <div class="q-hint">verb: <b>${it.verb}</b></div>
-        <div class="q-input-row"><input class="bf-input q-input" id="qInput" placeholder="past tense form…" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="qCheck"><span class="grainbtn"></span>Check</button></div>
+        <div class="q-hint">Verb: <b>${it.verb}</b></div>
+        <div class="q-input-row"><input class="bf-input q-input" id="qInput" placeholder="Vergangenheitsform…" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="qCheck"><span class="grainbtn"></span>Prüfen</button></div>
         <div class="q-feedback" id="qFeedback"></div>`;
       const inp=$("#qInput"); inp.focus();
       inp.addEventListener("keydown", e=>{ if(e.key==="Enter") quizCheckInput(); });
@@ -2423,8 +2425,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function quizReveal(ok, correct){
     const gs=gameState; if(ok) gs.score++;
     const last = gs.i+1>=gs.items.length;
-    $("#qFeedback").innerHTML = (ok?'<div class="fb ok">✓ Nice!</div>':'<div class="fb no">Not quite — the answer is <b>'+correct+'</b></div>')
-      + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"See results":"Next question"}</button>`;
+    $("#qFeedback").innerHTML = (ok?'<div class="fb ok">✓ Richtig!</div>':'<div class="fb no">Nicht ganz — die Antwort ist <b>'+correct+'</b></div>')
+      + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"Ergebnis":"Nächste Frage"}</button>`;
     $("#qNext").onclick=()=>{ gs.i++; if(gs.i<gs.items.length) quizQuestion(); else quizEnd(); };
   }
   function startScramble(){ gameState={ gameId:"order", items:shuffleArr(SCRAMBLE).slice(0,6), i:0, score:0 }; scrambleQuestion(); }
@@ -2435,7 +2437,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(pool.every((t,idx)=>t.idx===idx) && pool.length>1){ const x=pool.shift(); pool.push(x); }
     gs.pool=pool; gs.built=[];
     $("#gameProgress").innerHTML = quizProgress();
-    $("#gameStage").innerHTML = `<div class="q-hint" style="margin-top:0;">Tap the words in the correct order.</div>
+    $("#gameStage").innerHTML = `<div class="q-hint" style="margin-top:0;">Tippe die Wörter in der richtigen Reihenfolge an.</div>
       <div class="scramble-answer" id="scrAns"></div>
       <div class="scramble-pool" id="scrPool"></div>
       <div class="q-feedback" id="qFeedback"></div>`;
@@ -2450,8 +2452,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const it=gs.items[gs.i], ok = gs.built.every((t,idx)=> t.w===it.tokens[idx]);
       if(ok && !gs.scoredThis){ gs.score++; gs.scoredThis=true; }
       const last = gs.i+1>=gs.items.length;
-      fb.innerHTML = (ok?'<div class="fb ok">✓ Perfect order!</div>':'<div class="fb no">Not quite — correct: <b>'+it.tokens.join(" ")+'</b></div>')
-        + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"See results":"Next sentence"}</button>`;
+      fb.innerHTML = (ok?'<div class="fb ok">✓ Perfekt!</div>':'<div class="fb no">Nicht ganz — richtig: <b>'+it.tokens.join(" ")+'</b></div>')
+        + `<button class="btn" id="qNext"><span class="grainbtn"></span>${last?"Ergebnis":"Nächster Satz"}</button>`;
       $("#qNext").onclick=()=>{ gs.i++; if(gs.i<gs.items.length) scrambleQuestion(); else quizEnd(); };
     } else { fb.innerHTML=""; }
   }
@@ -2462,7 +2464,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#gameStage").innerHTML = `<div class="game-result">
       <div class="gr-score">${gs.score}<span>/${gs.items.length}</span></div>
       <div class="gr-msg">${resultMsg(pct)}</div>
-      <div class="gr-actions"><button class="btn" id="grAgain"><span class="grainbtn"></span>Play again</button><button class="btn ghost" id="grMenu">All games</button></div>
+      <div class="gr-actions"><button class="btn" id="grAgain"><span class="grainbtn"></span>Nochmal</button><button class="btn ghost" id="grMenu">Alle Spiele</button></div>
     </div>`;
     $("#grAgain").onclick=()=>launchGame(gs.gameId);
     $("#grMenu").onclick=exitGame;
@@ -2500,7 +2502,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if($("#studentSearch")) $("#studentSearch").value="";
     state.rescheduling=null; state.teacherSel=null; state.teacherManage=null; state.teacherStudent=null; state.editAvail=false;
     state.weekOffset=0; state.tWeekOffset=0;
-    const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Edit availability'; }
+    const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten'; }
     $("#userMenu").hidden=true;
     ["#studentModal","#receiptModal","#buyModal"].forEach(id=>{ const e=$(id); if(e) e.hidden=true; });
   }
@@ -2509,7 +2511,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     state.role="student"; state.currentUser=id;
     const s=studentById(id); state.credits=s.credits;
     showTabsForRole("student"); setIdentity(s);
-    $("#acctHello").textContent = "Hello, "+s.name.split(" ")[0]+".";
+    $("#acctHello").textContent = "Hallo, "+s.name.split(" ")[0]+".";
     renderTutors(); renderPacks();
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderBilling();
     setView("book");

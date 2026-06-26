@@ -266,7 +266,7 @@ def receipt_html(r_data, settings):
 
     return f"""<div class="receipt-doc">
       <div class="r-top">
-        <div class="r-brand"><div class="mark"></div><div><b>fluent.</b><span>English tutoring</span></div></div>
+        <div class="r-brand"><div class="mark"></div><div><b>the green pencil</b><span>Englisch-Nachhilfe</span></div></div>
         <div class="r-meta"><div class="r-h">Beleg · Receipt</div><div>Nr. {r_data['no']}</div><div>{r_data['dateStr']}</div></div>
       </div>
       <div class="r-parties">
@@ -442,10 +442,10 @@ def api_login(request):
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     if not email:
-        return JsonResponse({"error": "Enter your email"}, status=400)
+        return JsonResponse({"error": "Gib deine E-Mail ein"}, status=400)
     # Single generic message for both unknown-email and wrong-password so the
     # endpoint can't be used to enumerate which emails have accounts.
-    INVALID = "Invalid email or password."
+    INVALID = "E-Mail oder Passwort ungültig."
     user_obj = User.objects.filter(email__iexact=email).first()
     if user_obj is not None:
         user_obj = authenticate(request, username=user_obj.username, password=password)
@@ -702,15 +702,15 @@ def api_lessons(request, slug):
 def api_lesson_files(request, lesson_id):
     f = request.FILES.get("file")
     if not f:
-        return JsonResponse({"error": "No file uploaded."}, status=400)
+        return JsonResponse({"error": "Keine Datei hochgeladen."}, status=400)
     name = f.name or "file"
     if file_ext(name) not in ALLOWED_LESSON_EXTS:
         return JsonResponse(
-            {"error": "Unsupported file type. Allowed: PDF, Office docs, images, audio, zip."},
+            {"error": "Dateityp nicht unterstützt. Erlaubt: PDF, Office-Dokumente, Bilder, Audio, ZIP."},
             status=400,
         )
     if f.size > MAX_LESSON_FILE_BYTES:
-        return JsonResponse({"error": "File too large (max 25 MB)."}, status=400)
+        return JsonResponse({"error": "Datei zu groß (max. 25 MB)."}, status=400)
     lf = LessonFile.objects.create(
         lesson_id=lesson_id, file=f, original_name=name[:255], uploaded_by=request.user,
     )
@@ -778,8 +778,8 @@ def api_users(request):
         role="student",
         slug=slug,
         initials="NS",
-        color1="#9aa0a6",
-        color2="#6b7177",
+        color1="#52a86a",
+        color2="#2f8a4d",
     )
     new_user.first_name = "New"
     new_user.last_name = "Student"
@@ -798,7 +798,7 @@ def api_user_detail(request, slug):
     if request.method == "DELETE":
         # Don't let an admin delete their own account out from under themselves.
         if u == request.user:
-            return JsonResponse({"error": "You can't delete your own account."}, status=400)
+            return JsonResponse({"error": "Du kannst dein eigenes Konto nicht löschen."}, status=400)
         u.delete()
         return JsonResponse({"ok": True})
 
@@ -815,7 +815,7 @@ def api_user_detail(request, slug):
         new_email = (data["email"] or "").strip().lower()
         # Email is the login identifier — keep it unique to avoid ambiguous logins.
         if new_email and User.objects.filter(email__iexact=new_email).exclude(pk=u.pk).exists():
-            return JsonResponse({"error": "That email is already in use."}, status=400)
+            return JsonResponse({"error": "Diese E-Mail wird bereits verwendet."}, status=400)
         u.email = new_email
     if "password" in data and data["password"]:
         u.set_password(data["password"])
