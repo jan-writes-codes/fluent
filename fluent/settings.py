@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+import dj_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get(
@@ -28,6 +30,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise serves collected static files in production (DEBUG off). It must
+    # come right after SecurityMiddleware and before everything else.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -57,11 +62,17 @@ TEMPLATES = [
 WSGI_APPLICATION = 'fluent.wsgi.application'
 ASGI_APPLICATION = 'fluent.asgi.application'
 
+# Database is selected by the DATABASE_URL env var so each environment (test,
+# production) points at its own database without code changes. When unset we
+# fall back to a local SQLite file, keeping `runserver` zero-config for dev.
+#   SQLite:    sqlite:////absolute/path/to/db.sqlite3
+#   Postgres:  postgres://user:pass@host:5432/dbname
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        env='DATABASE_URL',
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 AUTH_USER_MODEL = 'core.User'
@@ -85,6 +96,20 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# WhiteNoise compresses static files (gzip/brotli) at `collectstatic` time and
+# serves them with long-lived caching headers. We use the non-manifest variant
+# so `{% static %}` resolves with or without a built manifest — the app never
+# 500s before `collectstatic` runs (tests, first boot). Media keeps Django's
+# default filesystem storage.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
