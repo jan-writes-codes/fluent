@@ -1065,9 +1065,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
   const DOW = ["Mo","Di","Mi","Do","Fr"];
 
   let PACKS = [
-    { n: 1,  price: "€32", each: "€32 / Stunde", feat: false },
-    { n: 5,  price: "€145", each: "€29 / Stunde", feat: true, tag: "Beliebt" },
-    { n: 10, price: "€270", each: "€27 / Stunde", feat: false },
+    { n: 1,  price: "€32", each: "€32 / session", feat: false },
+    { n: 5,  price: "€145", each: "€29 / session", feat: true, tag: "Beliebt" },
+    { n: 10, price: "€270", each: "€27 / session", feat: false },
   ];
 
   // deterministic availability per tutor/day/time
@@ -1660,21 +1660,48 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function openBuyInfo(p){
     const m=$("#buyModal");
     const stripeOn = !!(state.stripe && state.stripe.enabled);
+    // Every tutor in the system (with their e-mail), so the student can pick who
+    // to ask for a manual top-up — keyed on the tutor's real e-mail address.
+    const tutors = (tutorAccounts && tutorAccounts.length)
+      ? tutorAccounts.filter(t=>t.email).map(t=>({ name:t.name||"Tutor", email:t.email }))
+      : [];
+    const fallback = { name:"dein Tutor", email:"davit@fluent.at" };
+    const list = tutors.length ? tutors : [fallback];
+    const t0 = list[0];
+    const firstName = (t)=> (t.name||"").split(" ")[0] || t.name || "Tutor";
+    const mailHref = (t)=> `mailto:${t.email}?subject=${encodeURIComponent('Credits aufladen — '+p.n+'er-Paket')}&body=${encodeURIComponent('Hallo '+firstName(t)+', ich möchte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}`;
+    const tutorPicker = (list.length>1)
+      ? `<label class="bf-lab" style="margin-bottom:14px;text-align:left;">Tutor wählen<select class="bf-input" id="buyTutorSel">${list.map((t,i)=>`<option value="${i}">${esc(t.name)} · ${esc(t.email)}</option>`).join("")}</select></label>`
+      : ``;
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
-      <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg></div>
-      <h3 class="buy-h">${stripeOn ? `${p.n} Credits kaufen` : `Credits fügt dein Tutor hinzu`}</h3>
-      <p class="buy-p">${stripeOn ? `Bezahle das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) sicher per Karte. Deine <b>${p.n} Credits</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.` : `Für das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) schreib Davit. Er fügt die Credits zu deinem Stand hinzu und ein österreichischer Beleg wird dir automatisch ausgestellt.`}</p>
-      ${stripeOn ? `<button class="btn" id="buyStripe"><span class="grainbtn"></span>Jetzt sicher bezahlen</button>` : `<div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>davit@fluent.at</span></div>`}
-      <a class="btn ${stripeOn?'ghost':''}" id="buyMail" href="mailto:davit@fluent.at?subject=${encodeURIComponent('Credits aufladen — '+p.n+'er-Paket')}&body=${encodeURIComponent('Hallo Davit, ich m\u00f6chte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}">${stripeOn ? `Lieber Tutor schreiben` : `<span class="grainbtn"></span>Tutor schreiben`}</a>
+      <div class="buy-ic">${stripeOn ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>` : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>`}</div>
+      ${stripeOn ? `<h3 class="buy-h">${p.n} Credits kaufen</h3>
+      <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) sicher per Karte. Deine <b>${p.n} Credits</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
+      <button class="btn" id="buyStripe"><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
+      <a class="btn ghost" id="buyMail" href="${mailHref(t0)}">Lieber Tutor schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
-      ${stripeOn ? `<div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>` : ``}
+      <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`
+      : `<h3 class="buy-h">Credits fügt dein Tutor hinzu</h3>
+      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) schreib <b id="buyTutorName">${esc(firstName(t0))}</b>. Die Credits werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
+      ${tutorPicker}
+      <div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span id="buyTutorEmail">${esc(t0.email)}</span></div>
+      <a class="btn" id="buyMail" href="${mailHref(t0)}"><span class="grainbtn"></span>Tutor schreiben</a>
+      <button class="btn ghost" id="buyClose">Schließen</button>`}
     </div>`;
     m.hidden=false;
     $("#buyCard").onclick=(e)=>e.stopPropagation();
     $("#buyX").onclick=closeBuy; $("#buyClose").onclick=closeBuy;
     if (stripeOn && $("#buyStripe")) $("#buyStripe").onclick=()=>startStripeCheckout(p);
+    const selEl=$("#buyTutorSel");
+    if(selEl){ selEl.onchange=()=>{
+      const t=list[parseInt(selEl.value,10)]||t0;
+      const mail=$("#buyMail"); if(mail) mail.href=mailHref(t);
+      const nm=$("#buyTutorName"); if(nm) nm.textContent=firstName(t);
+      const em=$("#buyTutorEmail"); if(em) em.textContent=t.email;
+    }; }
   }
+
   function startStripeCheckout(p){
     const btn=$("#buyStripe");
     if(btn){ btn.disabled=true; btn.style.opacity="0.6"; }
@@ -2120,7 +2147,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const amt = parsePrice(price);
     if(!credits || credits <= 0 || amt == null) return "";
     const per = amt / credits;
-    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / Stunde";
+    return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / session";
   }
   function renderAdminPacks(){
     const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
@@ -2257,7 +2284,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     api('POST', '/api/users/').then(r=>{
       if(!r || !r.slug){ toast("Schüler konnte nicht hinzugefügt werden — bitte erneut versuchen"); return; }
       state.students.push({
-        id:r.slug, slug:r.slug, email:r.email, name:r.name, credits:r.credits||0,
+        id:r.slug, slug:r.slug, role:"student", email:r.email, name:r.name, credits:r.credits||0,
         c:[r.color1, r.color2], i:r.initials||"NS", password:r.tempPassword||"", photo:r.photo||null,
         billing:r.billing||{ line1:"", postcode:"", city:"", country:"Österreich" },
         log:[], notesLog:[], activeLessons:[],

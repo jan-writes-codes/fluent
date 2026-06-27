@@ -720,7 +720,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get(reverse("app")).content.decode()
@@ -746,6 +746,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--learning")
             if preview:
                 cmd.append("--preview")
+            if buy:
+                cmd.append("--buy")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -806,6 +808,12 @@ class DomAdminTests(_DomProbeBase):
         self.assertEqual(s["editPut"]["body"]["email"], "jan@fluent.at")
         self.assertEqual(s["editPut"]["body"]["name"], "Jan Heissenberger")
         self.assertEqual(s["editPut"]["body"]["password"], "geheim123")
+        # A newly added student must open in the *student* editor — not the tutor
+        # mask (the bug: the locally-mirrored account had no role, so it rendered
+        # as a tutor with no credits/billing fields).
+        self.assertEqual(s["editorRole"], "Schüler")
+        self.assertTrue(s["hasCreditsField"], "student editor must show the Credits field")
+        self.assertTrue(s["hasRemoveStudent"], "student editor must offer 'Schüler entfernen'")
 
     def test_admin_add_tutor_button_creates_and_selects_tutor(self):
         # The new "+ Tutor hinzufügen" button: POST must carry role:tutor, and the
@@ -1093,3 +1101,33 @@ class StripeCheckoutTests(FluentDataMixin, TestCase):
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.credits, start)
         self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_unpaid").count(), 0)
+
+
+# --------------------------------------------------------------------------- #
+# Buy-credits modal: tutor choice by e-mail (DOM)
+# --------------------------------------------------------------------------- #
+class DomBuyModalTests(_DomProbeBase):
+    def test_single_tutor_mail_targets_that_tutor(self):
+        # Only davit exists: no picker, and the e-mail link targets his address.
+        r = self.run_probe(self.maya, buy=True)
+        self.assertEqual(r["initErrors"], [])
+        b = r["buy"]
+        self.assertFalse(b["hasTutorSelect"], "one tutor needs no picker")
+        self.assertTrue(b["mailHref"].startswith("mailto:davit@fluent.at"),
+                        f"mail link must target the tutor: {b['mailHref']}")
+        self.assertEqual(b["contactEmail"], "davit@fluent.at")
+
+    def test_multiple_tutors_offer_choice_by_email(self):
+        # A second tutor in the system must appear in the picker, listed by e-mail,
+        # and the contact e-mail must be a real tutor address (not a hard-coded one).
+        make_user("berta", "tutor", first_name="Berta", last_name="Klein", initials="BK")
+        r = self.run_probe(self.maya, buy=True)
+        self.assertEqual(r["initErrors"], [])
+        b = r["buy"]
+        self.assertTrue(b["hasTutorSelect"], "two tutors must produce a picker")
+        joined = " ".join(b["selectOptions"])
+        self.assertIn("davit@fluent.at", joined)
+        self.assertIn("berta@fluent.at", joined)
+        self.assertIn(b["contactEmail"], {"davit@fluent.at", "berta@fluent.at"})
+        self.assertTrue(b["mailHref"].startswith("mailto:"))
+        self.assertIn(b["contactEmail"], b["mailHref"])
