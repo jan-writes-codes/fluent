@@ -36,7 +36,9 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from .models import User, Booking, Receipt, ActiveLesson, LessonFile
+from .models import (
+    User, Booking, Receipt, CreditTransaction, ActiveLesson, LessonFile,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -869,3 +871,225 @@ class DomBookingTests(_DomProbeBase):
             b["postedDay"], b["panelDay"],
             msg=f"booking date shifted: sent {b['postedDate']} but UI showed {b['panelDate']}",
         )
+
+
+# --------------------------------------------------------------------------- #
+# Immutable history + GDPR "anonymise & keep" on account deletion
+# --------------------------------------------------------------------------- #
+class HistoryRetentionTests(FluentDataMixin, TestCase):
+    """Purchase/lesson history must never be altered when an account is deleted:
+    the financial records survive (statutory retention) while the personal account
+    is erased (GDPR). The records carry frozen identity/billing snapshots so they
+    stay readable verbatim after the FK is detached."""
+
+    def _grant(self, n=5):
+        # Tutor grants credits -> creates a Receipt + CreditTransaction.
+        self.client.force_login(self.davit)
+        resp = self.client.post(
+            f"/api/credits/{self.maya.slug}/",
+            data=json.dumps({"n": n}), content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        return resp.json()
+
+    def test_deleting_student_keeps_receipt_with_frozen_snapshot(self):
+        self.maya.billing_name = "Maya Karlsson"
+        self.maya.billing_line1 = "Hauptstraße 1"
+        self.maya.billing_postcode = "1010"
+        self.maya.billing_city = "Wien"
+        self.maya.save()
+        self._grant(5)
+        receipt = Receipt.objects.get(student=self.maya)
+        # Snapshot is captured at issue time.
+        self.assertEqual(receipt.student_slug, "maya")
+        self.assertEqual(receipt.student_name, "Maya Karlsson")
+        self.assertEqual(receipt.billing_city, "Wien")
+
+        # Admin deletes the student.
+        self.client.force_login(self.admin)
+        resp = self.client.delete(f"/api/users/{self.maya.slug}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(slug="maya").exists())
+
+        # Receipt is retained, detached (FK NULL), snapshot intact.
+        receipt.refresh_from_db()
+        self.assertIsNone(receipt.student_id)
+        self.assertEqual(receipt.student_slug, "maya")
+        self.assertEqual(receipt.student_name, "Maya Karlsson")
+        self.assertEqual(receipt.billing_postcode, "1010")
+
+    def test_deleting_student_keeps_transactions_and_bookings(self):
+        self._grant(3)
+        # A held lesson (booking) for maya.
+        booking = Booking.objects.create(
+            student=self.maya, tutor=self.davit,
+            date=current_week_monday(), time="12:00", title="Maya session",
+        )
+        self.assertEqual(booking.student_slug, "maya")
+        self.assertEqual(booking.tutor_slug, "davit")
+
+        txn = CreditTransaction.objects.get(student=self.maya)
+        self.assertEqual(txn.student_slug, "maya")
+
+        self.client.force_login(self.admin)
+        self.client.delete(f"/api/users/{self.maya.slug}/")
+
+        booking.refresh_from_db()
+        txn.refresh_from_db()
+        self.assertIsNone(booking.student_id)
+        self.assertEqual(booking.student_slug, "maya")
+        self.assertEqual(booking.tutor_slug, "davit")  # tutor still there
+        self.assertIsNone(txn.student_id)
+        self.assertEqual(txn.student_slug, "maya")
+
+    def test_deleting_tutor_keeps_booking_history(self):
+        booking = Booking.objects.create(
+            student=self.maya, tutor=self.davit,
+            date=current_week_monday(), time="13:00", title="Past session",
+        )
+        self.client.force_login(self.admin)
+        self.client.delete(f"/api/users/{self.davit.slug}/")
+        booking.refresh_from_db()
+        self.assertIsNone(booking.tutor_id)
+        self.assertEqual(booking.tutor_slug, "davit")
+        self.assertEqual(booking.tutor_name, "Davit Petrosyan")
+
+    def test_receipt_payload_reads_from_snapshot_after_deletion(self):
+        self._grant(2)
+        self.client.force_login(self.admin)
+        self.client.delete(f"/api/users/{self.maya.slug}/")
+        # Admin loads the app: the orphaned receipt must still serialize.
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        receipts = [r for r in payload["receipts"] if r["studentId"] == "maya"]
+        self.assertTrue(receipts, "retained receipt must still appear for admin")
+        self.assertEqual(receipts[0]["studentName"], "Maya Karlsson")
+
+    def test_receipt_is_frozen_against_later_billing_edits(self):
+        self.maya.billing_city = "Wien"
+        self.maya.save()
+        self._grant(1)
+        receipt = Receipt.objects.get(student=self.maya)
+        # Student later moves: the issued receipt must not change.
+        self.maya.billing_city = "Graz"
+        self.maya.save()
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.billing_city, "Wien")
+
+
+# --------------------------------------------------------------------------- #
+# Stripe self-checkout
+# --------------------------------------------------------------------------- #
+class StripeCheckoutTests(FluentDataMixin, TestCase):
+    def test_checkout_disabled_without_key(self):
+        # No STRIPE_SECRET_KEY configured (default): endpoint reports disabled.
+        self.client.force_login(self.maya)
+        resp = self.client.post(
+            "/api/checkout/", data=json.dumps({"n": 5}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 503)
+
+    def test_payload_reports_stripe_disabled_by_default(self):
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertIn("stripe", payload)
+        self.assertFalse(payload["stripe"]["enabled"])
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x", STRIPE_PUBLISHABLE_KEY="pk_test_x")
+    def test_checkout_creates_session(self):
+        self.client.force_login(self.maya)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.create.return_value = mock.Mock(
+                url="https://checkout.stripe.test/cs_1", id="cs_1"
+            )
+            resp = self.client.post(
+                "/api/checkout/", data=json.dumps({"n": 5}),
+                content_type="application/json",
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["url"], "https://checkout.stripe.test/cs_1")
+        # Price is server-authoritative: 5-pack is €145 -> 14500 cents, qty 1.
+        _, kwargs = st.checkout.Session.create.call_args
+        self.assertEqual(kwargs["line_items"][0]["price_data"]["unit_amount"], 14500)
+        self.assertEqual(kwargs["metadata"], {"student_slug": "maya", "credits": "5"})
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_only_students_can_checkout(self):
+        self.client.force_login(self.davit)  # tutor
+        resp = self.client.post(
+            "/api/checkout/", data=json.dumps({"n": 5}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_confirm_credits_student_once(self):
+        start = self.maya.credits
+        session = {
+            "id": "cs_paid_1", "payment_status": "paid",
+            "metadata": {"student_slug": "maya", "credits": "5"},
+        }
+        self.client.force_login(self.maya)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.retrieve.return_value = session
+            r1 = self.client.post(
+                "/api/checkout/confirm/", data=json.dumps({"sessionId": "cs_paid_1"}),
+                content_type="application/json",
+            )
+            # Confirm again: must be idempotent (webhook + redirect can both fire).
+            r2 = self.client.post(
+                "/api/checkout/confirm/", data=json.dumps({"sessionId": "cs_paid_1"}),
+                content_type="application/json",
+            )
+        self.assertTrue(r1.json()["paid"])
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start + 5)
+        self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_paid_1").count(), 1)
+        self.assertTrue(r2.json()["paid"])  # second call returns the same receipt
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_confirm_rejects_another_students_session(self):
+        session = {
+            "id": "cs_x", "payment_status": "paid",
+            "metadata": {"student_slug": "ines", "credits": "5"},
+        }
+        self.client.force_login(self.maya)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.retrieve.return_value = session
+            resp = self.client.post(
+                "/api/checkout/confirm/", data=json.dumps({"sessionId": "cs_x"}),
+                content_type="application/json",
+            )
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_x").count(), 0)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")  # no webhook secret -> unverified JSON
+    def test_webhook_credits_idempotently(self):
+        start = self.maya.credits
+        event = json.dumps({
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_wh_1", "payment_status": "paid",
+                "metadata": {"student_slug": "maya", "credits": "10"},
+            }},
+        })
+        self.client.post("/api/stripe/webhook/", data=event, content_type="application/json")
+        self.client.post("/api/stripe/webhook/", data=event, content_type="application/json")
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start + 10)
+        self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_wh_1").count(), 1)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_webhook_ignores_unpaid_session(self):
+        start = self.maya.credits
+        event = json.dumps({
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_unpaid", "payment_status": "unpaid",
+                "metadata": {"student_slug": "maya", "credits": "5"},
+            }},
+        })
+        self.client.post("/api/stripe/webhook/", data=event, content_type="application/json")
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start)
+        self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_unpaid").count(), 0)

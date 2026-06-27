@@ -78,6 +78,17 @@ DATABASES = {
 AUTH_USER_MODEL = 'core.User'
 LOGIN_URL = '/login/'
 
+# --- Stripe payments (optional) ---------------------------------------------
+# Self-service credit top-ups go through Stripe Checkout when a secret key is
+# configured. Leave STRIPE_SECRET_KEY unset to keep the tutor-mediated (e-mail)
+# purchase flow as the only option — nothing in the app requires Stripe to run.
+#   STRIPE_SECRET_KEY        sk_test_... / sk_live_...   (server-side, secret)
+#   STRIPE_PUBLISHABLE_KEY   pk_test_... / pk_live_...   (exposed to the client)
+#   STRIPE_WEBHOOK_SECRET    whsec_...    verifies webhook authenticity
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
