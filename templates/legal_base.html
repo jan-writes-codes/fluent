@@ -1,0 +1,88 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>{% block title %}{% endblock %} · The Green Pencil</title>
+<style>
+  /* Self-hosted display font — no external CDN, no data sent to third parties. */
+  @font-face {
+    font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 400 800;
+    font-display: swap; src: url("{% static 'fonts/font3.woff2' %}") format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 400 800;
+    font-display: swap; src: url("{% static 'fonts/font2.woff2' %}") format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  :root {
+    --bg: #f5f2ea; --ink: #243528; --muted: #6e7d6e; --faint: #9aa897;
+    --line: rgba(36,53,40,0.16); --c1: #309050; --accent: var(--c1);
+    --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--ink);
+    -webkit-font-smoothing: antialiased; line-height: 1.65; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+  header.top { border-bottom: 1px solid var(--line); background: rgba(251,248,241,0.6); }
+  .top-in { display: flex; align-items: center; padding: 16px 0; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+  .mark { width: 40px; height: 40px; border-radius: 12px; overflow: hidden; display: grid; place-items: center;
+    background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%); box-shadow: 0 12px 26px -10px rgba(58,165,92,0.55); }
+  .mark img { width: 18px; height: auto; filter: brightness(0) invert(1); transform: translateY(-1px); }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; line-height: 1; }
+  .wordmark span { color: var(--accent); }
+  .wordmark .sub { display: block; font-family: var(--font-body); font-size: 10px; font-weight: 400;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-top: 4px; }
+
+  main { padding: 48px 0 72px; }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 5vw, 40px);
+    letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 8px; }
+  .updated { color: var(--faint); font-size: 14px; margin-bottom: 36px; }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em;
+    margin: 34px 0 10px; }
+  h3 { font-weight: 600; font-size: 16px; margin: 20px 0 6px; }
+  p, li { font-size: 15.5px; color: var(--ink); margin-bottom: 12px; }
+  ul { padding-left: 22px; margin-bottom: 12px; }
+  a { color: var(--c1); }
+  .muted { color: var(--muted); }
+  .todo { background: #fff6e6; border: 1px solid #e6c987; border-radius: 10px; padding: 12px 14px;
+    font-size: 13.5px; color: #6b5424; margin: 18px 0; }
+  .placeholder { background: rgba(48,144,80,0.12); border-radius: 5px; padding: 0 5px;
+    font-style: normal; color: var(--c1); font-weight: 600; }
+
+  footer.foot { border-top: 1px solid var(--line); padding: 28px 0; }
+  .foot-in { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; font-size: 14px; }
+  .foot-in a { color: var(--muted); text-decoration: none; }
+  .foot-in a:hover { color: var(--c1); }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-in">
+      <a class="brand" href="/">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <a href="/">← Zur Startseite</a>
+      <span><a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a></span>
+    </div>
+  </footer>
+</body>
+</html>

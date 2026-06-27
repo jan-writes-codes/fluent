@@ -1,4 +1,5 @@
 import json
+import secrets
 from datetime import date
 from functools import wraps
 from django.shortcuts import render, redirect
@@ -302,6 +303,16 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect("app")
     return render(request, "login.html")
+
+
+def impressum_view(request):
+    # Public legal pages (Impressum / Offenlegung). Required under §5 ECG, §25 MedienG.
+    return render(request, "impressum.html")
+
+
+def datenschutz_view(request):
+    # Public privacy notice (Datenschutzerklärung). Required under GDPR Art. 13/14.
+    return render(request, "datenschutz.html")
 
 
 def app_view(request):
@@ -771,10 +782,14 @@ def api_users(request):
     import time as time_module
     data = parse_body(request)
     slug = "stu" + str(int(time_module.time() * 1000))[-8:]
+    # Each student gets a unique, unguessable temporary password — never a shared
+    # default. It is returned once (below) so the admin can hand it to the student;
+    # it is not stored in clear text and can't be read back afterwards.
+    temp_password = secrets.token_urlsafe(9)
     new_user = User.objects.create_user(
         username=slug,
         email=f"{slug}@fluent.at",
-        password="password",
+        password=temp_password,
         role="student",
         slug=slug,
         initials="NS",
@@ -784,7 +799,9 @@ def api_users(request):
     new_user.first_name = "New"
     new_user.last_name = "Student"
     new_user.save()
-    return JsonResponse(serialize_user(new_user))
+    payload = serialize_user(new_user)
+    payload["tempPassword"] = temp_password  # shown to the admin once, then discarded
+    return JsonResponse(payload)
 
 
 @require_http_methods(["PUT", "DELETE"])
