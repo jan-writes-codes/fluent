@@ -171,6 +171,30 @@ class LoginPageTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Legal pages + account-creation hardening  (GDPR)
+# --------------------------------------------------------------------------- #
+class GdprComplianceTests(FluentDataMixin, TestCase):
+    def test_legal_pages_are_public(self):
+        for name in ("impressum", "datenschutz"):
+            resp = self.client.get(reverse(name))
+            self.assertEqual(resp.status_code, 200, name)
+
+    def test_new_student_gets_unique_non_default_password(self):
+        # A guessable shared default ("password") on every new account is a data-
+        # protection risk. Each student must get a unique, working credential.
+        self.client.force_login(self.admin)
+        resp = self.client.post("/api/users/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        temp = data.get("tempPassword")
+        self.assertTrue(temp, "create response must surface the generated password once")
+        self.assertNotEqual(temp, "password")
+        created = User.objects.get(slug=data["slug"])
+        self.assertFalse(created.check_password("password"))
+        self.assertTrue(created.check_password(temp))
+
+
+# --------------------------------------------------------------------------- #
 # Booking persistence + cross-user visibility  (Bug A, backend half)
 # --------------------------------------------------------------------------- #
 class BookingPersistenceTests(FluentDataMixin, TestCase):
