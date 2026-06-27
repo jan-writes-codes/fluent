@@ -224,10 +224,17 @@ def require_roles(*roles):
     return decorator
 
 
-def acting_tutor(request):
-    """The tutor a tutor/admin action is attributed to (single-tutor studio)."""
+def acting_tutor(request, slug=None):
+    """The tutor a tutor/admin action is attributed to.
+
+    A tutor always acts as themselves. An admin manages every tutor, so it must
+    say which one via ``slug``; absent that, fall back to the first tutor (keeps
+    single-tutor studios working without the client sending a slug).
+    """
     if getattr(request.user, "role", None) == "tutor":
         return request.user
+    if slug:
+        return User.objects.filter(role="tutor", slug=slug).first()
     return User.objects.filter(role="tutor").first()
 
 
@@ -363,20 +370,19 @@ def app_view(request):
         all_receipts = list(Receipt.objects.all().select_related("student"))
     receipts_data = [serialize_receipt(r) for r in all_receipts]
 
-    # Availability overrides: {date_key|time: is_open}
+    # Availability overrides, keyed per tutor so two tutors' calendars never
+    # collide: {tutor_slug: {date_key|time: is_open}}
     availability = {}
     for ao in AvailabilityOverride.objects.all().select_related("tutor"):
         # date_key format: "YYYY-M-D" (matches JS keyOf, 0-indexed month)
         k = f"{date_to_jskey(ao.date)}|{ao.time}"
-        availability[k] = ao.is_open
+        availability.setdefault(ao.tutor.slug, {})[k] = ao.is_open
 
-    # Custom times: {date_key: [times]}
+    # Custom times, also per tutor: {tutor_slug: {date_key: [times]}}
     custom_times = {}
     for ct in CustomTime.objects.all().select_related("tutor"):
         dk = date_to_jskey(ct.date)
-        if dk not in custom_times:
-            custom_times[dk] = []
-        custom_times[dk].append(ct.time)
+        custom_times.setdefault(ct.tutor.slug, {}).setdefault(dk, []).append(ct.time)
 
     # Student notes are tutor-private — never expose them to a student client.
     student_notes = {}
@@ -629,7 +635,9 @@ def api_availability(request):
         d = jskey_to_date(data["date"])
         time_str = data["time"]
         is_open = bool(data.get("isOpen", True))
-        tutor = acting_tutor(request)
+        tutor = acting_tutor(request, data.get("tutorSlug"))
+        if tutor is None:
+            return JsonResponse({"error": "unknown tutor"}, status=400)
         AvailabilityOverride.objects.update_or_create(
             tutor=tutor,
             date=d,
@@ -652,7 +660,9 @@ def api_custom_times(request):
     try:
         d = jskey_to_date(data["date"])
         time_str = data["time"]
-        tutor = acting_tutor(request)
+        tutor = acting_tutor(request, data.get("tutorSlug"))
+        if tutor is None:
+            return JsonResponse({"error": "unknown tutor"}, status=400)
         CustomTime.objects.get_or_create(tutor=tutor, date=d, time=time_str)
         return JsonResponse({"ok": True})
     except (KeyError, ValueError, IndexError) as e:
@@ -778,26 +788,48 @@ def api_users(request):
         users = list(User.objects.all())
         return JsonResponse({"users": [serialize_user(u) for u in users]})
 
-    # POST: create student
+    # POST: create a student (default) or a tutor
     import time as time_module
     data = parse_body(request)
-    slug = "stu" + str(int(time_module.time() * 1000))[-8:]
-    # Each student gets a unique, unguessable temporary password — never a shared
-    # default. It is returned once (below) so the admin can hand it to the student;
-    # it is not stored in clear text and can't be read back afterwards.
+    role = data.get("role", "student")
+    if role not in ("student", "tutor"):
+        return JsonResponse({"error": "invalid role"}, status=400)
+
+    # Unique, collision-safe slug. The timestamp tail is near-unique, but two
+    # rapid creates could clash — loop until the slug is actually free.
+    prefix = "tut" if role == "tutor" else "stu"
+    base = prefix + str(int(time_module.time() * 1000))[-8:]
+    slug = base
+    n = 2
+    while User.objects.filter(slug=slug).exists():
+        slug = f"{base}-{n}"
+        n += 1
+
+    name = (data.get("name") or "").strip()
+    first_name, _, last_name = name.partition(" ")
+    # Each account gets a unique, unguessable temporary password — never a shared
+    # default. It is returned once (below) so the admin can hand it over; it is not
+    # stored in clear text and can't be read back afterwards.
     temp_password = secrets.token_urlsafe(9)
-    new_user = User.objects.create_user(
-        username=slug,
-        email=f"{slug}@fluent.at",
-        password=temp_password,
-        role="student",
-        slug=slug,
-        initials="NS",
-        color1="#52a86a",
-        color2="#2f8a4d",
-    )
-    new_user.first_name = "New"
-    new_user.last_name = "Student"
+
+    if role == "tutor":
+        new_user = User.objects.create_user(
+            username=slug, email=f"{slug}@fluent.at", password=temp_password,
+            role="tutor", slug=slug,
+            initials=compute_initials(name) if name else "NT",
+            color1="#309050", color2="#277a42",
+        )
+        new_user.first_name = first_name or "New"
+        new_user.last_name = last_name or "Tutor"
+    else:
+        new_user = User.objects.create_user(
+            username=slug, email=f"{slug}@fluent.at", password=temp_password,
+            role="student", slug=slug,
+            initials=compute_initials(name) if name else "NS",
+            color1="#52a86a", color2="#2f8a4d",
+        )
+        new_user.first_name = first_name or "New"
+        new_user.last_name = last_name or "Student"
     new_user.save()
     payload = serialize_user(new_user)
     payload["tempPassword"] = temp_password  # shown to the admin once, then discarded
