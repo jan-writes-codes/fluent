@@ -343,6 +343,90 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Multi-tutor: admin can create/manage several tutors; their calendars are
+# isolated from one another.
+# --------------------------------------------------------------------------- #
+class MultiTutorTests(FluentDataMixin, TestCase):
+    def test_admin_creates_tutor_who_can_log_in(self):
+        self.client.force_login(self.admin)
+        created = self.client.post(
+            "/api/users/",
+            data=json.dumps({"role": "tutor", "name": "Lena Bauer"}),
+            content_type="application/json",
+        ).json()
+        self.assertTrue(created["slug"].startswith("tut"))
+        self.assertEqual(created["role"], "tutor")
+        self.assertEqual(created["initials"], "LB")
+        self.assertIn("tempPassword", created)
+        # the temp password actually logs in, as a tutor
+        fresh = Client()
+        login = fresh.post(
+            "/api/login/",
+            data=json.dumps({"email": created["email"], "password": created["tempPassword"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["role"], "tutor")
+
+    def test_edited_tutor_credentials_work(self):
+        """The reported bug: change a tutor's login, then sign in with it."""
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            f"/api/users/{self.davit.slug}/",
+            data=json.dumps({
+                "name": "Davit Petrosyan",
+                "email": "new.davit@fluent.at",
+                "password": "totallynew99",
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        fresh = Client()
+        login = fresh.post(
+            "/api/login/",
+            data=json.dumps({"email": "new.davit@fluent.at", "password": "totallynew99"}),
+            content_type="application/json",
+        )
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.json()["role"], "tutor")
+
+    def test_invalid_role_is_rejected(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            "/api/users/",
+            data=json.dumps({"role": "admin"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_availability_is_isolated_per_tutor(self):
+        other = make_user("lena", "tutor", first_name="Lena", last_name="Bauer", initials="LB")
+        self.client.force_login(self.admin)
+        # admin opens the SAME slot for davit but closes it for lena
+        for slug, is_open in ((self.davit.slug, True), (other.slug, False)):
+            r = self.client.post(
+                "/api/availability/",
+                data=json.dumps({"date": "2026-5-2", "time": "11:00", "isOpen": is_open, "tutorSlug": slug}),
+                content_type="application/json",
+            )
+            self.assertEqual(r.status_code, 200)
+        # the payload keys each tutor's overrides separately — no collision
+        html = self.client.get(reverse("app")).content.decode()
+        avail = extract_payload(html)["availability"]
+        self.assertEqual(avail[self.davit.slug]["2026-5-2|11:00"], True)
+        self.assertEqual(avail[other.slug]["2026-5-2|11:00"], False)
+
+    def test_admin_custom_time_requires_known_tutor(self):
+        self.client.force_login(self.admin)
+        r = self.client.post(
+            "/api/custom-times/",
+            data=json.dumps({"date": "2026-5-2", "time": "07:30", "tutorSlug": "nope"}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+
+# --------------------------------------------------------------------------- #
 # Authorization (RBAC + object-level / IDOR) and login hardening
 # --------------------------------------------------------------------------- #
 class AuthorizationTests(FluentDataMixin, TestCase):
@@ -634,7 +718,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get(reverse("app")).content.decode()
@@ -652,6 +736,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--admin-rename")
             if admin_save:
                 cmd.append("--admin-save")
+            if admin_add_tutor:
+                cmd.append("--admin-add-tutor")
             if admin_pricing:
                 cmd.append("--admin-pricing")
             if learning:
@@ -718,6 +804,17 @@ class DomAdminTests(_DomProbeBase):
         self.assertEqual(s["editPut"]["body"]["email"], "jan@fluent.at")
         self.assertEqual(s["editPut"]["body"]["name"], "Jan Heissenberger")
         self.assertEqual(s["editPut"]["body"]["password"], "geheim123")
+
+    def test_admin_add_tutor_button_creates_and_selects_tutor(self):
+        # The new "+ Tutor hinzufügen" button: POST must carry role:tutor, and the
+        # created tutor must become the selected, editable account (temp password
+        # shown so the admin can hand it over) with a "remove tutor" control.
+        r = self.run_probe(self.admin, admin_add_tutor=True)
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        a = r["adminAddTutor"]
+        self.assertEqual(a["postedRole"], "tutor", "must POST role:tutor")
+        self.assertEqual(a["editorPassword"], "tmp-tutor-pw", "temp password shown in editor")
+        self.assertTrue(a["hasRemoveTutor"], "tutor editor must offer removal")
 
 
 class DomPricingTests(_DomProbeBase):

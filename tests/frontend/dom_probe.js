@@ -24,6 +24,7 @@ const file = process.argv[2];
 const doBook = process.argv.includes("--book");
 const doAdminRename = process.argv.includes("--admin-rename");
 const doAdminSave = process.argv.includes("--admin-save");
+const doAdminAddTutor = process.argv.includes("--admin-add-tutor");
 const doAdminPricing = process.argv.includes("--admin-pricing");
 const doLearning = process.argv.includes("--learning");
 const doPreview = process.argv.includes("--preview");
@@ -57,12 +58,18 @@ const dom = new JSDOM(html, {
       if (opts && opts.body) { try { body = JSON.parse(opts.body); } catch (_) { body = opts.body; } }
       apiCalls.push({ method, url: u, body });
       if (u.includes("/api/bookings/") && method === "POST") bookingPost = body;
-      // Creating a student returns a serialized user the admin UI mirrors locally.
+      // Creating a user returns a serialized account the admin UI mirrors locally.
+      // Shape depends on the requested role (tutor vs student).
       if (u.endsWith("/api/users/") && method === "POST") {
-        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({
+        const isTutor = body && body.role === "tutor";
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(isTutor ? {
+          slug: "tuttest01", id: "tuttest01", email: "tuttest01@fluent.at",
+          name: "New Tutor", initials: "NT", role: "tutor",
+          color1: "#309050", color2: "#277a42", photo: null, tempPassword: "tmp-tutor-pw",
+        } : {
           slug: "stutest01", id: "stutest01", email: "stutest01@fluent.at",
-          name: "New Student", initials: "NS", credits: 0,
-          color1: "#9aa0a6", color2: "#6b7177", photo: null,
+          name: "New Student", initials: "NS", credits: 0, role: "student",
+          color1: "#9aa0a6", color2: "#6b7177", photo: null, tempPassword: "tmp-stu-pw",
           billing: { line1: "", postcode: "", city: "", country: "Österreich" },
         }) });
       }
@@ -147,6 +154,27 @@ setTimeout(() => {
           },
         });
       }, 80);
+    }, 80);
+    return;
+  }
+
+  if (doAdminAddTutor) {
+    // Click "+ Tutor hinzufügen": the POST must carry role:tutor, and the new
+    // tutor must become the selected, editable account (its temp password shown).
+    const addBtn = $("#adminAddTutorBtn");
+    if (!addBtn) return finish({ adminAddTutor: { error: "no add-tutor button" } });
+    addBtn.click();
+    setTimeout(() => {
+      const post = apiCalls.find((c) => c.method === "POST" && /\/api\/users\/$/.test(c.url));
+      const passEl = $("#edPass");
+      const removeBtn = $("#edRemoveTutor");
+      finish({
+        adminAddTutor: {
+          postedRole: post && post.body ? post.body.role : null,
+          editorPassword: passEl ? passEl.value : null,
+          hasRemoveTutor: !!removeBtn,
+        },
+      });
     }, 80);
     return;
   }

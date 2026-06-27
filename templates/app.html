@@ -963,7 +963,8 @@
           <div class="admin-grid">
             <div class="panel" style="padding: 8px;">
               <div class="admin-list" id="adminList"></div>
-              <button class="btn ghost" id="adminAddBtn" style="margin:8px; width:calc(100% - 16px);">+ Schüler hinzufügen</button>
+              <button class="btn ghost" id="adminAddBtn" style="margin:8px 8px 0; width:calc(100% - 16px);">+ Schüler hinzufügen</button>
+              <button class="btn ghost" id="adminAddTutorBtn" style="margin:8px; width:calc(100% - 16px);">+ Tutor hinzufügen</button>
             </div>
             <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
           </div>
@@ -1023,18 +1024,33 @@ window.DJANGO_DATA = {{ django_data|safe }};
     } catch (e) { return { error: 'Upload failed.' }; }
   }
 
-  const TUTORS = [
+  // Bookable tutors for the student calendar — derived from the server so the
+  // roster reflects whoever the admin has actually created (any slug, not just
+  // the seeded "davit").
+  const TUTORS = (DJ.tutors && DJ.tutors.length) ? DJ.tutors.map(t => ({
+    id: t.slug,
+    name: (t.name || "").split(" ")[0] || t.name || "Tutor",
+    role: "Englisch-Tutor",
+    c: [t.color1 || "#309050", t.color2 || "#277a42"],
+    i: t.initials || "T",
+  })) : [
     { id: "davit", name: "Davit", role: "Englisch-Tutor · Konversation & IELTS", c: ["#309050","#277a42"], i: "D" },
   ];
-  const tutorUser = (DJ.tutors && DJ.tutors[0]) ? {
-    id: DJ.tutors[0].slug,
-    role: "tutor",
-    name: DJ.tutors[0].name,
-    email: DJ.tutors[0].email,
-    i: DJ.tutors[0].initials,
-    c: [DJ.tutors[0].color1, DJ.tutors[0].color2],
-    photo: DJ.tutors[0].photo || null,
-  } : { id:"davit", role:"tutor", name:"Davit Petrosyan", email:"davit@fluent.at", i:"DV", c:["#309050","#277a42"], photo:null };
+  // All tutor accounts (for the admin roster + identity lookups). Mutated in
+  // place when the admin adds/removes a tutor so the UI stays consistent without
+  // a full reload.
+  const tutorAccounts = (DJ.tutors || []).map(t => ({
+    id: t.slug, role: "tutor", name: t.name, email: t.email,
+    i: t.initials || "T", c: [t.color1 || "#309050", t.color2 || "#277a42"],
+    photo: t.photo || null,
+  }));
+  // The tutor "I" am when in the teacher view: the logged-in tutor if a tutor is
+  // signed in, otherwise the first tutor (the one an admin impersonates by default).
+  const tutorUser = (DJ.role === "tutor" && DJ.currentUser) ? {
+    id: DJ.currentUser.slug, role: "tutor", name: DJ.currentUser.name,
+    email: DJ.currentUser.email, i: DJ.currentUser.initials,
+    c: [DJ.currentUser.color1, DJ.currentUser.color2], photo: DJ.currentUser.photo || null,
+  } : (tutorAccounts[0] || { id:"davit", role:"tutor", name:"Davit Petrosyan", email:"davit@fluent.at", i:"DV", c:["#309050","#277a42"], photo:null });
   const ADMIN = (DJ.role === "admin" && DJ.currentUser) ? {
     id: DJ.currentUser.slug,
     role: "admin",
@@ -1057,16 +1073,22 @@ window.DJANGO_DATA = {{ django_data|safe }};
   // deterministic availability per tutor/day/time
   function seeded(str) { let h = 2166136261; for (let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return ((h>>>0)%1000)/1000; }
   function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
-  function defaultAvail(date,time){ if(toMin(time)%60!==0) return false; return seeded("davit"+keyOf(date)+time) > 0.4; }
-  function slotOpen(date,time){ const k=keyOf(date)+"|"+time; if(k in state.availability) return state.availability[k]; return defaultAvail(date,time); }
-  function bookingConflict(date,time,exclude){ const s=toMin(time), e=s+50; return state.bookings.some(b=>{ if(b.tutorId!=="davit"||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+50; return s<be && bs<e; }); }
-  function dayTimes(date){ const dk=keyOf(date); const extra=state.customTimes[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
+  // Availability + custom times are per tutor. These helpers take a tutor id so
+  // the student calendar (the selected chip, state.tutor) and the teacher
+  // calendar (the signed-in tutor, state.myTutor) never read each other's slots.
+  function availMap(tid){ return (state.availability[tid] = state.availability[tid] || {}); }
+  function customMap(tid){ return (state.customTimes[tid] = state.customTimes[tid] || {}); }
+  function defaultAvail(date,time,tid){ if(toMin(time)%60!==0) return false; return seeded((tid||"")+keyOf(date)+time) > 0.4; }
+  function slotOpen(date,time,tid){ const m=state.availability[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
+  function bookingConflict(date,time,exclude,tid){ const s=toMin(time), e=s+50; return state.bookings.some(b=>{ if(b.tutorId!==tid||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+50; return s<be && bs<e; }); }
+  function dayTimes(date,tid){ const dk=keyOf(date); const extra=(state.customTimes[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
 
   const state = {
     // static UI state
     view: "book",
     credits: 0,
-    tutor: TUTORS[0].id,
+    tutor: (TUTORS[0] && TUTORS[0].id) || "",
+    myTutor: tutorUser.id,
     weekOffset: 0,
     selected: null,
     justBooked: null,
@@ -1079,10 +1101,19 @@ window.DJANGO_DATA = {{ django_data|safe }};
     teacherStudent: null,
     receipts: [],
     receiptSeq: (DJ.settings && DJ.settings.receiptSeq) || 1042,
-    availability: DJ.availability || {},
+    // Both keyed by tutor slug: availability = {tid: {date|time: bool}},
+    // customTimes = {tid: {date_key: [times]}}.
+    availability: (() => {
+      const av = {};
+      Object.entries(DJ.availability || {}).forEach(([tid, m]) => { av[tid] = { ...m }; });
+      return av;
+    })(),
     customTimes: (() => {
       const ct = {};
-      Object.entries(DJ.customTimes || {}).forEach(([k, times]) => { ct[k] = times; });
+      Object.entries(DJ.customTimes || {}).forEach(([tid, m]) => {
+        ct[tid] = {};
+        Object.entries(m || {}).forEach(([dk, times]) => { ct[tid][dk] = times.slice(); });
+      });
       return ct;
     })(),
     editAvail: false,
@@ -1090,7 +1121,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     currentUser: DJ.currentUserId || "maya",
     creditPrice: (DJ.settings && DJ.settings.creditPrice) || 30,
     impersonating: false,
-    adminSel: "davit",
+    adminSel: (DJ.tutors && DJ.tutors[0] && DJ.tutors[0].slug) || (DJ.students && DJ.students[0] && DJ.students[0].slug) || "admin",
     students: (DJ.students || []).map(s => ({
       ...s,
       id: s.slug || s.id,
@@ -1164,9 +1195,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function studentById(id){ return state.students.find(s=>s.id===id); }
   // Initials from a display name (mirrors the server's compute_initials).
   function initialsOf(name){ const p=(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "NS"; if(p.length===1) return p[0].slice(0,2).toUpperCase(); return (p[0][0]+p[1][0]).toUpperCase(); }
-  function allAccounts(){ return [tutorUser, ...state.students]; }
-  function accountByEmail(email){ return [ADMIN, tutorUser, ...state.students].find(u=>u.email.toLowerCase()===email); }
-  function accountById(id){ if(id==="davit") return tutorUser; if(id==="admin") return ADMIN; return studentById(id); }
+  function allAccounts(){ return [...tutorAccounts, ...state.students]; }
+  function accountByEmail(email){ return [ADMIN, ...tutorAccounts, ...state.students].find(u=>u.email.toLowerCase()===email); }
+  function accountById(id){ const t=tutorAccounts.find(x=>x.id===id); if(t) return t; if(ADMIN && id===ADMIN.id) return ADMIN; return studentById(id); }
   function meLog(){ const s=studentById(state.currentUser); return s ? s.log : []; }
 
   // ---------- Receipts (Austrian, VAT-exempt) ----------
@@ -1287,11 +1318,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
       const slots = document.createElement("div");
       slots.className = "slots";
       let any = false;
-      dayTimes(date).forEach(time => {
+      dayTimes(date, state.tutor).forEach(time => {
         const dk = keyOf(date);
         const myBk = state.bookings.find(b => b.studentId===state.currentUser && b.tutorId===state.tutor && sameDay(b.date,date) && b.time===time);
         const booked = !!myBk;
-        const open = !isPast && slotOpen(date,time) && !bookingConflict(date,time); // unavailable if its 50 min overlap a booking
+        const open = !isPast && slotOpen(date,time,state.tutor) && !bookingConflict(date,time,null,state.tutor); // unavailable if its 50 min overlap a booking
         if (!open && !booked) return; // skip closed/conflicting slots
         any = true;
         const el = document.createElement("button");
@@ -1394,7 +1425,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
   function icsEsc(t){ return String(t==null?"":t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
   function buildIcsAll(){
-    const evs = state.bookings.filter(b=>b.tutorId==="davit").sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
+    const evs = state.bookings.filter(b=>b.tutorId===state.myTutor).sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
     const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//Tutor Schedule//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEsc("The Green Pencil — Davits Stunden"),"REFRESH-INTERVAL;VALUE=DURATION:PT1H","X-PUBLISHED-TTL:PT1H"];
     evs.forEach(b=>{
       const s=studentById(b.studentId);
@@ -1704,11 +1735,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
       head.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${date.getDate()}</div>${isToday?'<div class="pip"></div>':''}`;
       col.appendChild(head);
       const slots=document.createElement("div"); slots.className="slots"; let any=false;
-      dayTimes(date).forEach(time=>{
+      dayTimes(date, state.myTutor).forEach(time=>{
         const dk=keyOf(date);
-        const bk=state.bookings.find(b=>b.tutorId==="davit"&&sameDay(b.date,date)&&b.time===time);
-        const conflict = bookingConflict(date,time);
-        const open = !isPast && slotOpen(date,time) && !conflict;
+        const bk=state.bookings.find(b=>b.tutorId===state.myTutor&&sameDay(b.date,date)&&b.time===time);
+        const conflict = bookingConflict(date,time,null,state.myTutor);
+        const open = !isPast && slotOpen(date,time,state.myTutor) && !conflict;
         if(state.editAvail){
           if(isPast) return;
           any=true;
@@ -1723,7 +1754,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
             el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">Buchung in der Nähe</span>`;
             el.onclick=()=>toast("Innerhalb von 50 Min. einer Buchung");
           } else {
-            const on=slotOpen(date,time);
+            const on=slotOpen(date,time,state.myTutor);
             el.className="slot avail "+(on?"avail-on":"avail-off");
             el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">${on?"Verfügbar":"Zu"}</span>`;
             el.onclick=()=>toggleAvail(date,time);
@@ -1754,17 +1785,17 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function teacherSelectSlot(date,time){ state.teacherManage=null; state.teacherSel={ dateKey:keyOf(date), date:new Date(date), time }; renderTeacherWeek(); renderTeacherSummary(); }
   function teacherManageSlot(bk){ state.teacherSel=null; state.teacherManage=bk; renderTeacherWeek(); renderTeacherSummary(); }
-  function toggleAvail(date,time){ const dk=keyOf(date), k=dk+"|"+time; const newOpen = !slotOpen(date,time); state.availability[k] = newOpen; api('POST', '/api/availability/', { date: dk, time, isOpen: newOpen }); renderTeacherWeek(); renderWeek(); }
+  function toggleAvail(date,time){ const dk=keyOf(date), k=dk+"|"+time; const newOpen = !slotOpen(date,time,state.myTutor); availMap(state.myTutor)[k] = newOpen; api('POST', '/api/availability/', { date: dk, time, isOpen: newOpen, tutorSlug: state.myTutor }); renderTeacherWeek(); renderWeek(); }
   function exitEditAvail(){ state.editAvail=false; const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten`; } renderTeacherWeek(); renderTeacherSummary(); renderWeek(); }
   function addCustomTime(i, time){
     if(!/^\d{1,2}:\d{2}$/.test(time||"")){ toast("Gib eine gültige Zeit ein"); return; }
     const ws=addDays(startOfWeek(NOW), state.tWeekOffset*7);
     const date=addDays(ws, i), dk=keyOf(date);
-    if(bookingConflict(date,time)){ toast("Das überschneidet eine Buchung — wähle eine andere Zeit"); return; }
-    state.customTimes[dk]=state.customTimes[dk]||[];
-    if(!state.customTimes[dk].includes(time) && !TIMES.includes(time)) state.customTimes[dk].push(time);
-    state.availability[dk+"|"+time]=true;
-    api('POST', '/api/custom-times/', { date: dk, time });
+    if(bookingConflict(date,time,null,state.myTutor)){ toast("Das überschneidet eine Buchung — wähle eine andere Zeit"); return; }
+    const cm=customMap(state.myTutor); cm[dk]=cm[dk]||[];
+    if(!cm[dk].includes(time) && !TIMES.includes(time)) cm[dk].push(time);
+    availMap(state.myTutor)[dk+"|"+time]=true;
+    api('POST', '/api/custom-times/', { date: dk, time, tutorSlug: state.myTutor });
     renderTeacherWeek(); renderTeacherSummary(); renderWeek();
     toast(time+" am "+DOW[i]+" "+date.getDate()+" hinzugefügt");
   }
@@ -1774,10 +1805,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const comp = s.credits<=0;
     if(!comp) setStudentCredits(studentId, s.credits-1);
     s.log.unshift({ type:"book", label: comp?"Gratis-Stunde vom Tutor gebucht":"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt: comp?"":"-1" });
-    state.bookings.push({ studentId, tutorId:"davit", date:new Date(date), time, title: comp?"Gratis-Stunde":"Englischstunde" });
+    state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title: comp?"Gratis-Stunde":"Englischstunde" });
     api('POST', '/api/bookings/', {
       studentSlug: studentId,
-      tutorSlug: 'davit',
+      tutorSlug: state.myTutor,
       date: ymd(date),
       time,
       title: comp ? 'Gratis-Stunde' : 'Englischstunde',
@@ -1880,8 +1911,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       $("#tNoteSave").onclick=()=>{
         const nt=$("#tTimeInput").value;
         if(/^\d{2}:\d{2}$/.test(nt) && nt!==bk.time){
-          if(bookingConflict(bk.date, nt, bk)){ toast("Diese Startzeit überschneidet eine andere Buchung — nicht geändert"); }
-          else { bk.time=nt; const dk=keyOf(bk.date); if(!dayTimes(bk.date).includes(nt)){ state.customTimes[dk]=state.customTimes[dk]||[]; state.customTimes[dk].push(nt); } toast("Stunde verschoben auf "+nt); }
+          if(bookingConflict(bk.date, nt, bk, bk.tutorId)){ toast("Diese Startzeit überschneidet eine andere Buchung — nicht geändert"); }
+          else { bk.time=nt; const dk=keyOf(bk.date); if(!dayTimes(bk.date, bk.tutorId).includes(nt)){ const cm=customMap(bk.tutorId); cm[dk]=cm[dk]||[]; cm[dk].push(nt); } toast("Stunde verschoben auf "+nt); }
         } else { toast("Details gespeichert"); }
         if (bk._pk) api('PUT', '/api/bookings/' + bk._pk + '/', {
           title: bk.title, notes: bk.notes, tutorNotes: bk.tutorNotes, callLink: bk.callLink, time: bk.time
@@ -2095,7 +2126,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function renderAdminEditor(){
     const el=$("#adminEditor"); if(!el) return;
     const u=accountById(state.adminSel); if(!u){ el.innerHTML=""; return; }
-    const isStudent = u.role!=="tutor";
+    const isStudent = u.role==="student";
+    const isTutor = u.role==="tutor";
     const b=u.billing||{};
     el.innerHTML=`
       <div class="ed-head">
@@ -2112,7 +2144,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <label class="bf-lab">Anzeigename<input class="bf-input" id="edName" value="${esc(u.name)}"></label>
         <div class="bf-grid">
           <label class="bf-lab">E-Mail (Login)<input class="bf-input" id="edEmail" value="${esc(u.email)}"></label>
-          <label class="bf-lab">Passwort<input class="bf-input" id="edPass" value="${esc(u.password)}"></label>
+          <label class="bf-lab">Passwort<input class="bf-input" id="edPass" value="${esc(u.password)}" placeholder="${u.password?'':'leer lassen = unverändert'}"></label>
         </div>
         ${isStudent?`
         <label class="bf-lab">Guthaben<input class="bf-input" id="edCredits" type="number" min="0" value="${u.credits}"></label>
@@ -2130,6 +2162,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <button class="btn ghost" id="edViewAs">Ansehen als ${u.name.split(" ")[0]}</button>
       </div>
       ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Schüler entfernen</button>':''}
+      ${isTutor?'<button class="btn-text" id="edRemoveTutor" style="color:#b8492c;">Tutor entfernen</button>':''}
     `;
     $("#edPhoto").onchange=(e)=>pickPhoto(e,u);
     if($("#edPhotoClear")) $("#edPhotoClear").onclick=()=>{ u.photo=null; reflectUser(u); renderAdmin(); };
@@ -2144,24 +2177,33 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#edSave").onclick=()=>saveAdminUser(u);
     $("#edViewAs").onclick=()=>impersonate(u);
     if($("#edRemove")) $("#edRemove").onclick=()=>removeAdminStudent(u);
+    if($("#edRemoveTutor")) $("#edRemoveTutor").onclick=()=>removeAdminTutor(u);
   }
   function pickPhoto(e,u){ const f=e.target.files&&e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ u.photo=rd.result; reflectUser(u); renderAdmin(); toast("Foto aktualisiert"); }; rd.readAsDataURL(f); }
   function saveAdminUser(u){
-    u.name=$("#edName").value.trim()||u.name;
-    u.email=$("#edEmail").value.trim().toLowerCase()||u.email;
-    u.password=$("#edPass").value||u.password;
-    u.i=initialsOf(u.name);
-    const payload={ name:u.name, email:u.email, password:u.password };
-    if(u.role!=="tutor"){
-      const cr=parseInt($("#edCredits").value,10); if(!isNaN(cr)) setStudentCredits(u.id, cr);
-      u.billing={ line1:$("#edLine1").value.trim(), postcode:$("#edZip").value.trim(), city:$("#edCity").value.trim(), country:$("#edCountry").value.trim()||"Österreich" };
-      payload.credits=u.credits; payload.billing=u.billing;
+    // Read the form first; only commit to local state once the server confirms,
+    // so a rejected edit (e.g. a duplicate email) doesn't leave the UI showing a
+    // change that didn't actually persist — the old bug was a success toast even
+    // when the save silently failed, so the account couldn't be logged into.
+    const newName=$("#edName").value.trim()||u.name;
+    const newEmail=$("#edEmail").value.trim().toLowerCase()||u.email;
+    const newPass=$("#edPass").value;  // blank = keep current password
+    const payload={ name:newName, email:newEmail };
+    if(newPass) payload.password=newPass;
+    let credits=null, billing=null;
+    if(u.role==="student"){
+      const cr=parseInt($("#edCredits").value,10); if(!isNaN(cr)) credits=cr;
+      billing={ line1:$("#edLine1").value.trim(), postcode:$("#edZip").value.trim(), city:$("#edCity").value.trim(), country:$("#edCountry").value.trim()||"Österreich" };
+      if(credits!=null) payload.credits=credits;
+      payload.billing=billing;
     }
-    // Persist to the server — without this the edit (incl. the login email) only
-    // lived in the browser, so the account couldn't actually be logged into.
-    api('PUT', '/api/users/'+u.id+'/', payload);
-    reflectUser(u); renderAdmin();
-    toast(u.name+" gespeichert");
+    api('PUT', '/api/users/'+u.id+'/', payload).then(r=>{
+      if(!r){ toast("Speichern fehlgeschlagen — E-Mail evtl. bereits vergeben"); return; }
+      u.name=newName; u.email=newEmail; if(newPass) u.password=newPass; u.i=initialsOf(newName);
+      if(u.role==="student"){ if(credits!=null) setStudentCredits(u.id, credits); u.billing=billing; }
+      reflectUser(u); renderAdmin();
+      toast(newName+" gespeichert");
+    });
   }
   function reflectUser(u){
     renderRoster();
@@ -2187,8 +2229,33 @@ window.DJANGO_DATA = {{ django_data|safe }};
     state.students=state.students.filter(s=>s.id!==u.id);
     state.bookings=state.bookings.filter(b=>b.studentId!==u.id);
     if(state.currentUser===u.id) state.currentUser=(state.students[0]||{id:"maya"}).id;
-    state.adminSel=(allAccounts()[0]||{id:"davit"}).id;
+    state.adminSel=(allAccounts()[0]||{id:"admin"}).id;
     renderAdmin(); renderRoster(); toast("Schüler entfernt");
+  }
+  function addAdminTutor(){
+    // Same pattern as students: create server-side first so the tutor has a real
+    // slug, then mirror into the in-memory tutor lists (roster + bookable chips).
+    api('POST', '/api/users/', { role: 'tutor' }).then(r=>{
+      if(!r || !r.slug){ toast("Tutor konnte nicht hinzugefügt werden — bitte erneut versuchen"); return; }
+      tutorAccounts.push({
+        id:r.slug, role:"tutor", name:r.name, email:r.email,
+        i:r.initials||"NT", c:[r.color1, r.color2], photo:r.photo||null, password:r.tempPassword||"",
+      });
+      TUTORS.push({ id:r.slug, name:(r.name||"Tutor").split(" ")[0], role:"Englisch-Tutor", c:[r.color1, r.color2], i:r.initials||"T" });
+      state.adminSel=r.slug; renderAdmin();
+      toast("Tutor hinzugefügt — Passwort unter „Details“ ablesen und weitergeben");
+    });
+  }
+  function removeAdminTutor(u){
+    api('DELETE', '/api/users/'+u.id+'/').then(r=>{ if(!r) toast("Tutor konnte nicht entfernt werden"); });
+    const ti=tutorAccounts.findIndex(t=>t.id===u.id); if(ti>=0) tutorAccounts.splice(ti,1);
+    const xi=TUTORS.findIndex(t=>t.id===u.id); if(xi>=0) TUTORS.splice(xi,1);
+    state.bookings=state.bookings.filter(b=>b.tutorId!==u.id);
+    delete state.availability[u.id]; delete state.customTimes[u.id];
+    if(state.tutor===u.id) state.tutor=(TUTORS[0]||{id:""}).id;
+    if(state.myTutor===u.id) state.myTutor=(tutorAccounts[0]||{id:""}).id;
+    state.adminSel=(allAccounts()[0]||{id:"admin"}).id;
+    renderAdmin(); renderRoster(); toast("Tutor entfernt");
   }
 
   // ---------- Toast ----------
@@ -2525,19 +2592,20 @@ window.DJANGO_DATA = {{ django_data|safe }};
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderBilling();
     setView("book");
   }
-  function applyTutor(){
+  function applyTutor(acct){
     resetTransient();
-    state.role="tutor"; showTabsForRole("tutor"); setIdentity(tutorUser);
+    const t = acct || tutorUser;
+    state.role="tutor"; state.myTutor=t.id; showTabsForRole("tutor"); setIdentity(t);
     renderTeacherWeek(); renderTeacherSummary(); renderRoster();
     setView("teacher");
   }
   function applyAdmin(){
     resetTransient();
-    state.role="admin"; state.adminSel="davit"; showTabsForRole("admin"); setIdentity(ADMIN);
+    state.role="admin"; state.adminSel=(allAccounts()[0]||{id:"admin"}).id; showTabsForRole("admin"); setIdentity(ADMIN);
     renderAdmin();
     setView("admin");
   }
-  function loginAs(acct){ if(acct.role==="admin") applyAdmin(); else if(acct.role==="tutor") applyTutor(); else applyStudent(acct.id); }
+  function loginAs(acct){ if(acct.role==="admin") applyAdmin(); else if(acct.role==="tutor") applyTutor(acct); else applyStudent(acct.id); }
   function logout(){
     // Sign-in lives on its own page (/login/), so clear the server session and
     // bounce there. .finally guarantees the redirect even if the request fails.
@@ -2580,6 +2648,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   $("#logoutBtn").onclick=logout;
   $("#billingSave").onclick=saveBilling;
   $("#adminAddBtn").onclick=addAdminStudent;
+  if($("#adminAddTutorBtn")) $("#adminAddTutorBtn").onclick=addAdminTutor;
   $("#adminSettingsSave").onclick=saveSettings;
   $("#impExit").onclick=exitImpersonation;
   $("#calSyncBtn").onclick=openCalSync;
