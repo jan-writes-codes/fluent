@@ -22,3 +22,6 @@ staticfiles/
 # Environment files (hold secrets — never commit)
 .env
 .env.*
+
+# Local throwaway venv (Python 3.11) used for running tests
+.venv2/

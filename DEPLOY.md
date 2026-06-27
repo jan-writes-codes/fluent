@@ -35,6 +35,21 @@ dashboard — `.env` files are gitignored):
 | `DJANGO_SECRET_KEY` | `DEBUG=false` | a long random string — **different per environment** |
 | `DJANGO_ALLOWED_HOSTS` | `DEBUG=false` | `thegreenpencil.at,www.thegreenpencil.at` |
 | `DATABASE_URL` | to use a non-default DB | `postgres://user:pass@host:5432/greenpencil_prod` |
+| `STRIPE_SECRET_KEY` | to enable self-checkout | `sk_live_…` (or `sk_test_…`) |
+| `STRIPE_PUBLISHABLE_KEY` | with Stripe | `pk_live_…` (or `pk_test_…`) |
+| `STRIPE_WEBHOOK_SECRET` | with Stripe webhook | `whsec_…` |
+
+### Stripe credit top-ups (optional)
+
+If `STRIPE_SECRET_KEY` is unset, the app runs unchanged and students buy credits
+the existing way (they message the tutor, who adds the credits). Setting the
+Stripe keys turns on self-service Stripe Checkout in the credit-top-up panel.
+
+Point a Stripe webhook at `https://<host>/api/stripe/webhook/` for the
+`checkout.session.completed` event and put its signing secret in
+`STRIPE_WEBHOOK_SECRET`. The webhook is the source of truth; the app also
+re-confirms the session when the student returns, so credits are granted exactly
+once even if the webhook is slow or not yet configured.
 
 `DATABASE_URL` formats:
 - SQLite: `sqlite:////absolute/path/to/db.sqlite3`

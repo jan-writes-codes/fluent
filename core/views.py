@@ -2,14 +2,25 @@ import json
 import secrets
 from datetime import date
 from functools import wraps
+from django.conf import settings as dj_settings
+from django.db import IntegrityError
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, FileResponse, Http404
 from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
     CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile
 )
+
+# Stripe is an optional dependency: the app must import and run without it (the
+# tutor-mediated purchase flow is always available). When the package is missing
+# or no secret key is configured, the Stripe endpoints report "disabled".
+try:
+    import stripe
+except ImportError:  # pragma: no cover - exercised only where stripe isn't installed
+    stripe = None
 
 # Uploaded lesson materials: an allowed type, reasonably sized.
 MAX_LESSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
@@ -87,11 +98,19 @@ def serialize_user(u):
     }
 
 
+def booking_student_slug(b):
+    return b.student.slug if b.student_id and b.student else b.student_slug
+
+
+def booking_tutor_slug(b):
+    return b.tutor.slug if b.tutor_id and b.tutor else b.tutor_slug
+
+
 def serialize_booking(b):
     return {
         "pk": b.pk,
-        "studentId": b.student.slug,
-        "tutorId": b.tutor.slug,
+        "studentId": booking_student_slug(b),
+        "tutorId": booking_tutor_slug(b),
         "date": b.date.isoformat(),
         "time": b.time,
         "title": b.title,
@@ -107,7 +126,7 @@ def blocker_booking(b):
     return {
         "pk": None,
         "studentId": "__blocked__",
-        "tutorId": b.tutor.slug,
+        "tutorId": booking_tutor_slug(b),
         "date": b.date.isoformat(),
         "time": b.time,
         "title": "",
@@ -135,17 +154,19 @@ def serialize_transaction(t):
 
 
 def serialize_receipt(r):
+    # Read from the frozen snapshot, not the live user: the receipt must read the
+    # same forever, and the student may no longer exist.
     return {
         "no": r.number,
         "dateStr": r.date_str,
-        "studentId": r.student.slug,
-        "studentName": r.student.get_full_name() or r.student.username,
+        "studentId": r.student_slug,
+        "studentName": r.student_name,
         "billing": {
-            "name": r.student.billing_name,
-            "line1": r.student.billing_line1,
-            "postcode": r.student.billing_postcode,
-            "city": r.student.billing_city,
-            "country": r.student.billing_country,
+            "name": r.billing_name,
+            "line1": r.billing_line1,
+            "postcode": r.billing_postcode,
+            "city": r.billing_city,
+            "country": r.billing_country,
         },
         "credits": r.credits,
         "unit": r.unit_price_cents,  # already in EUR (stored as integer EUR)
@@ -198,6 +219,144 @@ def receipt_unit_price(settings, n):
         except (ValueError, TypeError):
             continue
     return settings.credit_price
+
+
+def grant_credits(student, n, settings, *, label, sub, stripe_session_id=""):
+    """Add ``n`` credits to ``student`` and issue the matching receipt + ledger
+    entry, atomically. Shared by the tutor "add credits" action and the Stripe
+    checkout flow so both produce identical, auditable records.
+
+    The receipt and transaction capture a *snapshot* of the student's identity and
+    billing address at issue time: these are immutable financial records that must
+    stay readable verbatim even after the account is deleted (GDPR erasure).
+    """
+    from django.db import transaction as db_transaction
+    from django.utils import timezone
+
+    with db_transaction.atomic():
+        # Lock the student row so two concurrent grants can't both read the same
+        # receipt_seq and mint a duplicate receipt number.
+        student = User.objects.select_for_update().get(pk=student.pk)
+        student.credits += n
+        student.receipt_seq += 1
+        student.save()
+
+        now = timezone.localtime()
+        date_str = now.strftime("%d.%m.%Y")
+        receipt_no = f"RE-{now.year}-{str(student.receipt_seq).zfill(4)}"
+        student_name = student.get_full_name() or student.username
+
+        receipt = Receipt.objects.create(
+            number=receipt_no,
+            student=student,
+            student_slug=student.slug,
+            student_name=student_name,
+            billing_name=student.billing_name,
+            billing_line1=student.billing_line1,
+            billing_postcode=student.billing_postcode,
+            billing_city=student.billing_city,
+            billing_country=student.billing_country,
+            date_str=date_str,
+            credits=n,
+            unit_price_cents=receipt_unit_price(settings, n),
+            stripe_session_id=stripe_session_id,
+        )
+
+        CreditTransaction.objects.create(
+            student=student,
+            student_slug=student.slug,
+            student_name=student_name,
+            txn_type="buy",
+            label=label,
+            sub=sub,
+            amount=n,
+            receipt_no=receipt_no,
+        )
+
+    return receipt
+
+
+def stripe_enabled():
+    """True when self-service Stripe checkout is usable (package present + key set)."""
+    return bool(stripe and dj_settings.STRIPE_SECRET_KEY)
+
+
+def stripe_client():
+    stripe.api_key = dj_settings.STRIPE_SECRET_KEY
+    return stripe
+
+
+def pack_price_cents(settings, n):
+    """Total price (in cents) for a pack of ``n`` credits — server-authoritative so
+    a client can never dictate what it pays. Uses the configured pack price when
+    ``n`` matches a pack, else falls back to the per-credit rate × n."""
+    try:
+        packs = json.loads(settings.packs_json)
+    except (ValueError, TypeError):
+        packs = []
+    for p in packs:
+        try:
+            if int(p.get("n")) == n:
+                amt = parse_price(p.get("price"))
+                if amt:
+                    return round(amt * 100)
+        except (ValueError, TypeError):
+            continue
+    return settings.credit_price * 100 * n
+
+
+def credit_from_stripe_session(session):
+    """Idempotently grant the credits a *paid* Checkout session represents and
+    return the resulting Receipt (existing or freshly created), or None if the
+    session isn't payable/identifiable. Safe to call from both the webhook and the
+    post-payment redirect — the unique constraint on stripe_session_id guarantees a
+    session is only ever credited once, even under a race."""
+    sid = session.get("id")
+    if not sid or session.get("payment_status") != "paid":
+        return None
+    existing = Receipt.objects.filter(stripe_session_id=sid).first()
+    if existing:
+        return existing
+    meta = session.get("metadata") or {}
+    slug = meta.get("student_slug")
+    try:
+        n = int(meta.get("credits", 0))
+    except (ValueError, TypeError):
+        n = 0
+    if not slug or n <= 0:
+        return None
+    student = User.objects.filter(slug=slug, role="student").first()
+    if not student:
+        return None
+    settings = get_settings()
+    try:
+        return grant_credits(
+            student, n, settings,
+            label="Credits via Stripe", sub="Online bezahlt", stripe_session_id=sid,
+        )
+    except IntegrityError:
+        # A concurrent caller (webhook vs. redirect) won the race; reuse its receipt.
+        return Receipt.objects.filter(stripe_session_id=sid).first()
+
+
+def finalize_history_snapshots(user):
+    """Ensure every history row tied to ``user`` carries its identity snapshot
+    before the account is deleted, so SET_NULL never detaches a row to an
+    anonymous, unidentifiable state. Idempotent: only fills empty snapshots."""
+    name = user.get_full_name() or user.username
+    for b in Booking.objects.filter(student=user, student_slug=""):
+        b.student_slug, b.student_name = user.slug, name
+        b.save(update_fields=["student_slug", "student_name"])
+    for b in Booking.objects.filter(tutor=user, tutor_slug=""):
+        b.tutor_slug, b.tutor_name = user.slug, name
+        b.save(update_fields=["tutor_slug", "tutor_name"])
+    CreditTransaction.objects.filter(student=user, student_slug="").update(
+        student_slug=user.slug, student_name=name
+    )
+    # Receipts already snapshot billing at issue time; only patch a missing slug.
+    Receipt.objects.filter(student=user, student_slug="").update(
+        student_slug=user.slug, student_name=name
+    )
 
 
 def require_auth(request):
@@ -283,7 +442,7 @@ def receipt_html(r_data, settings):
       </div>
       <table class="r-table">
         <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
-        <tbody><tr><td>{r_data['credits']}</td><td>Guthaben für Englisch-Einzelunterricht<br/><span class="r-sub">1 Guthaben = eine 50-Minuten-Einheit</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
+        <tbody><tr><td>{r_data['credits']}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 50-Minuten-Einheit</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
       </table>
       <div class="r-totals">
         <div class="r-row"><span>Nettobetrag · Net</span><span>€ {money(r_data['net'])}</span></div>
@@ -444,6 +603,10 @@ def app_view(request):
             "packs": packs,
             "receiptSeq": max_seq,
         },
+        "stripe": {
+            "enabled": stripe_enabled(),
+            "publishableKey": dj_settings.STRIPE_PUBLISHABLE_KEY,
+        },
     }
 
     return render(request, "app.html", {"django_data": json.dumps(django_data), "role": user.role})
@@ -562,31 +725,12 @@ def api_credits(request, slug):
         return JsonResponse({"error": str(e)}, status=400)
 
     settings = get_settings()
-    student.credits += n
-    student.receipt_seq += 1
-    student.save()
-
-    from django.utils import timezone
-    now = timezone.localtime()
-    date_str = now.strftime("%d.%m.%Y")
-    receipt_no = f"RE-{now.year}-{str(student.receipt_seq).zfill(4)}"
-
-    receipt = Receipt.objects.create(
-        number=receipt_no,
-        student=student,
-        date_str=date_str,
-        credits=n,
-        unit_price_cents=receipt_unit_price(settings, n),
-    )
-
-    CreditTransaction.objects.create(
-        student=student,
-        txn_type="buy",
+    receipt = grant_credits(
+        student, n, settings,
         label="Credits added by tutor",
-        sub=f"Today · paid externally",
-        amount=n,
-        receipt_no=receipt_no,
+        sub="Today · paid externally",
     )
+    receipt_no = receipt.number
 
     r_data = serialize_receipt(receipt)
     html = receipt_html(r_data, settings)
@@ -619,6 +763,117 @@ def api_billing(request):
     if "country" in data:
         user.billing_country = data["country"] or "Österreich"
     user.save()
+    return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Stripe checkout API (self-service credit top-ups)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("student")
+def api_checkout(request):
+    """Create a Stripe Checkout session for the current student to buy ``n``
+    credits, and return its hosted-payment URL. Price is computed server-side."""
+    if not stripe_enabled():
+        return JsonResponse({"error": "stripe_disabled"}, status=503)
+    data = parse_body(request)
+    try:
+        n = int(data.get("n", 1))
+        if n <= 0:
+            raise ValueError("n must be positive")
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "invalid amount"}, status=400)
+
+    settings = get_settings()
+    amount = pack_price_cents(settings, n)
+    origin = request.build_absolute_uri("/").rstrip("/")
+    client = stripe_client()
+    try:
+        session = client.checkout.Session.create(
+            mode="payment",
+            line_items=[{
+                "quantity": 1,
+                "price_data": {
+                    "currency": "eur",
+                    "unit_amount": amount,
+                    "product_data": {
+                        "name": f"{n} Credits — the green pencil",
+                        "description": "1 Credit = eine 50-Minuten-Einheit Englisch-Einzelunterricht",
+                    },
+                },
+            }],
+            # Server-trusted facts the webhook/redirect use to credit the right
+            # student. The price is set above, not taken from the client.
+            metadata={"student_slug": request.user.slug, "credits": str(n)},
+            client_reference_id=request.user.slug,
+            customer_email=request.user.email or None,
+            success_url=f"{origin}/app/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{origin}/app/?checkout=cancel",
+        )
+    except Exception:
+        # Don't leak Stripe internals to the client; the UI falls back to e-mail.
+        return JsonResponse({"error": "stripe_error"}, status=502)
+    return JsonResponse({"url": session.url, "id": session.id})
+
+
+@require_http_methods(["POST"])
+@require_roles("student")
+def api_checkout_confirm(request):
+    """Called when the student returns from Stripe. Verifies the session was paid
+    and credits them if a webhook hasn't already. Idempotent."""
+    if not stripe_enabled():
+        return JsonResponse({"error": "stripe_disabled"}, status=503)
+    data = parse_body(request)
+    sid = (data.get("sessionId") or "").strip()
+    if not sid:
+        return JsonResponse({"error": "missing session"}, status=400)
+    client = stripe_client()
+    try:
+        session = client.checkout.Session.retrieve(sid)
+    except Exception:
+        return JsonResponse({"error": "not found"}, status=404)
+    # A student may only confirm a session that was created for them.
+    meta = session.get("metadata") or {}
+    if meta.get("student_slug") != request.user.slug:
+        return JsonResponse({"error": "forbidden"}, status=403)
+    receipt = credit_from_stripe_session(session)
+    if not receipt:
+        return JsonResponse({"paid": False})
+    request.user.refresh_from_db()
+    return JsonResponse({
+        "paid": True,
+        "credits": request.user.credits,
+        "receipt": serialize_receipt(receipt),
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_stripe_webhook(request):
+    """Stripe -> us. Verifies the signature (when a webhook secret is configured)
+    and credits the student on checkout.session.completed. The source of truth for
+    crediting; the post-payment redirect is only a faster-feeling fallback."""
+    if not stripe_enabled():
+        return JsonResponse({"error": "stripe_disabled"}, status=503)
+    payload = request.body
+    sig = request.META.get("HTTP_STRIPE_SIGNATURE", "")
+    secret = dj_settings.STRIPE_WEBHOOK_SECRET
+    client = stripe_client()
+    try:
+        if secret:
+            # Raises on a bad payload or a signature that doesn't match the secret
+            # (i.e. a forged event). Exception type varies across SDK versions, so
+            # catch broadly here — this block only constructs the event.
+            event = client.Webhook.construct_event(payload, sig, secret)
+        else:
+            # No secret configured (e.g. local dev): accept unverified JSON.
+            event = json.loads(payload)
+    except Exception:
+        return JsonResponse({"error": "invalid"}, status=400)
+    event_type = event.get("type") if isinstance(event, dict) else event["type"]
+    if event_type == "checkout.session.completed":
+        credit_from_stripe_session(event["data"]["object"])
     return JsonResponse({"ok": True})
 
 
@@ -848,6 +1103,13 @@ def api_user_detail(request, slug):
         # Don't let an admin delete their own account out from under themselves.
         if u == request.user:
             return JsonResponse({"error": "Du kannst dein eigenes Konto nicht löschen."}, status=400)
+        # GDPR "anonymise & keep": the account (and its PII — email, photo, notes)
+        # is erased, but the financial/lesson history is statutorily retained. The
+        # history models use on_delete=SET_NULL, so deleting the user detaches the
+        # FK while leaving the rows — and their frozen identity/billing snapshots —
+        # untouched. We finalise any missing snapshot first so nothing detaches to
+        # an unidentifiable record.
+        finalize_history_snapshots(u)
         u.delete()
         return JsonResponse({"ok": True})
 

@@ -27,8 +27,20 @@ class User(AbstractUser):
 
 
 class Booking(models.Model):
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_bookings')
-    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tutor_bookings')
+    # SET_NULL (not CASCADE): a held/completed lesson is part of the immutable
+    # history and must survive the deletion of a student or tutor account. The
+    # *_slug / *_name snapshots below keep the row self-describing once the FK is
+    # detached (GDPR erasure removes the account, the record itself is untouched).
+    student = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='student_bookings'
+    )
+    tutor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tutor_bookings'
+    )
+    student_slug = models.CharField(max_length=50, blank=True)
+    student_name = models.CharField(max_length=200, blank=True)
+    tutor_slug = models.CharField(max_length=50, blank=True)
+    tutor_name = models.CharField(max_length=200, blank=True)
     date = models.DateField()
     time = models.CharField(max_length=5)  # "HH:MM"
     title = models.CharField(max_length=200, default='English session')
@@ -40,12 +52,30 @@ class Booking(models.Model):
     class Meta:
         ordering = ['date', 'time']
 
+    def save(self, *args, **kwargs):
+        # Keep the identity snapshot in sync with the live FK while the accounts
+        # exist; once an account is deleted the FK goes NULL and the last-known
+        # snapshot is what remains.
+        if self.student_id and self.student:
+            self.student_slug = self.student.slug
+            self.student_name = self.student.get_full_name() or self.student.username
+        if self.tutor_id and self.tutor:
+            self.tutor_slug = self.tutor.slug
+            self.tutor_name = self.tutor.get_full_name() or self.tutor.username
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.student.slug} + {self.tutor.slug} on {self.date} at {self.time}'
+        return f'{self.student_slug} + {self.tutor_slug} on {self.date} at {self.time}'
 
 
 class CreditTransaction(models.Model):
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    # SET_NULL keeps the financial ledger intact after the student is deleted;
+    # the slug/name snapshot below preserves who the entry belonged to.
+    student = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions'
+    )
+    student_slug = models.CharField(max_length=50, blank=True)
+    student_name = models.CharField(max_length=200, blank=True)
     txn_type = models.CharField(max_length=10)  # book, buy, done
     label = models.CharField(max_length=200)
     sub = models.CharField(max_length=200, blank=True)
@@ -57,16 +87,43 @@ class CreditTransaction(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.student.slug}: {self.label}'
+        return f'{self.student_slug}: {self.label}'
 
 
 class Receipt(models.Model):
     number = models.CharField(max_length=30, unique=True)
-    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    # SET_NULL: an issued receipt is an accounting document with a statutory
+    # retention period (§ 132 BAO, 7 years) — it must outlive the account it was
+    # issued to. The billing snapshot below freezes the recipient's details at
+    # issue time (also the correct invoicing behaviour: a receipt never changes
+    # because the customer later edits their address).
+    student = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    student_slug = models.CharField(max_length=50, blank=True)
+    student_name = models.CharField(max_length=200, blank=True)
+    billing_name = models.CharField(max_length=200, blank=True)
+    billing_line1 = models.CharField(max_length=200, blank=True)
+    billing_postcode = models.CharField(max_length=20, blank=True)
+    billing_city = models.CharField(max_length=100, blank=True)
+    billing_country = models.CharField(max_length=100, blank=True)
     date_str = models.CharField(max_length=20)
     credits = models.IntegerField()
     unit_price_cents = models.IntegerField()  # in cents to avoid float
+    # Stripe Checkout session that paid for this receipt (empty for receipts the
+    # tutor added manually). Used to make webhook/redirect crediting idempotent.
+    stripe_session_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            # At most one receipt per Stripe session (empty = manual receipts,
+            # which are unconstrained). This is the database-level guard that
+            # makes webhook + redirect crediting idempotent under a race.
+            models.UniqueConstraint(
+                fields=['stripe_session_id'],
+                condition=~models.Q(stripe_session_id=''),
+                name='unique_stripe_session',
+            )
+        ]
 
     def __str__(self):
         return self.number
