@@ -694,6 +694,7 @@ class LessonFileTests(FluentDataMixin, TestCase):
 # --------------------------------------------------------------------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "tests", "frontend")
 PROBE = os.path.join(FRONTEND_DIR, "dom_probe.js")
+INTRO_PROBE = os.path.join(FRONTEND_DIR, "intro_probe.js")
 
 
 def _node_bin():
@@ -1244,6 +1245,67 @@ class IntroBookingTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Public intro calendar — client-side opening-week behaviour (jsdom)
+#
+# Bug: the calendar always opened on the current Mon–Fri week, which on a weekend
+# (or late in the week) is entirely in the past, so the visitor landed on a blank
+# calendar even though the tutor had plenty of upcoming availability. The fix
+# opens on the first upcoming week that actually has a bookable slot. These run
+# the *real* intro init script with a pinned clock so the regression is
+# deterministic regardless of the day the suite runs.
+# --------------------------------------------------------------------------- #
+class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._node = _node_bin()
+        cls._has_jsdom = _jsdom_installed()
+
+    def _probe(self, iso_now):
+        if not self._node:
+            self.skipTest("node not found on PATH — skipping jsdom frontend tests")
+        if not self._has_jsdom:
+            self.skipTest(
+                "jsdom not installed — run `cd tests/frontend && npm install` "
+                "to enable frontend tests"
+            )
+        html = self.client.get(reverse("intro")).content.decode()
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as fh:
+            fh.write(html)
+            path = fh.name
+        try:
+            out = subprocess.run(
+                [self._node, INTRO_PROBE, path, iso_now],
+                capture_output=True, text=True, timeout=60,
+            )
+            self.assertEqual(
+                out.returncode, 0, msg=f"probe failed: {out.stderr or out.stdout}"
+            )
+            return json.loads(out.stdout)
+        finally:
+            os.unlink(path)
+
+    def test_weekend_opens_on_first_week_with_slots(self):
+        # Sun 28 Jun 2026: the current Mon–Fri week (22–26) is entirely past.
+        r = self._probe("2026-06-28T12:00:00")
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertGreater(
+            r["slotCount"], 0,
+            "weekend visitor must not land on a blank calendar",
+        )
+        # It advanced to the upcoming week (29 Jun–3 Jul), not the elapsed one.
+        self.assertIn("29", r["dayNumbers"])
+        self.assertNotIn("22", r["dayNumbers"])
+
+    def test_midweek_stays_on_current_week(self):
+        # Wed 24 Jun 2026 morning: the current week still has bookable days, so
+        # the calendar must not skip ahead and hide today's remaining slots.
+        r = self._probe("2026-06-24T08:00:00")
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertGreater(r["slotCount"], 0)
+        self.assertIn("24", r["dayNumbers"])
+        
+        
 # Transactional e-mail for intro bookings (Resend via Anymail)
 # --------------------------------------------------------------------------- #
 @override_settings(
@@ -1251,6 +1313,7 @@ class IntroBookingTests(FluentDataMixin, TestCase):
     EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
     EMAIL_REPLY_TO="davit@thegreenpencil.at",
 )
+
 class IntroEmailTests(FluentDataMixin, TestCase):
     def _book(self, email="lena@example.at"):
         d = date.today() + timedelta(days=5)

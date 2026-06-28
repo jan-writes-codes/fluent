@@ -209,6 +209,27 @@ window.INTRO_DATA = {{ intro_data|safe }};
     if(sameDay(date, REAL)) return toMin(time) <= (REAL.getHours()*60 + REAL.getMinutes());
     return false;
   }
+  // True if the Mon–Fri week at `offset` has at least one bookable slot for the
+  // current tutor — i.e. an open, not-yet-past, unbooked slot.
+  function weekHasSlot(offset){
+    const ws = addDays(startOfWeek(NOW), offset*7);
+    for(let i=0;i<5;i++){
+      const date = addDays(ws,i);
+      if(date < NOW && !sameDay(date, REAL)) continue;   // skip fully-past days
+      const open = dayTimes(date, state.tutor).some(time =>
+        !isPastSlot(date,time) && slotOpen(date,time,state.tutor) && !bookedConflict(date,time,state.tutor));
+      if(open) return true;
+    }
+    return false;
+  }
+  // The current calendar week can be entirely in the past (e.g. on a weekend, or
+  // late in the week), which would otherwise land the visitor on a blank
+  // calendar even though the tutor has upcoming availability. Open instead on the
+  // first upcoming week (within the bookable horizon) that actually has a slot.
+  function firstBookableOffset(){
+    for(let o=0;o<=8;o++){ if(weekHasSlot(o)) return o; }
+    return 0;
+  }
   function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
   function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; return String(Math.floor(tm/60)).padStart(2,"0")+":"+String(tm%60).padStart(2,"0"); }
   function tutorBySlug(s){ return TUTORS.find(t=>t.slug===s) || TUTORS[0] || {}; }
@@ -350,6 +371,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
   $("#bookModal").onclick=closeBook;
   document.addEventListener("keydown",(e)=>{ if(e.key==="Escape" && !$("#bookModal").hidden) closeBook(); });
 
+  state.weekOffset = firstBookableOffset();
   renderTutors();
   renderWeek();
 })();
