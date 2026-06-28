@@ -1416,3 +1416,65 @@ class IntroEmailTests(FluentDataMixin, TestCase):
         fmt = "%Y%m%dT%H%M%SZ"
         delta = datetime.strptime(end, fmt) - datetime.strptime(start, fmt)
         self.assertEqual(delta, timedelta(minutes=15))
+
+
+# --------------------------------------------------------------------------- #
+# Transactional e-mail for credit (paid) lesson bookings
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
+)
+class LessonBookingEmailTests(FluentDataMixin, TestCase):
+    def _book(self, student_slug="maya", tutor_slug="davit",
+              d="2026-06-08", t="09:00", title="English session"):
+        self.client.force_login(getattr(self, student_slug))
+        return self.client.post(
+            "/api/bookings/",
+            data=json.dumps({
+                "studentSlug": student_slug, "tutorSlug": tutor_slug,
+                "date": d, "time": t, "title": title,
+            }),
+            content_type="application/json",
+        )
+
+    def test_tutor_is_notified_at_own_address(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        tutor_mail = [m for m in mail.outbox if m.to == ["davit@fluent.at"]]
+        self.assertEqual(len(tutor_mail), 1, "the tutor must be e-mailed at their own address")
+        msg = tutor_mail[0]
+        self.assertIn("Maya Karlsson", msg.subject)
+        self.assertIn("Maya Karlsson", msg.body)
+        # 45-minute unit reflected in the time range.
+        self.assertIn("09:00–09:45", msg.body)
+        # Tutor can reply straight to the student.
+        self.assertEqual(msg.reply_to, ["maya@fluent.at"])
+        # HTML alternative present.
+        self.assertTrue(any(ct == "text/html" for _, ct in msg.alternatives))
+
+    def test_no_mail_when_tutor_has_no_address(self):
+        from django.core import mail
+        self.davit.email = ""
+        self.davit.save()
+        self.assertEqual(self._book().status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_email_failure_never_breaks_booking(self):
+        with mock.patch(
+            "core.emails.send_lesson_tutor_notification", side_effect=RuntimeError("ESP down")
+        ):
+            resp = self._book()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Booking.objects.filter(student=self.maya, time="09:00").exists())
+
+    def test_intro_booking_does_not_trigger_lesson_mail(self):
+        # The lesson notifier is a no-op for intros (those have their own flow).
+        from django.core import mail
+        from core import emails
+        b = Booking.objects.create(
+            tutor=self.davit, date=date(2026, 6, 8), time="09:00", is_intro=True,
+            guest_name="Lena Gast", guest_email="lena@example.at",
+        )
+        emails.send_lesson_tutor_notification(b.pk)
+        self.assertEqual(len(mail.outbox), 0)

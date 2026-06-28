@@ -846,6 +846,9 @@ def api_bookings(request):
             time=time_str,
             title=title,
         )
+        # Let the tutor know a student booked one of their slots.
+        from . import emails
+        emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
         return JsonResponse({"pk": b.pk})
     except (KeyError, User.DoesNotExist, ValueError) as e:
         return JsonResponse({"error": str(e)}, status=400)
