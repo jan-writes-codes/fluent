@@ -1194,6 +1194,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function tutorById(id){ return TUTORS.find(t=>t.id===id); }
   function studentById(id){ return state.students.find(s=>s.id===id); }
+  // A booking may belong to a guest who booked a free intro from the public page
+  // (no account). Resolve to the roster student, or a synthetic read-only "guest"
+  // so the tutor calendar can show & manage the slot without a User row.
+  function bookingStudent(b){
+    const s=studentById(b && b.studentId);
+    if(s) return s;
+    const nm=(b && b.guestName) ? b.guestName : "Gast";
+    return { id:(b && b.studentId)||"intro", name:nm, i:initialsOf(nm), c:["#7c8a99","#5f6b77"],
+      credits:0, billing:{}, log:[], isGuest:true, guestEmail:(b && b.guestEmail)||"" };
+  }
   // Initials from a display name (mirrors the server's compute_initials).
   function initialsOf(name){ const p=(name||"").trim().split(/\s+/).filter(Boolean); if(!p.length) return "NS"; if(p.length===1) return p[0].slice(0,2).toUpperCase(); return (p[0][0]+p[1][0]).toUpperCase(); }
   function allAccounts(){ return [...tutorAccounts, ...state.students]; }
@@ -1814,9 +1824,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
           any=true;
           const el=document.createElement("button");
           if(bk){
-            const s=studentById(bk.studentId);
+            const s=bookingStudent(bk);
             el.className="slot t-booked locked";
-            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Gebucht"}</span>`;
+            el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}</span>`;
             el.onclick=()=>toast("Gebuchte Zeit kann nicht geschlossen werden");
           } else if(conflict){
             el.className="slot avail avail-blocked";
@@ -1835,9 +1845,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
         any=true;
         const el=document.createElement("button");
         if(bk){
-          const s=studentById(bk.studentId);
+          const s=bookingStudent(bk);
           el.className="slot t-booked"+(state.teacherManage===bk?" sel":"");
-          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s?s.name.split(" ")[0]:"Gebucht"}</span>`;
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${s.name.split(" ")[0]}${bk.isIntro?' <span class="ts-intro">· Intro</span>':''}</span>`;
           el.onclick=()=>teacherManageSlot(bk);
         } else {
           const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
@@ -1889,14 +1899,19 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function teacherRemove(bk){
     const i=state.bookings.indexOf(bk); if(i<0) return;
-    const s=studentById(bk.studentId);
+    const s=studentById(bk.studentId);  // null for a free guest/intro booking
     state.bookings.splice(i,1);
     if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/');
-    addStudentCredits(bk.studentId, 1);
-    s.log.unshift({ type:"buy", label:"Buchung vom Tutor entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Credit zurück", amt:"+1" });
+    // Only refund a credit when an actual student paid for the slot. A free intro
+    // never consumed one, so removing it just frees the time.
+    if (s) {
+      addStudentCredits(bk.studentId, 1);
+      s.log.unshift({ type:"buy", label:"Buchung vom Tutor entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Credit zurück", amt:"+1" });
+    }
     state.teacherManage=null; state.teacherSel=null;
     renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
-    toast(`${s.name.split(" ")[0]} entfernt · 1 Credit zurück`);
+    const who = s ? s.name.split(" ")[0] : (bk.guestName || "Schnupperstunde");
+    toast(s ? `${who} entfernt · 1 Credit zurück` : `${who} (Intro) entfernt`);
   }
 
   function renderTeacherSummary(){
@@ -1950,10 +1965,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
       return;
     }
     if(state.teacherManage){
-      const bk=state.teacherManage, s=studentById(bk.studentId);
+      const bk=state.teacherManage, s=bookingStudent(bk);
+      const guestLine = s.isGuest ? `<div class="rl">${escHtml(s.guestEmail||"Schnupperstunde · Gast")}</div>` : "";
       card.innerHTML=`
-        <div class="manage-eyebrow">Gebuchte Zeit</div>
-        <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${s.name}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div></div></div>
+        <div class="manage-eyebrow">${bk.isIntro?"Schnupperstunde · Gast":"Gebuchte Zeit"}</div>
+        <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${escHtml(s.name)}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div>${guestLine}</div></div>
         <label class="field-label">Titel der Stunde</label>
         <input class="bf-input" id="tTitle" value="${escHtml(bk.title)}">
         <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· 50 Min.</span></label>
@@ -1970,7 +1986,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <button class="btn" id="tNoteSave" style="margin-top:12px;"><span class="grainbtn"></span>Details speichern</button>
         <button class="btn danger-btn" id="tRemove" style="margin-top:10px;"><span class="grainbtn"></span>Aus der Zeit entfernen</button>
         <button class="btn-text" id="tBack">← Zurück</button>
-        <div class="micro">Entfernen gibt die Zeit frei und <b style='color:var(--c1)'>1 Credit</b> zurück an ${s.name.split(" ")[0]}.</div>
+        <div class="micro">${s.isGuest
+          ? `Entfernen gibt die Zeit wieder frei. Eine Schnupperstunde verbraucht keinen Credit.`
+          : `Entfernen gibt die Zeit frei und <b style='color:var(--c1)'>1 Credit</b> zurück an ${s.name.split(" ")[0]}.`}</div>
       `;
       $("#tTitle").oninput=(e)=>{ bk.title=e.target.value; };
       $("#tNoteTA").oninput=(e)=>{ bk.notes=e.target.value; };
@@ -2100,12 +2118,15 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
 
   function tutorRow(b, completed){
-    const s=studentById(b.studentId);
-    if(!s) return "";  // anonymized/non-roster booking (e.g. a student's "__blocked__" slot)
+    // Hide a student's anonymized "__blocked__" slot, but show real bookings and
+    // free guest intro sessions (which have no roster account).
+    if(b.studentId==="__blocked__") return "";
+    const s=bookingStudent(b);
+    const nameLine = s.isGuest ? `${escHtml(s.name)} · Intro` : escHtml(s.name);
     return `<div class="li">
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
-      <div class="info"><div class="t">${b.title}</div><div class="s">${s.name} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
+      <div class="info"><div class="t">${b.title}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
       <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':'<span class="pill2">50 Min.</span>'}</div>
     </div>`;
   }

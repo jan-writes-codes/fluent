@@ -3,6 +3,8 @@ import secrets
 from datetime import date
 from functools import wraps
 from django.conf import settings as dj_settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, FileResponse, Http404
@@ -117,6 +119,11 @@ def serialize_booking(b):
         "notes": b.notes,
         "tutorNotes": b.tutor_notes,
         "callLink": b.call_link,
+        # Guest "intro" bookings have no student account; the tutor UI shows the
+        # guest's name/e-mail from here instead of looking them up in the roster.
+        "isIntro": b.is_intro,
+        "guestName": b.guest_name,
+        "guestEmail": b.guest_email,
     }
 
 
@@ -479,6 +486,132 @@ def impressum_view(request):
 def datenschutz_view(request):
     # Public privacy notice (Datenschutzerklärung). Required under GDPR Art. 13/14.
     return render(request, "datenschutz.html")
+
+
+def public_booking_payload():
+    """Public, PII-free data for the anonymous intro-booking calendar: every
+    tutor, their availability overrides + custom times, and the slots already
+    taken (date/time only, never who booked them)."""
+    tutors = list(User.objects.filter(role="tutor").order_by("slug"))
+    tutor_payload = [
+        {
+            "slug": t.slug,
+            "name": t.get_full_name() or t.username,
+            "firstName": (t.get_full_name() or t.username).split(" ")[0],
+            "initials": t.initials,
+            "color1": t.color1,
+            "color2": t.color2,
+        }
+        for t in tutors
+    ]
+
+    availability = {}
+    for ao in AvailabilityOverride.objects.all().select_related("tutor"):
+        if not ao.tutor:
+            continue
+        k = f"{date_to_jskey(ao.date)}|{ao.time}"
+        availability.setdefault(ao.tutor.slug, {})[k] = ao.is_open
+
+    custom_times = {}
+    for ct in CustomTime.objects.all().select_related("tutor"):
+        if not ct.tutor:
+            continue
+        dk = date_to_jskey(ct.date)
+        custom_times.setdefault(ct.tutor.slug, {}).setdefault(dk, []).append(ct.time)
+
+    # Anonymized taken slots so the calendar greys them out without leaking who
+    # booked. Only today onward matters for booking.
+    from django.utils import timezone
+    today = timezone.localdate()
+    booked = {}
+    for b in Booking.objects.filter(date__gte=today).select_related("tutor"):
+        slug = b.tutor.slug if b.tutor_id and b.tutor else b.tutor_slug
+        if slug:
+            booked.setdefault(slug, []).append(f"{date_to_jskey(b.date)}|{b.time}")
+
+    return {
+        "tutors": tutor_payload,
+        "availability": availability,
+        "customTimes": custom_times,
+        "booked": booked,
+    }
+
+
+def intro_view(request):
+    # Public booking page: anonymous visitors pick a tutor + open slot and book a
+    # free intro session. No login required; sign-in is a separate route.
+    data = public_booking_payload()
+    return render(request, "intro.html", {"intro_data": json.dumps(data)})
+
+
+import re as _re
+_TIME_RE = _re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+@require_http_methods(["POST"])
+def api_intro_booking(request):
+    """Public: book a free guest intro session (no account, no credits).
+
+    CSRF-protected like every other POST (the page carries the token). A guest is
+    identified only by the name + e-mail they provide here; the booking never
+    touches a User row. Capped at one intro per e-mail.
+    """
+    data = parse_body(request)
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    tutor_slug = (data.get("tutorSlug") or "").strip()
+    date_key = data.get("date") or ""
+    time_str = (data.get("time") or "").strip()
+
+    if not name:
+        return JsonResponse({"error": "Bitte gib deinen Namen ein."}, status=400)
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({"error": "Bitte gib eine gültige E-Mail-Adresse ein."}, status=400)
+    if not _TIME_RE.match(time_str):
+        return JsonResponse({"error": "Ungültige Uhrzeit."}, status=400)
+
+    tutor = User.objects.filter(role="tutor", slug=tutor_slug).first()
+    if tutor is None:
+        return JsonResponse({"error": "Tutor nicht gefunden."}, status=400)
+    try:
+        booking_date = jskey_to_date(date_key)
+    except (ValueError, AttributeError, TypeError):
+        return JsonResponse({"error": "Ungültiger Termin."}, status=400)
+
+    from django.utils import timezone
+    if booking_date < timezone.localdate():
+        return JsonResponse({"error": "Dieser Termin liegt in der Vergangenheit."}, status=400)
+
+    # One free intro per e-mail — prevents abuse of the no-account free slot.
+    if Booking.objects.filter(is_intro=True, guest_email__iexact=email).exists():
+        return JsonResponse(
+            {"error": "Für diese E-Mail wurde bereits eine Schnupperstunde gebucht."},
+            status=409,
+        )
+    # Slot must be free and not explicitly closed by the tutor.
+    if Booking.objects.filter(tutor=tutor, date=booking_date, time=time_str).exists():
+        return JsonResponse({"error": "Dieser Termin ist bereits vergeben."}, status=409)
+    if AvailabilityOverride.objects.filter(
+        tutor=tutor, date=booking_date, time=time_str, is_open=False
+    ).exists():
+        return JsonResponse({"error": "Dieser Termin ist nicht verfügbar."}, status=409)
+
+    Booking.objects.create(
+        tutor=tutor, student=None,
+        date=booking_date, time=time_str,
+        title="Schnupperstunde (Intro)",
+        is_intro=True, guest_name=name, guest_email=email,
+        # Snapshot so the tutor calendar can show the guest without a User row.
+        student_name=name, student_slug="intro",
+    )
+    return JsonResponse({
+        "ok": True,
+        "tutorName": tutor.get_full_name() or tutor.username,
+        "date": booking_date.isoformat(),
+        "time": time_str,
+    })
 
 
 def app_view(request):
