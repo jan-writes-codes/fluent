@@ -38,6 +38,12 @@ dashboard — `.env` files are gitignored):
 | `STRIPE_SECRET_KEY` | to enable self-checkout | `sk_live_…` (or `sk_test_…`) |
 | `STRIPE_PUBLISHABLE_KEY` | with Stripe | `pk_live_…` (or `pk_test_…`) |
 | `STRIPE_WEBHOOK_SECRET` | with Stripe webhook | `whsec_…` |
+| `RESEND_API_KEY` | to send real e-mail | `re_…` |
+| `DEFAULT_FROM_EMAIL` | with e-mail | `The Green Pencil <hallo@thegreenpencil.at>` |
+| `EMAIL_REPLY_TO` | recommended | `davit@thegreenpencil.at` |
+| `TUTOR_NOTIFY_EMAIL` | to alert the tutor | `davit@thegreenpencil.at` |
+| `EMAIL_ASYNC` | optional | `true` (send off the request thread; default) |
+| `SITE_URL` | optional | `https://thegreenpencil.at` (links in e-mails) |
 
 ### Stripe credit top-ups (optional)
 
@@ -50,6 +56,32 @@ Point a Stripe webhook at `https://<host>/api/stripe/webhook/` for the
 `STRIPE_WEBHOOK_SECRET`. The webhook is the source of truth; the app also
 re-confirms the session when the student returns, so credits are granted exactly
 once even if the webhook is slow or not yet configured.
+
+### Transactional e-mail (Resend, optional)
+
+Booking confirmations and tutor alerts go out through [Resend](https://resend.com)
+via `django-anymail`. **If `RESEND_API_KEY` is unset the app runs unchanged** and
+e-mail is printed to the console instead of sent — nothing breaks.
+
+To turn it on:
+
+1. **Create a Resend account** and add `thegreenpencil.at` as a sending domain.
+   Choose the **EU region** (data residency) when creating it.
+2. **Add the DNS records Resend shows you** to `thegreenpencil.at` — the DKIM
+   `CNAME`(s) and the SPF `TXT`. Sending from a subdomain (e.g.
+   `send.thegreenpencil.at`) keeps the root domain's reputation insulated.
+3. **Add a DMARC record** so mailbox providers trust the domain:
+   `_dmarc.thegreenpencil.at  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@thegreenpencil.at"`
+4. **Set the env vars**: `RESEND_API_KEY`, `DEFAULT_FROM_EMAIL` (on the verified
+   domain), `EMAIL_REPLY_TO` (the tutor's inbox), and `TUTOR_NOTIFY_EMAIL`.
+5. (Optional) Point a Resend **webhook** at Anymail's tracking URL to record
+   bounces/complaints — wire `anymail.urls` if/when you want delivery events.
+
+**Async delivery.** By default (`EMAIL_ASYNC=true`) mail is sent on a background
+thread so a booking never blocks on the ESP. A thread is enough for a single
+studio; for durable, restart-surviving retries swap `core.emails.queue_email`
+for a queue (Django Q2 over the existing Postgres needs no Redis, just one extra
+worker process) — the call sites don't change.
 
 `DATABASE_URL` formats:
 - SQLite: `sqlite:////absolute/path/to/db.sqlite3`

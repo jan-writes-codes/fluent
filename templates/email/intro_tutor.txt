@@ -1,0 +1,10 @@
+Neue Schnupperstunde gebucht.
+
+{{ guest_name }} hat eine kostenlose Intro gebucht.
+
+Termin:  {{ when }}
+Tutor:   {{ tutor_name }}
+Kontakt: {{ guest_name }} <{{ guest_email }}>
+
+Die Buchung steht bereits in deinem Kalender im Tutor-Portal.
+Antworte dem Gast direkt unter {{ guest_email }}.
