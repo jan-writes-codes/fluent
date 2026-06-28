@@ -128,6 +128,52 @@ On a PaaS, use that as the **start command**, and
 
 For a single-tutor business, **(B)** is the lower-maintenance choice.
 
+## Custom domains (Render + GoDaddy)
+
+Pointing a domain at a Render service is three steps that must agree:
+**Render** has to accept the hostname, **DNS** has to route it to Render, and
+**Django** has to allow it. Example below wires the test service to
+`test.thegreenpencil.at`; the prod service is identical with the apex/`www`.
+
+1. **Render — add the custom domain.** Open the *test* web service →
+   **Settings → Custom Domains → Add Custom Domain** → enter
+   `test.thegreenpencil.at`. Render shows the DNS target to point at, typically
+   the service's `*.onrender.com` hostname (e.g. `green-pencil-test.onrender.com`).
+   Copy that value.
+
+2. **GoDaddy — add the DNS record.** In **My Products → Domain → DNS →
+   Manage DNS**, add a record:
+
+   | Type | Name | Value | TTL |
+   | ---- | ---- | ----- | --- |
+   | `CNAME` | `test` | `green-pencil-test.onrender.com` (the target Render showed) | default (1 hr) |
+
+   `Name` is just the subdomain label `test`, not the full domain — GoDaddy
+   appends `thegreenpencil.at`. Use a **CNAME** for a subdomain like `test`.
+   (The apex `thegreenpencil.at` can't be a CNAME — for prod use the `A`
+   records / values Render gives for the root domain instead.)
+
+3. **Django — allow the host.** In the test service's env vars on Render, make
+   sure `DJANGO_ALLOWED_HOSTS` includes the new host, then redeploy:
+
+   ```
+   DJANGO_ALLOWED_HOSTS=test.thegreenpencil.at
+   ```
+
+   Without this, Django answers `400 Bad Request (DisallowedHost)` even though
+   DNS and TLS are correct. (Same-origin form posts/CSRF work without extra
+   config — Django matches the request's own origin and `SECURE_PROXY_SSL_HEADER`
+   already accounts for Render's TLS-terminating proxy.)
+
+Then wait for propagation. Render auto-issues a Let's Encrypt certificate once
+it can resolve the record (usually minutes, up to ~an hour while DNS spreads);
+the domain shows **Verified** in Render when ready. Check progress with:
+
+```bash
+dig +short test.thegreenpencil.at        # should return the Render target/IP
+curl -I https://test.thegreenpencil.at   # expect 200/302, valid TLS
+```
+
 ## Quick checklist per environment
 
 - [ ] `DJANGO_SECRET_KEY` set (unique), `DJANGO_DEBUG=false`, `DJANGO_ALLOWED_HOSTS` set
