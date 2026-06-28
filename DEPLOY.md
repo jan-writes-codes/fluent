@@ -70,8 +70,10 @@ To turn it on:
 2. **Add the DNS records Resend shows you** to `thegreenpencil.at` — the DKIM
    `CNAME`(s) and the SPF `TXT`. Sending from a subdomain (e.g.
    `send.thegreenpencil.at`) keeps the root domain's reputation insulated.
-3. **Add a DMARC record** so mailbox providers trust the domain:
-   `_dmarc.thegreenpencil.at  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@thegreenpencil.at"`
+3. **Add a DMARC record** so mailbox providers trust the domain. Start in
+   monitor mode on a fresh domain, then ramp up once real sends look clean:
+   `_dmarc.thegreenpencil.at  TXT  "v=DMARC1; p=none; rua=mailto:dmarc@thegreenpencil.at; fo=1"`
+   → after ~1 week tighten `p=none` to `p=quarantine`, then `p=reject`.
 4. **Set the env vars**: `RESEND_API_KEY`, `DEFAULT_FROM_EMAIL` (on the verified
    domain), `EMAIL_REPLY_TO` (the tutor's inbox), and `TUTOR_NOTIFY_EMAIL`.
 5. (Optional) Point a Resend **webhook** at Anymail's tracking URL to record
