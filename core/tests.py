@@ -126,8 +126,8 @@ class LoginPageTests(FluentDataMixin, TestCase):
         s = SiteSettings.objects.first() or SiteSettings.objects.create()
         s.packs_json = json.dumps([
             {"n": 1, "price": "€32", "feat": False},
-            {"n": 5, "price": "€145", "feat": True, "tag": "Popular"},
-            {"n": 10, "price": "€270", "feat": False},
+            {"n": 5, "price": "€145", "feat": False},
+            {"n": 10, "price": "€270", "feat": True, "tag": "Popular"},
         ])
         s.save()
         resp = self.client.get(reverse("landing"))

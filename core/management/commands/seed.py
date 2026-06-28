@@ -182,7 +182,7 @@ class Command(BaseCommand):
         # Theo transactions
         theo_receipt = make_receipt(theo, 3, "30.05.2026")
         CreditTransaction.objects.create(
-            student=theo, txn_type="buy", label="Credits added by tutor",
+            student=theo, txn_type="buy", label="Einheiten added by tutor",
             sub="May 30 · paid externally", amount=3, receipt_no=theo_receipt.number,
         )
         CreditTransaction.objects.create(
@@ -200,7 +200,7 @@ class Command(BaseCommand):
         # Omar transactions
         omar_receipt = make_receipt(omar, 10, "25.05.2026")
         CreditTransaction.objects.create(
-            student=omar, txn_type="buy", label="Credits added by tutor",
+            student=omar, txn_type="buy", label="Einheiten added by tutor",
             sub="May 25 · paid externally", amount=10, receipt_no=omar_receipt.number,
         )
         CreditTransaction.objects.create(

@@ -33,7 +33,7 @@ _MON = ["", "Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "Augu
 # Formatting helpers
 # --------------------------------------------------------------------------- #
 # An intro/Schnupperstunde runs 15 minutes; a paid credit lesson is one
-# 45-minute unit (1 Credit = eine 45-Minuten-Einheit).
+# 45-minute unit (1 Einheit = 45 Minuten Unterricht).
 INTRO_MINUTES = 15
 LESSON_MINUTES = 45
 

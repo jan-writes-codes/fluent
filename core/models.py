@@ -211,8 +211,8 @@ class SiteSettings(models.Model):
     credit_price = models.IntegerField(default=30)  # EUR
     packs_json = models.TextField(
         default='[{"n":1,"price":"€32","each":"€32 / session","feat":false},'
-                '{"n":5,"price":"€145","each":"€29 / session","feat":true,"tag":"Popular"},'
-                '{"n":10,"price":"€270","each":"€27 / session","feat":false}]'
+                '{"n":5,"price":"€145","each":"€29 / session","feat":false},'
+                '{"n":10,"price":"€270","each":"€27 / session","feat":true,"tag":"Popular"}]'
     )
 
     def __str__(self):
