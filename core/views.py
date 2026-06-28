@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.shortcuts import render, redirect
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -512,6 +512,40 @@ def impressum_view(request):
 def datenschutz_view(request):
     # Public privacy notice (Datenschutzerklärung). Required under GDPR Art. 13/14.
     return render(request, "datenschutz.html")
+
+
+# Public, crawler-facing pages worth listing in the sitemap. The booking app and
+# API endpoints are intentionally excluded — they're gated or non-content.
+SITEMAP_PATHS = ["/", "/intro/", "/impressum/", "/datenschutz/"]
+
+
+def robots_txt(request):
+    # Tells search engines they may crawl the site and points them at the
+    # sitemap so new/updated pages get discovered faster.
+    sitemap_url = request.build_absolute_uri("/sitemap.xml")
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /app/",
+        "Disallow: /api/",
+        f"Sitemap: {sitemap_url}",
+        "",
+    ])
+    return HttpResponse(body, content_type="text/plain")
+
+
+def sitemap_xml(request):
+    # Minimal XML sitemap of the public pages, with absolute URLs.
+    urls = "".join(
+        f"<url><loc>{request.build_absolute_uri(p)}</loc></url>"
+        for p in SITEMAP_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return HttpResponse(body, content_type="application/xml")
 
 
 def public_booking_payload():
