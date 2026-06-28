@@ -1193,11 +1193,26 @@ class IntroBookingTests(FluentDataMixin, TestCase):
         self.assertEqual(Receipt.objects.count(), 0)
         self.assertEqual(CreditTransaction.objects.count(), 0)
 
-    def test_one_intro_per_email(self):
+    def test_one_intro_per_email_per_tutor(self):
         self.assertEqual(self._post(time="14:00").status_code, 200)
-        # Same e-mail, different slot -> rejected.
+        # Same e-mail, same tutor, different slot -> rejected.
         again = self._post(time="15:00")
         self.assertEqual(again.status_code, 409)
+
+    def test_same_email_can_book_a_different_tutor(self):
+        other = make_user(
+            "nina", "tutor", first_name="Nina", last_name="Berg", initials="NB"
+        )
+        self.assertEqual(self._post(time="14:00").status_code, 200)
+        # One per tutor: the same guest may still try a second tutor once.
+        ok = self._post(tutorSlug=other.slug, time="14:00")
+        self.assertEqual(ok.status_code, 200, ok.content)
+
+    def test_booking_error_carries_davit_contact(self):
+        self._post(time="14:00")
+        again = self._post(time="15:00")
+        self.assertIn("davit@thegreenpencil.at", again.json()["error"])
+        self.assertIn("397 5535", again.json()["error"])
 
     def test_cannot_book_taken_slot(self):
         self.assertEqual(self._post(email="a@example.at", time="14:00").status_code, 200)

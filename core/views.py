@@ -548,6 +548,15 @@ def intro_view(request):
 import re as _re
 _TIME_RE = _re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
+# Shown to guests on every booking error so they always have a way to reach a
+# human: Davit's mobile and e-mail.
+_INTRO_CONTACT = "Melde dich gerne bei Davit: +43 676 397 5535 oder davit@thegreenpencil.at"
+
+
+def _intro_error(message, status):
+    """Guest-facing booking error: always carries Davit's contact details."""
+    return JsonResponse({"error": f"{message} {_INTRO_CONTACT}"}, status=status)
+
 
 @require_http_methods(["POST"])
 def api_intro_booking(request):
@@ -566,45 +575,47 @@ def api_intro_booking(request):
     time_str = (data.get("time") or "").strip()
 
     if not name:
-        return JsonResponse({"error": "Bitte gib deinen Namen ein."}, status=400)
+        return _intro_error("Bitte gib deinen Namen ein.", 400)
     try:
         validate_email(email)
     except ValidationError:
-        return JsonResponse({"error": "Bitte gib eine gültige E-Mail-Adresse ein."}, status=400)
+        return _intro_error("Bitte gib eine gültige E-Mail-Adresse ein.", 400)
     # Phone is required so the tutor can reach the guest (WhatsApp / callback).
     if len(_re.sub(r"[^0-9]", "", phone)) < 6:
-        return JsonResponse(
-            {"error": "Bitte gib eine gültige Telefonnummer an (für WhatsApp & Rückfragen)."},
-            status=400,
+        return _intro_error(
+            "Bitte gib eine gültige Telefonnummer an (für WhatsApp & Rückfragen).", 400
         )
     if not _TIME_RE.match(time_str):
-        return JsonResponse({"error": "Ungültige Uhrzeit."}, status=400)
+        return _intro_error("Ungültige Uhrzeit.", 400)
 
     tutor = User.objects.filter(role="tutor", slug=tutor_slug).first()
     if tutor is None:
-        return JsonResponse({"error": "Tutor nicht gefunden."}, status=400)
+        return _intro_error("Tutor nicht gefunden.", 400)
     try:
         booking_date = jskey_to_date(date_key)
     except (ValueError, AttributeError, TypeError):
-        return JsonResponse({"error": "Ungültiger Termin."}, status=400)
+        return _intro_error("Ungültiger Termin.", 400)
 
     from django.utils import timezone
     if booking_date < timezone.localdate():
-        return JsonResponse({"error": "Dieser Termin liegt in der Vergangenheit."}, status=400)
+        return _intro_error("Dieser Termin liegt in der Vergangenheit.", 400)
 
-    # One free intro per e-mail — prevents abuse of the no-account free slot.
-    if Booking.objects.filter(is_intro=True, guest_email__iexact=email).exists():
-        return JsonResponse(
-            {"error": "Für diese E-Mail wurde bereits eine Schnupperstunde gebucht."},
-            status=409,
+    # One free intro per e-mail *per tutor* — a guest may try a Schnupperstunde
+    # with each tutor once, but not book the same tutor twice.
+    if Booking.objects.filter(
+        is_intro=True, tutor=tutor, guest_email__iexact=email
+    ).exists():
+        return _intro_error(
+            "Für diese E-Mail wurde bei diesem Tutor bereits eine Schnupperstunde gebucht.",
+            409,
         )
     # Slot must be free and not explicitly closed by the tutor.
     if Booking.objects.filter(tutor=tutor, date=booking_date, time=time_str).exists():
-        return JsonResponse({"error": "Dieser Termin ist bereits vergeben."}, status=409)
+        return _intro_error("Dieser Termin ist bereits vergeben.", 409)
     if AvailabilityOverride.objects.filter(
         tutor=tutor, date=booking_date, time=time_str, is_open=False
     ).exists():
-        return JsonResponse({"error": "Dieser Termin ist nicht verfügbar."}, status=409)
+        return _intro_error("Dieser Termin ist nicht verfügbar.", 409)
 
     booking = Booking.objects.create(
         tutor=tutor, student=None,
