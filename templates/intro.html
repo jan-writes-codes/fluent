@@ -6,6 +6,8 @@
 <meta name="csrf-token" content="{{ csrf_token }}">
 <meta name="robots" content="noindex">
 <title>Erste Stunde buchen — kostenlos &amp; unverbindlich | The Green Pencil</title>
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
 <style>
 /* latin */
 @font-face {
@@ -139,7 +141,7 @@
           <p class="hero-sub">Wähle einen Tutor und ein freies Zeitfenster. Die erste Einheit ist ein <b>unverbindliches Kennenlernen</b> — kostenlos, kein Konto und keine Zahlungsdaten nötig.</p>
           <div class="hero-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"></path></svg>
-            50-Minuten-Einheit · ganz ohne Credits · einmal pro Person
+            15-Minuten-Einheit · ganz ohne Credits · einmal pro Person
           </div>
         </div>
       </section>
@@ -180,7 +182,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
   const AVAIL = DATA.availability || {};         // {slug: {"key|time": bool}}
   const CUSTOM = DATA.customTimes || {};         // {slug: {key: [times]}}
   const BOOKED = DATA.booked || {};              // {slug: ["key|time", ...]}
-  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=30){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
+  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=15){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
   const DOW = ["Mo","Di","Mi","Do","Fr"];
   const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
   const MONTHS_S = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
@@ -201,8 +203,8 @@ window.INTRO_DATA = {{ intro_data|safe }};
   function slotOpen(date,time,tid){ const m=AVAIL[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
   function dayTimes(date,tid){ const dk=keyOf(date); const extra=(CUSTOM[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
   function bookedConflict(date,time,tid){
-    const taken=(BOOKED[tid]||[]); const dk=keyOf(date); const s=toMin(time), e=s+50;
-    return taken.some(k => { const [kk,tt]=k.split("|"); if(kk!==dk) return false; const bs=toMin(tt), be=bs+50; return s<be && bs<e; });
+    const taken=(BOOKED[tid]||[]); const dk=keyOf(date); const s=toMin(time), e=s+15;
+    return taken.some(k => { const [kk,tt]=k.split("|"); if(kk!==dk) return false; const bs=toMin(tt), be=bs+45; return s<be && bs<e; });
   }
   function isPastSlot(date,time){
     if(date < NOW) return true;
@@ -231,7 +233,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
     return 0;
   }
   function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
-  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; return String(Math.floor(tm/60)).padStart(2,"0")+":"+String(tm%60).padStart(2,"0"); }
+  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+15; return String(Math.floor(tm/60)).padStart(2,"0")+":"+String(tm%60).padStart(2,"0"); }
   function tutorBySlug(s){ return TUTORS.find(t=>t.slug===s) || TUTORS[0] || {}; }
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function avStyle(t){ return `background:linear-gradient(135deg, ${t.color1||'#309050'}, ${t.color2||'#277a42'})`; }
@@ -302,6 +304,8 @@ window.INTRO_DATA = {{ intro_data|safe }};
       <input class="inp" id="biName" type="text" autocomplete="name" placeholder="Vor- und Nachname">
       <label class="lab" for="biEmail">E-Mail</label>
       <input class="inp" id="biEmail" type="email" autocomplete="email" placeholder="du@beispiel.at">
+      <label class="lab" for="biPhone">Telefon <span style="color:var(--muted);font-weight:400;">· für WhatsApp &amp; Rückfragen</span></label>
+      <input class="inp" id="biPhone" type="tel" autocomplete="tel" placeholder="+43 660 1234567">
       <div class="err" id="bookErr"></div>
       <button class="btn" id="bookSubmit" style="width:100%;margin-top:16px;"><span class="grainbtn"></span>Kostenlos buchen</button>
       <div class="fineprint">Kostenlos &amp; unverbindlich · keine Zahlungsdaten. Mit dem Buchen stimmst du der Verarbeitung deiner Angaben gemäß <a href="{% url 'datenschutz' %}" target="_blank" rel="noopener">Datenschutzerklärung</a> zu.</div>
@@ -319,16 +323,18 @@ window.INTRO_DATA = {{ intro_data|safe }};
     const sel=state.selected; if(!sel) return;
     const name=($("#biName").value||"").trim();
     const email=($("#biEmail").value||"").trim();
+    const phone=($("#biPhone").value||"").trim();
     const err=$("#bookErr");
     if(!name){ err.textContent="Bitte gib deinen Namen ein."; return; }
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent="Bitte gib eine gültige E-Mail-Adresse ein."; return; }
+    if(phone.replace(/[^0-9]/g,"").length<6){ err.textContent="Bitte gib eine gültige Telefonnummer an (für WhatsApp & Rückfragen)."; return; }
     err.textContent="";
     state.booking=true;
     const btn=$("#bookSubmit"); if(btn){ btn.disabled=true; btn.textContent="Wird gebucht…"; }
     fetch("/api/intro-bookings/", {
       method:"POST",
       headers:{ "Content-Type":"application/json", "X-CSRFToken":CSRF },
-      body:JSON.stringify({ tutorSlug:sel.tutorSlug, date:sel.key, time:sel.time, name, email }),
+      body:JSON.stringify({ tutorSlug:sel.tutorSlug, date:sel.key, time:sel.time, name, email, phone }),
     }).then(async r=>{
       const data = await r.json().catch(()=>({}));
       state.booking=false;

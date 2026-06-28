@@ -53,6 +53,7 @@ class Booking(models.Model):
     is_intro = models.BooleanField(default=False)
     guest_name = models.CharField(max_length=200, blank=True)
     guest_email = models.EmailField(blank=True)
+    guest_phone = models.CharField(max_length=40, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

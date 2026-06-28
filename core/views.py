@@ -124,6 +124,7 @@ def serialize_booking(b):
         "isIntro": b.is_intro,
         "guestName": b.guest_name,
         "guestEmail": b.guest_email,
+        "guestPhone": b.guest_phone,
     }
 
 
@@ -449,7 +450,7 @@ def receipt_html(r_data, settings):
       </div>
       <table class="r-table">
         <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
-        <tbody><tr><td>{r_data['credits']}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 50-Minuten-Einheit</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
+        <tbody><tr><td>{r_data['credits']}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 45-Minuten-Einheit</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
       </table>
       <div class="r-totals">
         <div class="r-row"><span>Nettobetrag · Net</span><span>€ {money(r_data['net'])}</span></div>
@@ -559,6 +560,7 @@ def api_intro_booking(request):
     data = parse_body(request)
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
+    phone = (data.get("phone") or "").strip()
     tutor_slug = (data.get("tutorSlug") or "").strip()
     date_key = data.get("date") or ""
     time_str = (data.get("time") or "").strip()
@@ -569,6 +571,12 @@ def api_intro_booking(request):
         validate_email(email)
     except ValidationError:
         return JsonResponse({"error": "Bitte gib eine gültige E-Mail-Adresse ein."}, status=400)
+    # Phone is required so the tutor can reach the guest (WhatsApp / callback).
+    if len(_re.sub(r"[^0-9]", "", phone)) < 6:
+        return JsonResponse(
+            {"error": "Bitte gib eine gültige Telefonnummer an (für WhatsApp & Rückfragen)."},
+            status=400,
+        )
     if not _TIME_RE.match(time_str):
         return JsonResponse({"error": "Ungültige Uhrzeit."}, status=400)
 
@@ -602,7 +610,7 @@ def api_intro_booking(request):
         tutor=tutor, student=None,
         date=booking_date, time=time_str,
         title="Schnupperstunde (Intro)",
-        is_intro=True, guest_name=name, guest_email=email,
+        is_intro=True, guest_name=name, guest_email=email, guest_phone=phone,
         # Snapshot so the tutor calendar can show the guest without a User row.
         student_name=name, student_slug="intro",
     )
@@ -936,7 +944,7 @@ def api_checkout(request):
                     "unit_amount": amount,
                     "product_data": {
                         "name": f"{n} Credits — the green pencil",
-                        "description": "1 Credit = eine 50-Minuten-Einheit Englisch-Einzelunterricht",
+                        "description": "1 Credit = eine 45-Minuten-Einheit Englisch-Einzelunterricht",
                     },
                 },
             }],
