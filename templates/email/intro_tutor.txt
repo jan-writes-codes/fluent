@@ -2,9 +2,10 @@ Neue Schnupperstunde gebucht.
 
 {{ guest_name }} hat eine kostenlose Intro gebucht.
 
-Termin:  {{ when }}
-Tutor:   {{ tutor_name }}
-Kontakt: {{ guest_name }} <{{ guest_email }}>
+Termin:   {{ when }}
+Tutor:    {{ tutor_name }}
+Kontakt:  {{ guest_name }} <{{ guest_email }}>
+Telefon:  {{ guest_phone }} (WhatsApp / Rückruf für Rückfragen)
 
 Die Buchung steht bereits in deinem Kalender im Tutor-Portal.
-Antworte dem Gast direkt unter {{ guest_email }}.
+Antworte dem Gast direkt unter {{ guest_email }} oder melde dich telefonisch unter {{ guest_phone }}.

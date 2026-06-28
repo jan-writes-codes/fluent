@@ -34,7 +34,7 @@ _MON = ["", "Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "Augu
 # --------------------------------------------------------------------------- #
 def _end_time(hhmm):
     h, m = (int(x) for x in hhmm.split(":"))
-    total = h * 60 + m + 50
+    total = h * 60 + m + 15
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
@@ -43,7 +43,7 @@ def _date_long(d):
 
 
 def booking_when(booking):
-    """Human German date/time line, e.g. 'Montag, 1. Juli 2026 · 14:00–14:50'."""
+    """Human German date/time line, e.g. 'Montag, 1. Juli 2026 · 14:00–14:15'."""
     return f"{_date_long(booking.date)} · {booking.time}–{_end_time(booking.time)}"
 
 
@@ -54,7 +54,7 @@ def build_ics(booking):
         booking.date, dt_time.fromisoformat(booking.time)
     ).replace(tzinfo=VIENNA)
     start = start_local.astimezone(UTC)
-    end = start + timedelta(minutes=50)
+    end = start + timedelta(minutes=15)
     stamp = timezone.now().astimezone(UTC)
     fmt = "%Y%m%dT%H%M%SZ"
     tutor = booking.tutor_name or (booking.tutor.get_full_name() if booking.tutor_id and booking.tutor else "The Green Pencil")
@@ -97,6 +97,7 @@ def _ctx(booking):
         "guest_name": booking.guest_name,
         "guest_first": (booking.guest_name or "").split(" ")[0] or "du",
         "guest_email": booking.guest_email,
+        "guest_phone": booking.guest_phone,
         "tutor_name": tutor,
         "when": booking_when(booking),
         "date_long": _date_long(booking.date),

@@ -1152,6 +1152,7 @@ class IntroBookingTests(FluentDataMixin, TestCase):
         body = {
             "tutorSlug": "davit", "date": self._jskey(d),
             "time": "14:00", "name": "Lena Gast", "email": "lena@example.at",
+            "phone": "+43 660 1234567",
         }
         body.update(over)
         return self.client.post(
@@ -1322,6 +1323,7 @@ class IntroEmailTests(FluentDataMixin, TestCase):
             data=json.dumps({
                 "tutorSlug": "davit", "date": f"{d.year}-{d.month - 1}-{d.day}",
                 "time": "14:00", "name": "Lena Gast", "email": email,
+                "phone": "+43 660 1234567",
             }),
             content_type="application/json",
         )
@@ -1364,7 +1366,7 @@ class IntroEmailTests(FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Booking.objects.filter(is_intro=True, guest_email="lena@example.at").exists())
 
-    def test_ics_event_is_fifty_minutes(self):
+    def test_ics_event_is_fifteen_minutes(self):
         from core.emails import build_ics
         import re
         d = date.today() + timedelta(days=5)
@@ -1379,4 +1381,4 @@ class IntroEmailTests(FluentDataMixin, TestCase):
         from datetime import datetime
         fmt = "%Y%m%dT%H%M%SZ"
         delta = datetime.strptime(end, fmt) - datetime.strptime(start, fmt)
-        self.assertEqual(delta, timedelta(minutes=50))
+        self.assertEqual(delta, timedelta(minutes=15))

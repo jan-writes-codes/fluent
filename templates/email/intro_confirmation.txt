@@ -4,7 +4,7 @@ Deine kostenlose Englisch-Schnupperstunde mit {{ tutor_name }} ist eingetragen.
 Sie ist unverbindlich — wir schauen gemeinsam, wo du stehst und wohin du willst.
 
 Termin:  {{ date_long }}
-Uhrzeit: {{ time_range }} (50 Minuten)
+Uhrzeit: {{ time_range }} (15 Minuten)
 Tutor:   {{ tutor_name }}
 
 Im Anhang findest du eine Kalender-Datei (.ics), mit der du den Termin

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>The Green Pencil — Englisch-Nachhilfe</title>
 {% load static %}
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
 <style>/* Self-hosted display font — no Google Fonts CDN, no visitor data sent to third parties (GDPR). */
 @font-face { font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 400 800; font-stretch: 100%; font-display: swap;
   src: url("{% static 'fonts/font1.woff2' %}") format('woff2');
@@ -785,9 +787,9 @@
     <main id="main">
       <section class="view active" id="view-book">
         <div class="wrap">
-          <div class="eyebrow">Live-Verfügbarkeit · 50-Minuten-Stunden</div>
+          <div class="eyebrow">Live-Verfügbarkeit · 45-Minuten-Stunden</div>
           <h1 class="title">Buch deine nächste Englischstunde.</h1>
-          <p class="sub">Wähle einen Tutor, ein freies Zeitfenster und buche es. Jede Stunde dauert 50 Minuten und kostet einen Credit.</p>
+          <p class="sub">Wähle einen Tutor, ein freies Zeitfenster und buche es. Jede Stunde dauert 45 Minuten und kostet einen Credit.</p>
 
           <div class="book-grid">
             <div class="panel" style="grid-column: 1;">
@@ -832,7 +834,7 @@
               <div class="ring"></div>
               <div class="ey">Credits</div>
               <div class="big" id="balanceBig">8</div>
-              <div class="unit">Credits verfügbar · 1 Credit = eine 50-Minuten-Stunde</div>
+              <div class="unit">Credits verfügbar · 1 Credit = eine 45-Minuten-Stunde</div>
               <div class="meta">
                 <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Geplant</div></div>
                 <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Abgeschlossen</div></div>
@@ -1034,7 +1036,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     c: [t.color1 || "#309050", t.color2 || "#277a42"],
     i: t.initials || "T",
   })) : [
-    { id: "davit", name: "Davit", role: "Englisch-Tutor · Konversation & IELTS", c: ["#309050","#277a42"], i: "D" },
+    { id: "davit", name: "Davit", role: "Englisch-Tutor · Konversation & Prüfungen", c: ["#309050","#277a42"], i: "D" },
   ];
   // All tutor accounts (for the admin roster + identity lookups). Mutated in
   // place when the admin adds/removes a tutor so the UI stays consistent without
@@ -1061,7 +1063,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     photo: DJ.currentUser.photo || null,
   } : { id:"admin", role:"admin", name:"Studio Admin", email:"admin@fluent.at", i:"AD", c:["#8a7cb0","#5f5188"], photo:null };
 
-  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=30){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
+  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=15){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
   const DOW = ["Mo","Di","Mi","Do","Fr"];
 
   let PACKS = [
@@ -1080,7 +1082,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function customMap(tid){ return (state.customTimes[tid] = state.customTimes[tid] || {}); }
   function defaultAvail(date,time,tid){ if(toMin(time)%60!==0) return false; return seeded((tid||"")+keyOf(date)+time) > 0.4; }
   function slotOpen(date,time,tid){ const m=state.availability[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
-  function bookingConflict(date,time,exclude,tid){ const s=toMin(time), e=s+50; return state.bookings.some(b=>{ if(b.tutorId!==tid||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+50; return s<be && bs<e; }); }
+  function bookingConflict(date,time,exclude,tid){ const s=toMin(time), e=s+45; return state.bookings.some(b=>{ if(b.tutorId!==tid||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+45; return s<be && bs<e; }); }
   function dayTimes(date,tid){ const dk=keyOf(date); const extra=(state.customTimes[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
 
   const state = {
@@ -1250,7 +1252,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       </div>
       <table class="r-table">
         <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
-        <tbody><tr><td>${r.credits}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 50-Minuten-Einheit</span></td><td>€ ${money(r.unit)}</td><td>€ ${money(r.net)}</td></tr></tbody>
+        <tbody><tr><td>${r.credits}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 45-Minuten-Einheit</span></td><td>€ ${money(r.unit)}</td><td>€ ${money(r.net)}</td></tr></tbody>
       </table>
       <div class="r-totals">
         <div class="r-row"><span>Nettobetrag · Net</span><span>€ ${money(r.net)}</span></div>
@@ -1333,7 +1335,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         const dk = keyOf(date);
         const myBk = state.bookings.find(b => b.studentId===state.currentUser && b.tutorId===state.tutor && sameDay(b.date,date) && b.time===time);
         const booked = !!myBk;
-        const open = !isPast && slotOpen(date,time,state.tutor) && !bookingConflict(date,time,null,state.tutor); // unavailable if its 50 min overlap a booking
+        const open = !isPast && slotOpen(date,time,state.tutor) && !bookingConflict(date,time,null,state.tutor); // unavailable if its 45 min overlap a booking
         if (!open && !booked) return; // skip closed/conflicting slots
         any = true;
         const el = document.createElement("button");
@@ -1360,7 +1362,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
   const DOW_FULL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
 
-  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+45; const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
 
   function selectSlot(date, time) {
     state.justBooked = null; state.managing = null;
@@ -1410,14 +1412,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function buildIcs(b){
     const t = tutorById(b.tutorId);
     const [h,m] = b.time.split(":").map(Number);
-    const end = new Date(b.date); end.setHours(h, m+50, 0, 0);
+    const end = new Date(b.date); end.setHours(h, m+45, 0, 0);
     const dt = icsStamp(b.date, b.time);
     const dtEnd = end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate())+"T"+pad2(end.getHours())+pad2(end.getMinutes())+"00";
     return [
       "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Fluent//English Tutoring//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
       "BEGIN:VEVENT","UID:fluent-"+b.tutorId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
       "SUMMARY:Englischstunde mit "+t.name,
-      "DESCRIPTION:50-minütige Englisch-Einzelstunde ("+t.role+") mit "+t.name+".",
+      "DESCRIPTION:45-minütige Englisch-Einzelstunde ("+t.role+") mit "+t.name+".",
       "LOCATION:"+(b.callLink||"Videocall"),"STATUS:CONFIRMED",
       "BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:Deine Stunde beginnt in 30 Minuten","END:VALARM",
       "END:VEVENT","END:VCALENDAR"
@@ -1441,12 +1443,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
     evs.forEach(b=>{
       const s=studentById(b.studentId);
       const [h,m]=b.time.split(":").map(Number);
-      const end=new Date(b.date); end.setHours(h,m+50,0,0);
+      const end=new Date(b.date); end.setHours(h,m+45,0,0);
       const dt=icsStamp(b.date,b.time);
       const dtEnd=end.getFullYear()+pad2(end.getMonth()+1)+pad2(end.getDate())+"T"+pad2(end.getHours())+pad2(end.getMinutes())+"00";
       lines.push("BEGIN:VEVENT","UID:fluent-"+b.studentId+"-"+dt+"@fluent.app","DTSTAMP:"+dt,"DTSTART:"+dt,"DTEND:"+dtEnd,
         "SUMMARY:"+icsEsc((b.title||"Englischstunde")+" — "+(s?s.name:"")),
-        "DESCRIPTION:"+icsEsc(b.notes||"50-minütige Einzelstunde"),
+        "DESCRIPTION:"+icsEsc(b.notes||"45-minütige Einzelstunde"),
         "LOCATION:"+icsEsc(b.callLink||"Videocall"),"STATUS:CONFIRMED","END:VEVENT");
     });
     lines.push("END:VCALENDAR");
@@ -1552,7 +1554,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="sum-rows">
           <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(b.date)}</span></div>
           <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${b.time} – ${endTime(b.time)}</span></div>
-          <div class="sum-row"><span class="k">Dauer</span><span class="v">50 Minuten</span></div>
+          <div class="sum-row"><span class="k">Dauer</span><span class="v">45 Minuten</span></div>
         </div>
         ${b.callLink?`<a class="btn join-btn" href="${escHtml(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:2px 0 0;">Dein Tutor stellt den Call-Link vor der Stunde hier ein.</div>`}
         <div class="notes-block">
@@ -1608,7 +1610,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <div class="sum-rows">
         <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(d)}</span></div>
         <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${state.selected.time} – ${endTime(state.selected.time)}</span></div>
-        <div class="sum-row"><span class="k">Dauer</span><span class="v">50 Minuten</span></div>
+        <div class="sum-row"><span class="k">Dauer</span><span class="v">45 Minuten</span></div>
         <div class="sum-row"><span class="k">Format</span><span class="v">Einzel · Video</span></div>
       </div>
       <div class="cost">
@@ -1831,7 +1833,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
           } else if(conflict){
             el.className="slot avail avail-blocked";
             el.innerHTML=`<span class="ts-time">${time}</span><span class="av-state">Buchung in der Nähe</span>`;
-            el.onclick=()=>toast("Innerhalb von 50 Min. einer Buchung");
+            el.onclick=()=>toast("Innerhalb von 45 Min. einer Buchung");
           } else {
             const on=slotOpen(date,time,state.myTutor);
             el.className="slot avail "+(on?"avail-on":"avail-off");
@@ -1931,7 +1933,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
             <select class="t-select ca-day" id="caDay">${dayOpts}</select>
             <input type="time" class="t-select ca-time" id="caTime" value="09:15" step="300" min="07:00" max="21:00" />
           </div>
-          <div class="micro" style="text-align:left;margin:0 0 14px;">Jede Startzeit — solange die 50 Minuten keine Buchung überschneiden.</div>
+          <div class="micro" style="text-align:left;margin:0 0 14px;">Jede Startzeit — solange die 45 Minuten keine Buchung überschneiden.</div>
           <button class="btn" id="caAdd"><span class="grainbtn"></span>Startzeit hinzufügen</button>
         </div>
         <button class="btn ghost" id="availDone" style="margin-top:10px;">Fertig</button>
@@ -1972,7 +1974,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${escHtml(s.name)}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div>${guestLine}</div></div>
         <label class="field-label">Titel der Stunde</label>
         <input class="bf-input" id="tTitle" value="${escHtml(bk.title)}">
-        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· 50 Min.</span></label>
+        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· 45 Min.</span></label>
         <div class="time-edit">
           <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00">
           <span class="time-end" id="tTimeEnd">endet ${endTime(bk.time)}</span>
@@ -2127,7 +2129,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
       <div class="info"><div class="t">${b.title}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
-      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':'<span class="pill2">50 Min.</span>'}</div>
+      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':'<span class="pill2">45 Min.</span>'}</div>
     </div>`;
   }
   function renderTutorLists(){
