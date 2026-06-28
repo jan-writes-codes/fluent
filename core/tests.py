@@ -1304,3 +1304,79 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
         self.assertEqual(r["initErrors"], [], "init must not throw")
         self.assertGreater(r["slotCount"], 0)
         self.assertIn("24", r["dayNumbers"])
+        
+        
+# Transactional e-mail for intro bookings (Resend via Anymail)
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
+    EMAIL_REPLY_TO="davit@thegreenpencil.at",
+)
+
+class IntroEmailTests(FluentDataMixin, TestCase):
+    def _book(self, email="lena@example.at"):
+        d = date.today() + timedelta(days=5)
+        return self.client.post(
+            "/api/intro-bookings/",
+            data=json.dumps({
+                "tutorSlug": "davit", "date": f"{d.year}-{d.month - 1}-{d.day}",
+                "time": "14:00", "name": "Lena Gast", "email": email,
+            }),
+            content_type="application/json",
+        )
+
+    def test_guest_gets_confirmation_with_ics(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        guest = [m for m in mail.outbox if m.to == ["lena@example.at"]]
+        self.assertEqual(len(guest), 1)
+        msg = guest[0]
+        self.assertIn("Schnupperstunde", msg.subject)
+        self.assertEqual(msg.reply_to, ["davit@thegreenpencil.at"])
+        # multipart: a plaintext body + an HTML alternative
+        self.assertIn("Lena", msg.body)
+        self.assertTrue(any(ct == "text/html" for _, ct in msg.alternatives))
+        # calendar invite attached
+        ics = [a for a in msg.attachments if a[0] == "schnupperstunde.ics"]
+        self.assertEqual(len(ics), 1)
+        self.assertIn("BEGIN:VEVENT", ics[0][1])
+        self.assertIn("text/calendar", ics[0][2])
+
+    @override_settings(TUTOR_NOTIFY_EMAIL="studio@thegreenpencil.at")
+    def test_tutor_is_notified_when_configured(self):
+        from django.core import mail
+        self._book()
+        tutor_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
+        self.assertEqual(len(tutor_mail), 1)
+        self.assertIn("Lena Gast", tutor_mail[0].subject)
+        self.assertIn("lena@example.at", tutor_mail[0].body)
+
+    def test_no_tutor_mail_when_unconfigured(self):
+        from django.core import mail
+        self._book()  # TUTOR_NOTIFY_EMAIL unset by default
+        self.assertEqual(len(mail.outbox), 1)  # guest only
+
+    def test_email_failure_never_breaks_booking(self):
+        # Even if the e-mail layer throws, the booking must still succeed.
+        with mock.patch("core.emails.send_intro_confirmation", side_effect=RuntimeError("ESP down")):
+            resp = self._book()
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Booking.objects.filter(is_intro=True, guest_email="lena@example.at").exists())
+
+    def test_ics_event_is_fifty_minutes(self):
+        from core.emails import build_ics
+        import re
+        d = date.today() + timedelta(days=5)
+        b = Booking.objects.create(
+            tutor=self.davit, date=d, time="14:00", is_intro=True,
+            guest_name="Lena Gast", guest_email="lena@example.at",
+            student_name="Lena Gast", student_slug="intro",
+        )
+        ics = build_ics(b)
+        start = re.search(r"DTSTART:(\d{8}T\d{6}Z)", ics).group(1)
+        end = re.search(r"DTEND:(\d{8}T\d{6}Z)", ics).group(1)
+        from datetime import datetime
+        fmt = "%Y%m%dT%H%M%SZ"
+        delta = datetime.strptime(end, fmt) - datetime.strptime(start, fmt)
+        self.assertEqual(delta, timedelta(minutes=50))

@@ -89,6 +89,40 @@ STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
+# --- Transactional email (Resend via django-anymail) ------------------------
+# Set RESEND_API_KEY to send real mail (booking confirmations, tutor alerts).
+# When unset, mail is printed to the console so the flow stays visible in dev —
+# nothing in the app requires e-mail to be configured.
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+# Absolute base URL for links in e-mails (Impressum, Datenschutz, etc.).
+SITE_URL = os.environ.get('SITE_URL', 'https://thegreenpencil.at').rstrip('/')
+# Visible sender; must be on a domain verified (with DKIM) in the Resend dashboard.
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'The Green Pencil <hallo@thegreenpencil.at>'
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Replies (e.g. a guest answering a confirmation) should reach the tutor's inbox.
+EMAIL_REPLY_TO = os.environ.get('EMAIL_REPLY_TO', '')
+# Where "new intro booked" alerts go (the tutor/studio inbox). Empty = no alert.
+TUTOR_NOTIFY_EMAIL = os.environ.get('TUTOR_NOTIFY_EMAIL', '')
+# Send in a background thread so a booking request never blocks on the ESP.
+# Set EMAIL_ASYNC=false to send inline (tests do this for determinism).
+EMAIL_ASYNC = os.environ.get('EMAIL_ASYNC', 'true').lower() in ('1', 'true', 'yes', 'on')
+
+try:
+    import anymail  # noqa: F401
+    _HAS_ANYMAIL = True
+except ImportError:  # pragma: no cover - dependency declared in requirements
+    _HAS_ANYMAIL = False
+
+if RESEND_API_KEY and _HAS_ANYMAIL:
+    INSTALLED_APPS.append('anymail')
+    EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+    ANYMAIL = {'RESEND_API_KEY': RESEND_API_KEY}
+else:
+    # No ESP configured: surface mail in the console rather than failing.
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
