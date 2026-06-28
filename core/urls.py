@@ -8,6 +8,8 @@ urlpatterns = [
     path('impressum/', views.impressum_view, name='impressum'),
     path('datenschutz/', views.datenschutz_view, name='datenschutz'),
     path('intro/', views.intro_view, name='intro'),
+    path('robots.txt', views.robots_txt, name='robots_txt'),
+    path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('api/intro-bookings/', views.api_intro_booking),
     path('api/login/', views.api_login),
     path('api/logout/', views.api_logout),
