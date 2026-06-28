@@ -598,7 +598,7 @@ def api_intro_booking(request):
     ).exists():
         return JsonResponse({"error": "Dieser Termin ist nicht verfügbar."}, status=409)
 
-    Booking.objects.create(
+    booking = Booking.objects.create(
         tutor=tutor, student=None,
         date=booking_date, time=time_str,
         title="Schnupperstunde (Intro)",
@@ -606,6 +606,10 @@ def api_intro_booking(request):
         # Snapshot so the tutor calendar can show the guest without a User row.
         student_name=name, student_slug="intro",
     )
+    # Fire-and-forget: a mail hiccup must never fail the booking itself.
+    from . import emails
+    emails.queue_email(emails.send_intro_confirmation, booking.pk)
+    emails.queue_email(emails.send_intro_tutor_notification, booking.pk)
     return JsonResponse({
         "ok": True,
         "tutorName": tutor.get_full_name() or tutor.username,
