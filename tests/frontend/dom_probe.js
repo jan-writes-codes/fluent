@@ -28,6 +28,7 @@ const doAdminAddTutor = process.argv.includes("--admin-add-tutor");
 const doAdminPricing = process.argv.includes("--admin-pricing");
 const doLearning = process.argv.includes("--learning");
 const doPreview = process.argv.includes("--preview");
+const doBuy = process.argv.includes("--buy");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -131,6 +132,29 @@ setTimeout(() => {
     });
   }
 
+  if (doBuy) {
+    // As a student: open the first credit pack's buy modal and inspect the
+    // tutor-contact flow — the e-mail link must target a real tutor's address
+    // and, with more than one tutor, a picker must list them all by e-mail.
+    const pack = document.querySelector("#packs .pack");
+    if (!pack) return finish({ buy: { error: "no pack rendered" } });
+    pack.click();
+    setTimeout(() => {
+      const mail = $("#buyMail");
+      const sel = $("#buyTutorSel");
+      const emailSpan = $("#buyTutorEmail");
+      finish({
+        buy: {
+          mailHref: mail ? mail.getAttribute("href") : null,
+          hasTutorSelect: !!sel,
+          selectOptions: sel ? Array.from(sel.options).map((o) => o.textContent) : [],
+          contactEmail: emailSpan ? emailSpan.textContent : null,
+        },
+      });
+    }, 60);
+    return;
+  }
+
   if (doAdminSave) {
     // Full admin flow: add a student, edit their login + name, save. Each step
     // must hit the server (the bug was that none of them did).
@@ -138,6 +162,12 @@ setTimeout(() => {
     if (!addBtn) return finish({ adminSave: { error: "no add button" } });
     addBtn.click();
     setTimeout(() => {
+      // The just-added student must open in the *student* editor (role label,
+      // credits field, "remove student") — not the tutor mask.
+      const roleEl = document.querySelector(".ed-role");
+      const editorRole = roleEl ? roleEl.textContent : null;
+      const hasCreditsField = !!$("#edCredits");
+      const hasRemoveStudent = !!$("#edRemove");
       const setVal = (id, v) => { const e = $(id); if (e) { e.value = v; } };
       setVal("#edName", "Jan Heissenberger");
       setVal("#edEmail", "jan@fluent.at");
@@ -151,6 +181,9 @@ setTimeout(() => {
           adminSave: {
             createPosted: !!post,
             editPut: put ? { url: put.url, body: put.body } : null,
+            editorRole: editorRole,
+            hasCreditsField: hasCreditsField,
+            hasRemoveStudent: hasRemoveStudent,
           },
         });
       }, 80);
@@ -239,7 +272,7 @@ setTimeout(() => {
     const cb = $("#confirmBtn");
     // The selected date the UI shows the user (local time, from fmtLong).
     const panelDateEl = [...document.querySelectorAll(".sum-row")].find((r) =>
-      /Date/i.test(r.querySelector(".k") ? r.querySelector(".k").textContent : "")
+      /Date|Datum/i.test(r.querySelector(".k") ? r.querySelector(".k").textContent : "")
     );
     const panelDate = panelDateEl ? panelDateEl.querySelector(".v").textContent : null;
     if (!cb) return finish({ booking: { error: "no confirm button", panelDate } });

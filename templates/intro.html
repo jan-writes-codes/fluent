@@ -1,0 +1,358 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="de"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<meta name="robots" content="noindex">
+<title>Erste Stunde buchen — kostenlos &amp; unverbindlich | The Green Pencil</title>
+<style>
+/* latin */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal; font-weight: 400 800; font-stretch: 100%; font-display: swap;
+  src: url("{% static 'fonts/font3.woff2' %}") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+  :root {
+    --bg: #f5f2ea; --bg-2: #efe8da; --ink: #243528; --muted: #6e7d6e; --faint: #9aa897;
+    --line: rgba(36,53,40,0.16); --line-2: rgba(36,53,40,0.09); --glass: rgba(251,248,241,0.60);
+    --c1: #309050; --c2: #d0925a; --c3: #277a42; --accent: var(--c1); --good: #3aa55c;
+    --radius: 18px; --shadow: 0 26px 60px -34px rgba(31,60,34,0.45);
+    --font-display: "Bricolage Grotesque", "Hanken Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; overflow-x: hidden; }
+  .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.42; mix-blend-mode: multiply; }
+  .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); }
+  .blob.b2 { width: 52vw; height: 52vw; right: -14vw; top: -12vw; background: radial-gradient(circle at 60% 40%, var(--c2), transparent 60%); }
+  .blob.b3 { width: 58vw; height: 58vw; right: 4vw; bottom: -30vw; background: radial-gradient(circle at 50% 50%, var(--c3), transparent 60%); }
+  .page { position: relative; z-index: 2; }
+  .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 28px; }
+
+  header.top { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(14px);
+    background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22)); border-bottom: 1px solid var(--line-2); }
+  .top-in { display: flex; align-items: center; gap: 20px; padding: 14px 0; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+  .mark { width: 40px; height: 40px; border-radius: 12px; overflow: hidden; display: grid; place-items: center;
+    background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%); box-shadow: 0 12px 26px -10px rgba(58,165,92,0.55); }
+  .mark img { width: 18px; height: auto; filter: brightness(0) invert(1); transform: translateY(-1px); }
+  .wordmark { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; line-height: 1; white-space: nowrap; }
+  .wordmark span { color: var(--accent); }
+  .wordmark .sub { display: block; font-size: 10px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin-top: 4px; }
+  .top-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+  .btn { font-family: var(--font-body); font-weight: 600; font-size: 15px; border: 0; border-radius: 13px; cursor: pointer;
+    padding: 12px 20px; color: #fbf8f1; position: relative; overflow: hidden; transition: 0.18s; letter-spacing: -0.01em;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 9px; justify-content: center;
+    background: linear-gradient(120deg, var(--c1), #277a42 95%); box-shadow: 0 14px 30px -16px rgba(31,122,67,0.7); }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 20px 38px -16px rgba(31,122,67,0.8); }
+  .btn[disabled] { opacity: 0.55; cursor: default; transform: none; box-shadow: none; }
+  .btn.ghost { background: var(--glass); color: var(--ink); box-shadow: none; border: 1px solid var(--line); }
+  .btn.ghost:hover { background: rgba(251,248,241,0.85); }
+
+  .hero { padding: 46px 0 8px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--c3);
+    background: var(--glass); border: 1px solid var(--line); border-radius: 100px; padding: 7px 14px; }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 4px rgba(58,165,92,0.18); }
+  h1.hero-h { font-family: var(--font-display); font-weight: 800; font-size: clamp(32px, 5vw, 52px); line-height: 1.04; letter-spacing: -0.03em; margin: 18px 0 0; max-width: 16ch; }
+  h1.hero-h em { font-style: normal; color: var(--c1); }
+  .hero-sub { font-size: 17px; color: var(--muted); max-width: 54ch; margin-top: 14px; }
+  .hero-note { display: inline-flex; align-items: center; gap: 9px; margin-top: 16px; font-size: 14px; color: var(--c3); font-weight: 500; }
+  .hero-note svg { width: 17px; height: 17px; }
+
+  .panel { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius); backdrop-filter: blur(10px); }
+  .booker { margin: 26px 0 60px; padding: 22px; }
+  .section-lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin-bottom: 12px; }
+
+  .tutor-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .tutor-chip { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 100px; cursor: pointer;
+    background: rgba(255,255,255,0.5); border: 1px solid var(--line); transition: 0.16s; }
+  .tutor-chip:hover { background: #fff; }
+  .tutor-chip.sel { border-color: var(--c1); background: color-mix(in oklch, var(--c1) 12%, #fff); box-shadow: 0 8px 22px -14px rgba(31,122,67,0.7); }
+  .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; }
+  .tutor-chip .tc-name { font-weight: 600; font-size: 14.5px; }
+  .tutor-chip .tc-role { font-size: 12px; color: var(--muted); }
+
+  .cal-head { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; }
+  .cal-month { font-family: var(--font-display); font-weight: 700; font-size: 19px; }
+  .weeknav { display: flex; gap: 6px; margin-left: auto; }
+  .weeknav button { background: rgba(255,255,255,0.6); border: 1px solid var(--line); border-radius: 10px; width: 36px; height: 36px; cursor: pointer; color: var(--ink); display: grid; place-items: center; transition: 0.16s; }
+  .weeknav button:hover:not([disabled]) { background: #fff; }
+  .weeknav button[disabled] { opacity: 0.4; cursor: default; }
+  .weeknav .today-btn { width: auto; padding: 0 14px; font-weight: 600; font-size: 13.5px; }
+
+  .cal-scroll { overflow-x: auto; }
+  .days-row { display: grid; grid-template-columns: repeat(5, minmax(118px, 1fr)); gap: 10px; min-width: 600px; }
+  .day-col { background: rgba(255,255,255,0.4); border: 1px solid var(--line-2); border-radius: 14px; padding: 10px; }
+  .day-name { text-align: center; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line-2); position: relative; }
+  .day-name .dn { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .day-name .dd { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+  .day-name.is-today .dd { color: var(--c1); }
+  .slots { display: flex; flex-direction: column; gap: 6px; }
+  .slot { font-family: var(--font-body); font-size: 13.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 8px 0; cursor: pointer; transition: 0.13s; }
+  .slot:hover { border-color: var(--c1); color: var(--c1); transform: translateY(-1px); }
+  .no-slot { text-align: center; color: var(--faint); font-size: 13px; padding: 8px 0; }
+
+  .modal-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(20,30,22,0.5); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 20px; }
+  .modal-overlay[hidden] { display: none; }
+  .modal-card { width: 100%; max-width: 440px; background: var(--bg); border: 1px solid var(--line); border-radius: 20px; padding: 26px; box-shadow: var(--shadow); position: relative; }
+  .modal-x { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.6); cursor: pointer; font-size: 18px; color: var(--muted); }
+  .modal-card h3 { font-family: var(--font-display); font-weight: 800; font-size: 23px; letter-spacing: -0.02em; }
+  .modal-card .when { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--c3); font-weight: 600; background: color-mix(in oklch, var(--c1) 10%, #fff); border: 1px solid var(--line); border-radius: 100px; padding: 7px 13px; }
+  .lab { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 16px 0 6px; }
+  .inp { width: 100%; font-family: var(--font-body); font-size: 15px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
+  .inp:focus { outline: none; border-color: var(--c1); }
+  .err { color: #b8492c; font-size: 13px; margin-top: 10px; min-height: 1px; }
+  .fineprint { font-size: 12px; color: var(--muted); margin-top: 14px; }
+  .fineprint a { color: var(--c1); }
+  .ok-ic { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; margin: 0 auto 6px; background: color-mix(in oklch, var(--good) 16%, #fff); color: var(--good); }
+  .center { text-align: center; }
+
+  .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 90; background: var(--ink); color: #fbf8f1; padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; box-shadow: 0 18px 40px -18px rgba(0,0,0,0.6); opacity: 0; transition: 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  @media (max-width: 720px) { .hero { padding: 30px 0 4px; } }
+</style>
+</head>
+<body>
+  <div class="field"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <div class="page">
+    <header class="top">
+      <div class="wrap top-in">
+        <a class="brand" href="/">
+          <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+          <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+        </a>
+        <div class="top-actions">
+          <a class="btn ghost" href="{% url 'login' %}">Anmelden</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <div class="eyebrow"><span class="dot"></span>Live-Verfügbarkeit · kostenlose Schnupperstunde</div>
+          <h1 class="hero-h">Buch deine <em>erste Stunde</em>.</h1>
+          <p class="hero-sub">Wähle einen Tutor und ein freies Zeitfenster. Die erste Einheit ist ein <b>unverbindliches Kennenlernen</b> — kostenlos, kein Konto und keine Zahlungsdaten nötig.</p>
+          <div class="hero-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"></path></svg>
+            50-Minuten-Einheit · ganz ohne Credits · einmal pro Person
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <div class="panel booker">
+          <div class="section-lbl">Tutor wählen</div>
+          <div class="tutor-row" id="tutorRow"></div>
+
+          <div class="cal-head">
+            <div class="cal-month" id="monthLabel"></div>
+            <div class="weeknav">
+              <button class="today-btn" id="todayBtn">Diese Woche</button>
+              <button id="prevWeek" aria-label="Vorherige Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <button id="nextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+            </div>
+          </div>
+          <div class="cal-scroll"><div class="days-row" id="daysRow"></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="bookModal" hidden></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+window.INTRO_DATA = {{ intro_data|safe }};
+</script>
+<script>
+(function () {
+  "use strict";
+  const DATA = window.INTRO_DATA || {};
+  const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const $ = (s) => document.querySelector(s);
+
+  const TUTORS = DATA.tutors || [];
+  const AVAIL = DATA.availability || {};         // {slug: {"key|time": bool}}
+  const CUSTOM = DATA.customTimes || {};         // {slug: {key: [times]}}
+  const BOOKED = DATA.booked || {};              // {slug: ["key|time", ...]}
+  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=30){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
+  const DOW = ["Mo","Di","Mi","Do","Fr"];
+  const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+  const MONTHS_S = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+  const DOW_FULL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+
+  const NOW = new Date(); NOW.setHours(0,0,0,0);
+  const REAL = new Date();
+  let state = { tutor: (TUTORS[0]||{}).slug || "", weekOffset: 0, selected: null, booking: false };
+
+  // ---- date / slot helpers (mirrors the app's calendar logic) ----
+  function startOfWeek(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+  function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+  function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+  function keyOf(d){ return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate(); }   // 0-indexed month — matches the server
+  function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+  function seeded(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return ((h>>>0)%1000)/1000; }
+  function defaultAvail(date,time,tid){ if(toMin(time)%60!==0) return false; return seeded((tid||"")+keyOf(date)+time) > 0.4; }
+  function slotOpen(date,time,tid){ const m=AVAIL[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
+  function dayTimes(date,tid){ const dk=keyOf(date); const extra=(CUSTOM[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
+  function bookedConflict(date,time,tid){
+    const taken=(BOOKED[tid]||[]); const dk=keyOf(date); const s=toMin(time), e=s+50;
+    return taken.some(k => { const [kk,tt]=k.split("|"); if(kk!==dk) return false; const bs=toMin(tt), be=bs+50; return s<be && bs<e; });
+  }
+  function isPastSlot(date,time){
+    if(date < NOW) return true;
+    if(sameDay(date, REAL)) return toMin(time) <= (REAL.getHours()*60 + REAL.getMinutes());
+    return false;
+  }
+  function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
+  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+50; return String(Math.floor(tm/60)).padStart(2,"0")+":"+String(tm%60).padStart(2,"0"); }
+  function tutorBySlug(s){ return TUTORS.find(t=>t.slug===s) || TUTORS[0] || {}; }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function avStyle(t){ return `background:linear-gradient(135deg, ${t.color1||'#309050'}, ${t.color2||'#277a42'})`; }
+
+  let toastTimer;
+  function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),3200); }
+
+  // ---- render ----
+  function renderTutors(){
+    const row=$("#tutorRow"); row.innerHTML="";
+    if(!TUTORS.length){ row.innerHTML=`<div class="no-slot">Zurzeit ist kein Tutor verfügbar — bitte später erneut versuchen.</div>`; return; }
+    TUTORS.forEach(t=>{
+      const d=document.createElement("div");
+      d.className="tutor-chip"+(t.slug===state.tutor?" sel":"");
+      d.innerHTML=`<div class="av" style="${avStyle(t)}">${esc(t.initials||"T")}</div>
+        <div><div class="tc-name">${esc(t.firstName||t.name)}</div><div class="tc-role">Englisch-Tutor</div></div>`;
+      d.onclick=()=>{ state.tutor=t.slug; renderTutors(); renderWeek(); };
+      row.appendChild(d);
+    });
+  }
+
+  function renderWeek(){
+    const weekStart = addDays(startOfWeek(NOW), state.weekOffset*7);
+    const firstMonth = weekStart.getMonth(), lastMonth = addDays(weekStart,4).getMonth();
+    $("#monthLabel").textContent = firstMonth===lastMonth
+      ? MONTHS[firstMonth]+" "+weekStart.getFullYear()
+      : MONTHS_S[firstMonth]+" – "+MONTHS_S[lastMonth]+" "+weekStart.getFullYear();
+    $("#prevWeek").disabled = state.weekOffset<=0;
+    $("#nextWeek").disabled = state.weekOffset>=8;
+
+    const row=$("#daysRow"); row.innerHTML="";
+    for(let i=0;i<5;i++){
+      const date=addDays(weekStart,i);
+      const isToday=sameDay(date,REAL);
+      const isPastDay = date < NOW && !isToday;
+      const col=document.createElement("div"); col.className="day-col";
+      const head=document.createElement("div"); head.className="day-name"+(isToday?" is-today":"");
+      head.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${date.getDate()}</div>`;
+      col.appendChild(head);
+      const slots=document.createElement("div"); slots.className="slots";
+      let any=false;
+      if(!isPastDay){
+        dayTimes(date,state.tutor).forEach(time=>{
+          if(isPastSlot(date,time)) return;
+          if(!slotOpen(date,time,state.tutor)) return;
+          if(bookedConflict(date,time,state.tutor)) return;
+          any=true;
+          const b=document.createElement("button"); b.className="slot"; b.textContent=time;
+          b.onclick=()=>openBook(date,time);
+          slots.appendChild(b);
+        });
+      }
+      if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent=isPastDay?"—":"Voll"; slots.appendChild(n); }
+      col.appendChild(slots); row.appendChild(col);
+    }
+  }
+
+  // ---- booking modal ----
+  function openBook(date,time){
+    const t=tutorBySlug(state.tutor);
+    state.selected={ date, time, key:keyOf(date), tutorSlug:state.tutor };
+    const m=$("#bookModal");
+    m.innerHTML=`<div class="modal-card" id="bookCard">
+      <button class="modal-x" id="bookX" aria-label="Schließen">×</button>
+      <h3>Schnupperstunde buchen</h3>
+      <div class="when"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>${esc(t.firstName||t.name)} · ${fmtLong(date)} · ${time}–${endTime(time)}</div>
+      <label class="lab" for="biName">Dein Name</label>
+      <input class="inp" id="biName" type="text" autocomplete="name" placeholder="Vor- und Nachname">
+      <label class="lab" for="biEmail">E-Mail</label>
+      <input class="inp" id="biEmail" type="email" autocomplete="email" placeholder="du@beispiel.at">
+      <div class="err" id="bookErr"></div>
+      <button class="btn" id="bookSubmit" style="width:100%;margin-top:16px;"><span class="grainbtn"></span>Kostenlos buchen</button>
+      <div class="fineprint">Kostenlos &amp; unverbindlich · keine Zahlungsdaten. Mit dem Buchen stimmst du der Verarbeitung deiner Angaben gemäß <a href="{% url 'datenschutz' %}" target="_blank" rel="noopener">Datenschutzerklärung</a> zu.</div>
+    </div>`;
+    m.hidden=false;
+    $("#bookCard").onclick=(e)=>e.stopPropagation();
+    $("#bookX").onclick=closeBook;
+    $("#bookSubmit").onclick=submitBook;
+    setTimeout(()=>{ const n=$("#biName"); if(n) n.focus(); },30);
+  }
+  function closeBook(){ $("#bookModal").hidden=true; }
+
+  function submitBook(){
+    if(state.booking) return;
+    const sel=state.selected; if(!sel) return;
+    const name=($("#biName").value||"").trim();
+    const email=($("#biEmail").value||"").trim();
+    const err=$("#bookErr");
+    if(!name){ err.textContent="Bitte gib deinen Namen ein."; return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ err.textContent="Bitte gib eine gültige E-Mail-Adresse ein."; return; }
+    err.textContent="";
+    state.booking=true;
+    const btn=$("#bookSubmit"); if(btn){ btn.disabled=true; btn.textContent="Wird gebucht…"; }
+    fetch("/api/intro-bookings/", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "X-CSRFToken":CSRF },
+      body:JSON.stringify({ tutorSlug:sel.tutorSlug, date:sel.key, time:sel.time, name, email }),
+    }).then(async r=>{
+      const data = await r.json().catch(()=>({}));
+      state.booking=false;
+      if(r.ok && data.ok){
+        // Block the slot locally so it disappears from the calendar.
+        (BOOKED[sel.tutorSlug]=BOOKED[sel.tutorSlug]||[]).push(sel.key+"|"+sel.time);
+        showConfirmation(name, data);
+        renderWeek();
+      } else {
+        if(btn){ btn.disabled=false; btn.innerHTML='<span class="grainbtn"></span>Kostenlos buchen'; }
+        $("#bookErr").textContent = data.error || "Buchung fehlgeschlagen — bitte erneut versuchen.";
+      }
+    }).catch(()=>{
+      state.booking=false;
+      if(btn){ btn.disabled=false; btn.innerHTML='<span class="grainbtn"></span>Kostenlos buchen'; }
+      $("#bookErr").textContent = "Netzwerkfehler — bitte erneut versuchen.";
+    });
+  }
+
+  function showConfirmation(name, data){
+    const m=$("#bookModal");
+    const first=(name||"").split(" ")[0];
+    m.innerHTML=`<div class="modal-card center" id="bookCard">
+      <button class="modal-x" id="bookX" aria-label="Schließen">×</button>
+      <div class="ok-ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h3>Geschafft, ${esc(first)}!</h3>
+      <p style="color:var(--muted);margin-top:10px;">Deine kostenlose Schnupperstunde mit <b>${esc(data.tutorName||"")}</b> ist eingetragen. Wir melden uns per E-Mail zur Bestätigung.</p>
+      <a class="btn" href="/" style="width:100%;margin-top:18px;"><span class="grainbtn"></span>Zur Startseite</a>
+      <button class="btn ghost" id="bookClose" style="width:100%;margin-top:10px;">Weiteren Termin ansehen</button>
+    </div>`;
+    $("#bookCard").onclick=(e)=>e.stopPropagation();
+    $("#bookX").onclick=closeBook; $("#bookClose").onclick=closeBook;
+    toast("Schnupperstunde gebucht 🎉");
+  }
+
+  // ---- wire ----
+  $("#prevWeek").onclick=()=>{ if(state.weekOffset>0){ state.weekOffset--; renderWeek(); } };
+  $("#nextWeek").onclick=()=>{ if(state.weekOffset<8){ state.weekOffset++; renderWeek(); } };
+  $("#todayBtn").onclick=()=>{ state.weekOffset=0; renderWeek(); };
+  $("#bookModal").onclick=closeBook;
+  document.addEventListener("keydown",(e)=>{ if(e.key==="Escape" && !$("#bookModal").hidden) closeBook(); });
+
+  renderTutors();
+  renderWeek();
+})();
+</script>
+</body>
+</html>

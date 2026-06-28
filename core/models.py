@@ -47,6 +47,12 @@ class Booking(models.Model):
     notes = models.TextField(blank=True)
     tutor_notes = models.TextField(blank=True)
     call_link = models.TextField(blank=True)
+    # Free "intro" session booked by a visitor from the public landing page, who
+    # has no account yet. The guest's contact details live here (not on a User),
+    # an intro never consumes credits, and it's capped at one per e-mail.
+    is_intro = models.BooleanField(default=False)
+    guest_name = models.CharField(max_length=200, blank=True)
+    guest_email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
