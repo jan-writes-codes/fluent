@@ -176,6 +176,8 @@ window.INTRO_DATA = {{ intro_data|safe }};
   "use strict";
   const DATA = window.INTRO_DATA || {};
   const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  // Shown on booking errors so guests always have a way to reach a human.
+  const CONTACT = "Melde dich gerne bei Davit: +43 676 397 5535 oder davit@thegreenpencil.at";
   const $ = (s) => document.querySelector(s);
 
   const TUTORS = DATA.tutors || [];
@@ -345,12 +347,12 @@ window.INTRO_DATA = {{ intro_data|safe }};
         renderWeek();
       } else {
         if(btn){ btn.disabled=false; btn.innerHTML='<span class="grainbtn"></span>Kostenlos buchen'; }
-        $("#bookErr").textContent = data.error || "Buchung fehlgeschlagen — bitte erneut versuchen.";
+        $("#bookErr").textContent = data.error || ("Buchung fehlgeschlagen — bitte erneut versuchen. "+CONTACT);
       }
     }).catch(()=>{
       state.booking=false;
       if(btn){ btn.disabled=false; btn.innerHTML='<span class="grainbtn"></span>Kostenlos buchen'; }
-      $("#bookErr").textContent = "Netzwerkfehler — bitte erneut versuchen.";
+      $("#bookErr").textContent = "Netzwerkfehler — bitte erneut versuchen. "+CONTACT;
     });
   }
 
