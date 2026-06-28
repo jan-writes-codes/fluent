@@ -32,9 +32,15 @@ _MON = ["", "Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "Augu
 # --------------------------------------------------------------------------- #
 # Formatting helpers
 # --------------------------------------------------------------------------- #
-def _end_time(hhmm):
+# An intro/Schnupperstunde runs 15 minutes; a paid credit lesson is one
+# 45-minute unit (1 Einheit = 45 Minuten Unterricht).
+INTRO_MINUTES = 15
+LESSON_MINUTES = 45
+
+
+def _end_time(hhmm, minutes=INTRO_MINUTES):
     h, m = (int(x) for x in hhmm.split(":"))
-    total = h * 60 + m + 15
+    total = h * 60 + m + minutes
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
@@ -45,6 +51,11 @@ def _date_long(d):
 def booking_when(booking):
     """Human German date/time line, e.g. 'Montag, 1. Juli 2026 · 14:00–14:15'."""
     return f"{_date_long(booking.date)} · {booking.time}–{_end_time(booking.time)}"
+
+
+def lesson_when(booking):
+    """Date/time line for a 45-minute credit lesson, e.g. '… · 09:00–09:45'."""
+    return f"{_date_long(booking.date)} · {booking.time}–{_end_time(booking.time, LESSON_MINUTES)}"
 
 
 def build_ics(booking):
@@ -106,8 +117,10 @@ def _ctx(booking):
     }
 
 
-def _message(subject, to, text_body, html_body):
-    reply = [settings.EMAIL_REPLY_TO] if settings.EMAIL_REPLY_TO else None
+def _message(subject, to, text_body, html_body, reply_to=None):
+    reply = reply_to if reply_to else (
+        [settings.EMAIL_REPLY_TO] if settings.EMAIL_REPLY_TO else None
+    )
     msg = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
@@ -149,6 +162,53 @@ def send_intro_tutor_notification(booking_id):
         subject, to,
         render_to_string("email/intro_tutor.txt", ctx),
         render_to_string("email/intro_tutor.html", ctx),
+    )
+    msg.send()
+
+
+def _lesson_ctx(booking):
+    student = booking.student if booking.student_id else None
+    student_name = (
+        (student.get_full_name() or student.username) if student else booking.student_name
+    ) or "Ein Schüler"
+    student_email = (student.email if student else "") or ""
+    tutor = booking.tutor_name or (
+        booking.tutor.get_full_name() if booking.tutor_id and booking.tutor else "Tutor"
+    )
+    return {
+        "student_name": student_name,
+        "student_first": (student_name or "").split(" ")[0] or "dein Schüler",
+        "student_email": student_email,
+        "tutor_name": tutor,
+        "title": booking.title,
+        "when": lesson_when(booking),
+        "date_long": _date_long(booking.date),
+        "time_range": f"{booking.time}–{_end_time(booking.time, LESSON_MINUTES)}",
+        "site_url": settings.SITE_URL,
+    }
+
+
+def send_lesson_tutor_notification(booking_id):
+    """Notify the tutor that a student booked (and spent a credit on) a lesson.
+
+    Goes to the tutor's own e-mail address — not the studio-wide
+    ``TUTOR_NOTIFY_EMAIL`` used for intros — so the right tutor hears about
+    their own bookings. No-op for intros or if the tutor has no address."""
+    booking = Booking.objects.filter(pk=booking_id).first()
+    if not booking or booking.is_intro:
+        return
+    to = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
+    if not to:
+        return
+    ctx = _lesson_ctx(booking)
+    subject = f"Neue Buchung: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}"
+    # Reply goes to the student so the tutor can answer directly.
+    reply_to = [ctx["student_email"]] if ctx["student_email"] else None
+    msg = _message(
+        subject, to,
+        render_to_string("email/lesson_tutor.txt", ctx),
+        render_to_string("email/lesson_tutor.html", ctx),
+        reply_to=reply_to,
     )
     msg.send()
 

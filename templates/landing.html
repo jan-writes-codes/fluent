@@ -550,12 +550,12 @@
         <div class="wrap">
           <div class="sec-eyebrow reveal">Preise</div>
           <h2 class="sec-h reveal">Faire Preise, klare Pakete.</h2>
-          <p class="sec-lead reveal">Bezahlt wird in Credits — 1 Credit ist eine 45-Minuten-Einheit. Je größer das Paket, desto günstiger die einzelne Stunde. Keine Abos, keine versteckten Kosten.</p>
+          <p class="sec-lead reveal">Bezahlt wird in Einheiten — 1 Einheit dauert 45 Minuten. Je größer das Paket, desto günstiger die einzelne Stunde. Keine Abos, keine versteckten Kosten.</p>
           <div class="price-grid">
             {% for pack in packs %}
             <div class="price-card reveal{% if pack.feat %} feat{% endif %}">
               {% if pack.tag %}<div class="pc-tag">{{ pack.tag }}</div>{% endif %}
-              <div class="pc-credits">{{ pack.n }} {% if pack.n == 1 %}Credit{% else %}Credits{% endif %}</div>
+              <div class="pc-credits">{{ pack.n }} {% if pack.n == 1 %}Einheit{% else %}Einheiten{% endif %}</div>
               <div class="pc-price">{{ pack.price }}</div>
               {% if pack.per_unit %}<div class="pc-each">€{{ pack.per_unit }} pro Einheit</div>{% endif %}
               <div class="pc-card-cta">
@@ -564,7 +564,7 @@
             </div>
             {% endfor %}
           </div>
-          <p class="price-note reveal">Die <strong>erste Schnupperstunde ist gratis</strong> und unverbindlich — ganz ohne Zahlungsdaten. Credits buchst du erst, wenn du weitermachen möchtest.</p>
+          <p class="price-note reveal">Das <strong>erste Kennenlerngespräch mit mir ist gratis</strong> und unverbindlich — ganz ohne Zahlungsdaten. Einheiten buchst du erst, wenn du weitermachen möchtest.</p>
         </div>
       </section>
 

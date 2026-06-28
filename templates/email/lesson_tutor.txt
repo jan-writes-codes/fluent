@@ -1,0 +1,10 @@
+Neue Stunde gebucht.
+
+{{ student_name }} hat eine Einheit bei dir gebucht.
+
+Termin:   {{ when }}
+Schüler:  {{ student_name }}{% if student_email %} <{{ student_email }}>{% endif %}
+Thema:    {{ title }}
+
+Die Buchung steht bereits in deinem Kalender im Tutor-Portal.{% if student_email %}
+Antworte {{ student_first }} direkt unter {{ student_email }}.{% endif %}

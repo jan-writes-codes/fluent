@@ -340,7 +340,7 @@ def credit_from_stripe_session(session):
     try:
         return grant_credits(
             student, n, settings,
-            label="Credits via Stripe", sub="Online bezahlt", stripe_session_id=sid,
+            label="Einheiten via Stripe", sub="Online bezahlt", stripe_session_id=sid,
         )
     except IntegrityError:
         # A concurrent caller (webhook vs. redirect) won the race; reuse its receipt.
@@ -450,7 +450,7 @@ def receipt_html(r_data, settings):
       </div>
       <table class="r-table">
         <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
-        <tbody><tr><td>{r_data['credits']}</td><td>Credits für Englisch-Einzelunterricht<br/><span class="r-sub">1 Credit = eine 45-Minuten-Einheit</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
+        <tbody><tr><td>{r_data['credits']}</td><td>Einheiten für Englisch-Einzelunterricht<br/><span class="r-sub">1 Einheit = 45 Minuten Unterricht</span></td><td>€ {money(r_data['unit'])}</td><td>€ {money(r_data['net'])}</td></tr></tbody>
       </table>
       <div class="r-totals">
         <div class="r-row"><span>Nettobetrag · Net</span><span>€ {money(r_data['net'])}</span></div>
@@ -470,7 +470,7 @@ def landing_view(request):
     # Public marketing landing page — the site's front door. No auth required;
     # its CTAs funnel visitors into the booking app (which gates on login).
     # Pricing mirrors the admin-configured credit packs so the public page and
-    # the in-app "Credits aufladen" screen never drift apart.
+    # the in-app "Einheiten aufladen" screen never drift apart.
     settings = get_settings()
     try:
         raw_packs = json.loads(settings.packs_json)
@@ -880,6 +880,9 @@ def api_bookings(request):
             time=time_str,
             title=title,
         )
+        # Let the tutor know a student booked one of their slots.
+        from . import emails
+        emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
         return JsonResponse({"pk": b.pk})
     except (KeyError, User.DoesNotExist, ValueError) as e:
         return JsonResponse({"error": str(e)}, status=400)
@@ -924,7 +927,7 @@ def api_booking_detail(request, pk):
 
 
 # ---------------------------------------------------------------------------
-# Credits API
+# Einheiten API
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["POST"])
@@ -942,7 +945,7 @@ def api_credits(request, slug):
     settings = get_settings()
     receipt = grant_credits(
         student, n, settings,
-        label="Credits added by tutor",
+        label="Einheiten added by tutor",
         sub="Today · paid externally",
     )
     receipt_no = receipt.number
@@ -1013,8 +1016,8 @@ def api_checkout(request):
                     "currency": "eur",
                     "unit_amount": amount,
                     "product_data": {
-                        "name": f"{n} Credits — the green pencil",
-                        "description": "1 Credit = eine 45-Minuten-Einheit Englisch-Einzelunterricht",
+                        "name": f"{n} Einheiten — the green pencil",
+                        "description": "1 Einheit = 45 Minuten Englisch-Einzelunterricht",
                     },
                 },
             }],
