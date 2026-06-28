@@ -973,14 +973,10 @@
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
             <div class="section-h"><h2>Preise</h2></div>
-            <div class="bf-grid">
-              <label class="bf-lab">Preis pro Credit (€) · Belege<input class="bf-input" id="adminPrice" type="number" min="1" /></label>
-              <div></div>
-            </div>
             <div class="ed-sub">Credit-Pakete für Schüler</div>
             <div class="admin-packs" id="adminPacks"></div>
             <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Preise speichern</button>
-            <div class="micro" style="text-align:left; margin-top:10px;">Der Preis pro Credit gilt für die Belege; Pakete sehen die Schüler unter „Credits aufladen“.</div>
+            <div class="micro" style="text-align:left; margin-top:10px;">Pakete sehen die Schüler unter „Credits aufladen“.</div>
           </div>
         </div>
       </section>
@@ -1362,7 +1358,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function fmtLong(d){ return DOW_FULL[(d.getDay()+6)%7] + ", " + MONTHS_S[d.getMonth()] + " " + d.getDate(); }
   const DOW_FULL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
 
-  function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+45; const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+  function endTime(t, mins){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+(mins||45); const hh=Math.floor(tm/60), mm=tm%60; return String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"); }
+  // Schnupperstunden (free intros) run 15 min; paid lessons 45 min.
+  function lessonMins(b){ return b && b.isIntro ? 15 : 45; }
 
   function selectSlot(date, time) {
     state.justBooked = null; state.managing = null;
@@ -1974,10 +1972,10 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="sum-head"><div class="avatar" style="${avatarStyle(s)}">${s.i}</div><div><div class="nm">${escHtml(s.name)}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div>${guestLine}</div></div>
         <label class="field-label">Titel der Stunde</label>
         <input class="bf-input" id="tTitle" value="${escHtml(bk.title)}">
-        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· 45 Min.</span></label>
+        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· ${lessonMins(bk)} Min.</span></label>
         <div class="time-edit">
           <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00">
-          <span class="time-end" id="tTimeEnd">endet ${endTime(bk.time)}</span>
+          <span class="time-end" id="tTimeEnd">endet ${endTime(bk.time, lessonMins(bk))}</span>
         </div>
         <label class="field-label" style="margin-top:12px;">Call-Link <span class="lbl-only">· Zoom, Teams…</span></label>
         <input class="bf-input" id="tCallLink" type="url" placeholder="https://… Meeting-Link einfügen" value="${escHtml(bk.callLink)}">
@@ -1995,7 +1993,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       $("#tTitle").oninput=(e)=>{ bk.title=e.target.value; };
       $("#tNoteTA").oninput=(e)=>{ bk.notes=e.target.value; };
       $("#tPrivTA").oninput=(e)=>{ bk.tutorNotes=e.target.value; };
-      $("#tTimeInput").oninput=(e)=>{ const v=e.target.value; if(/^\d{2}:\d{2}$/.test(v)) $("#tTimeEnd").textContent="ends "+endTime(v); };
+      $("#tTimeInput").oninput=(e)=>{ const v=e.target.value; if(/^\d{2}:\d{2}$/.test(v)) $("#tTimeEnd").textContent="endet "+endTime(v, lessonMins(bk)); };
       $("#tCallLink").oninput=(e)=>{ bk.callLink=e.target.value.trim(); };
       $("#tNoteSave").onclick=()=>{
         const nt=$("#tTimeInput").value;
@@ -2128,8 +2126,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
     return `<div class="li">
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
-      <div class="info"><div class="t">${b.title}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
-      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':'<span class="pill2">45 Min.</span>'}</div>
+      <div class="info"><div class="t">${b.title}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time, lessonMins(b))}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
+      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':`<span class="pill2">${lessonMins(b)} Min.</span>`}</div>
     </div>`;
   }
   function renderTutorLists(){
@@ -2162,7 +2160,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   // ---------- Admin: user management ----------
   function esc(s){ return String(s==null?"":s).replace(/"/g,"&quot;"); }
   function escHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); if($("#adminPrice")) $("#adminPrice").value=state.creditPrice; }
+  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); }
   // Auto-derived "per session" label = total price ÷ credits. Blank (never a
   // ZeroDivision/NaN) when credits or price are missing.
   function packEach(n, price){
@@ -2192,7 +2190,6 @@ window.DJANGO_DATA = {{ django_data|safe }};
     el.querySelectorAll('[data-pk]').forEach(inp=>{ inp.oninput=()=>recompute(+inp.dataset.pk); });
   }
   function saveSettings(){
-    const v=parseInt($("#adminPrice").value,10); if(!isNaN(v)&&v>0) state.creditPrice=v;
     $("#adminPacks").querySelectorAll("[data-pk]").forEach(inp=>{
       const p=PACKS[+inp.dataset.pk], f=inp.dataset.f;
       if(f==="n"){ const n=parseInt(inp.value,10); if(!isNaN(n)&&n>0) p.n=n; }
@@ -2200,7 +2197,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     });
     // "each" is always derived from price ÷ credits — never hand-entered.
     PACKS.forEach(p=>{ p.each = packEach(p.n, p.price); });
-    api('PUT', '/api/settings/', { creditPrice: state.creditPrice, packs: PACKS });
+    api('PUT', '/api/settings/', { packs: PACKS });
     renderPacks(); renderAdmin();
     toast("Preise gespeichert");
   }

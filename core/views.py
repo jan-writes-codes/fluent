@@ -469,7 +469,32 @@ def receipt_html(r_data, settings):
 def landing_view(request):
     # Public marketing landing page — the site's front door. No auth required;
     # its CTAs funnel visitors into the booking app (which gates on login).
-    return render(request, "landing.html")
+    # Pricing mirrors the admin-configured credit packs so the public page and
+    # the in-app "Credits aufladen" screen never drift apart.
+    settings = get_settings()
+    try:
+        raw_packs = json.loads(settings.packs_json)
+    except (ValueError, TypeError):
+        raw_packs = []
+    packs = []
+    for p in raw_packs:
+        try:
+            n = int(p.get("n"))
+        except (ValueError, TypeError):
+            continue
+        total = parse_price(p.get("price"))
+        per_unit = round(total / n) if total and n > 0 else None
+        tag = (p.get("tag") or "").strip()
+        if tag.lower() == "popular":
+            tag = "Beliebt"
+        packs.append({
+            "n": n,
+            "price": p.get("price", ""),
+            "per_unit": per_unit,
+            "feat": bool(p.get("feat")),
+            "tag": tag,
+        })
+    return render(request, "landing.html", {"packs": packs})
 
 
 def login_view(request):

@@ -267,6 +267,23 @@
   .offer h3 { font-family: var(--font-display); font-weight: 700; font-size: 21px; letter-spacing: -0.01em; margin-bottom: 9px; }
   .offer p { font-size: 14.5px; color: var(--muted); line-height: 1.55; }
 
+  /* ---------- Pricing ---------- */
+  .price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; align-items: stretch; }
+  @media (max-width: 820px) { .price-grid { grid-template-columns: 1fr; max-width: 420px; margin-left: auto; margin-right: auto; } }
+  .price-card { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius); padding: 30px 26px; backdrop-filter: blur(10px);
+    transition: 0.18s; position: relative; display: flex; flex-direction: column; }
+  .price-card:hover { transform: translateY(-3px); border-color: color-mix(in oklch, var(--c1) 50%, transparent); box-shadow: var(--shadow); }
+  .price-card.feat { border-color: color-mix(in oklch, var(--c1) 55%, transparent); box-shadow: var(--shadow); }
+  .pc-tag { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); background: var(--c1); color: #fff;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.02em; padding: 4px 14px; border-radius: 100px; white-space: nowrap; }
+  .pc-credits { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
+  .pc-price { font-family: var(--font-display); font-weight: 800; font-size: 38px; letter-spacing: -0.03em; margin-top: 12px; line-height: 1; }
+  .pc-each { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  .pc-card-cta { margin-top: 22px; }
+  .pc-card-cta .btn { width: 100%; }
+  .price-note { font-size: 14.5px; color: var(--muted); margin-top: 26px; text-align: center; text-wrap: pretty; }
+  .price-note strong { color: var(--ink); font-weight: 600; }
+
   /* ---------- About ---------- */
   .about-grid { display: grid; grid-template-columns: 0.78fr 1.22fr; gap: 52px; align-items: center; margin-top: 8px; }
   @media (max-width: 820px) { .about-grid { grid-template-columns: 1fr; gap: 34px; } }
@@ -361,6 +378,7 @@
           <a class="navlink" href="#angebot">Angebot</a>
           <a class="navlink" href="#ueber-mich">Über mich</a>
           <a class="navlink" href="#ansatz">Ansatz</a>
+          <a class="navlink" href="#preise">Preise</a>
           <a class="btn ghost btn-icon" href="{% url 'login' %}" aria-label="Anmelden" title="Anmelden">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z"></path><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"></path></svg>
           </a>
@@ -520,6 +538,29 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- PREISE -->
+      <section class="block" id="preise">
+        <div class="wrap">
+          <div class="sec-eyebrow reveal">Preise</div>
+          <h2 class="sec-h reveal">Faire Preise, klare Pakete.</h2>
+          <p class="sec-lead reveal">Bezahlt wird in Credits — 1 Credit ist eine 45-Minuten-Einheit. Je größer das Paket, desto günstiger die einzelne Stunde. Keine Abos, keine versteckten Kosten.</p>
+          <div class="price-grid">
+            {% for pack in packs %}
+            <div class="price-card reveal{% if pack.feat %} feat{% endif %}">
+              {% if pack.tag %}<div class="pc-tag">{{ pack.tag }}</div>{% endif %}
+              <div class="pc-credits">{{ pack.n }} {% if pack.n == 1 %}Credit{% else %}Credits{% endif %}</div>
+              <div class="pc-price">{{ pack.price }}</div>
+              {% if pack.per_unit %}<div class="pc-each">€{{ pack.per_unit }} pro Einheit</div>{% endif %}
+              <div class="pc-card-cta">
+                <a class="btn{% if not pack.feat %} ghost{% endif %}" href="{% url 'intro' %}"><span class="grainbtn"></span>Loslegen</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <p class="price-note reveal">Die <strong>erste Schnupperstunde ist gratis</strong> und unverbindlich — ganz ohne Zahlungsdaten. Credits buchst du erst, wenn du weitermachen möchtest.</p>
         </div>
       </section>
 

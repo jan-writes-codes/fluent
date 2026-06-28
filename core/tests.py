@@ -120,6 +120,25 @@ class LoginPageTests(FluentDataMixin, TestCase):
         self.assertContains(resp, 'href="/intro/"')
         self.assertContains(resp, 'href="/login/"')
 
+    def test_landing_page_shows_pricing(self):
+        # Pricing is published on the landing page, mirroring the admin packs.
+        from core.models import SiteSettings
+        s = SiteSettings.objects.first() or SiteSettings.objects.create()
+        s.packs_json = json.dumps([
+            {"n": 1, "price": "€32", "feat": False},
+            {"n": 5, "price": "€145", "feat": True, "tag": "Popular"},
+            {"n": 10, "price": "€270", "feat": False},
+        ])
+        s.save()
+        resp = self.client.get(reverse("landing"))
+        self.assertContains(resp, 'id="preise"')
+        self.assertContains(resp, "€145")
+        self.assertContains(resp, "€270")
+        # Per-unit price is derived server-side (145 / 5 = 29).
+        self.assertContains(resp, "€29 pro Einheit")
+        # English default tag is shown in German on the German page.
+        self.assertContains(resp, "Beliebt")
+
     def test_anonymous_app_redirects_to_login(self):
         resp = self.client.get(reverse("app"))
         self.assertEqual(resp.status_code, 302)
