@@ -2089,19 +2089,26 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
 
   function topUp(s, n, fromModal){
+    // Optimistic receipt for instant display; the server mints the authoritative
+    // number (sequenced per student) which we adopt below — the client counter is
+    // only a placeholder until the response lands.
     const r = issueReceipt(s, n);
     s.log.unshift({ type:"buy", label:"Einheiten vom Tutor hinzugefügt", sub:"Heute · extern bezahlt", amt:"+"+n, receiptNo: r.no });
     addStudentCredits(s.id, n);
     api('POST', '/api/credits/' + s.id + '/', { n }).then(res => {
       if (res && res.receiptNo) {
-        const entry = s.log[0];
-        entry.receiptNo = res.receiptNo;
+        // Adopt the server's number everywhere the placeholder went, so in-session
+        // lookups and the rendered document match the persisted record.
+        if (s.log[0]) s.log[0].receiptNo = res.receiptNo;
+        r.no = res.receiptNo;
+        if ($("#receiptShell")) openReceipt(r);   // refresh an open modal
+        renderAccount(); if(fromModal) renderStudentModal();
       }
     });
     renderRoster(); renderAccount();
     if(fromModal) renderStudentModal();
     openReceipt(r);
-    toast(`+${n} Einheiten → ${s.name.split(" ")[0]} · Beleg ${r.no}`);
+    toast(`+${n} Einheiten → ${s.name.split(" ")[0]}`);
   }
 
   // ---------- Student history modal ----------

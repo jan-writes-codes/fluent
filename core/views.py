@@ -920,6 +920,23 @@ def _booking_credit_txn(student, label, sub, amount):
     )
 
 
+def _slot_unavailable(tutor, booking_date, time_str, *, exclude_pk=None):
+    """Return an error code if the tutor's slot can't be booked — already taken, or
+    explicitly closed by the tutor — else None. Server-side mirror of the browser's
+    bookingConflict/slotOpen guards, so the API can't be driven into a double-booking
+    (the public intro endpoint already enforces the same rules)."""
+    taken = Booking.objects.filter(tutor=tutor, date=booking_date, time=time_str)
+    if exclude_pk is not None:
+        taken = taken.exclude(pk=exclude_pk)
+    if taken.exists():
+        return "slot_taken"
+    if AvailabilityOverride.objects.filter(
+        tutor=tutor, date=booking_date, time=time_str, is_open=False
+    ).exists():
+        return "slot_closed"
+    return None
+
+
 def _booking_within_24h(b):
     """True when booking ``b`` starts less than 24h from now (or is in the past) —
     the window in which a student forfeits the credit on cancellation."""
@@ -949,6 +966,12 @@ def api_bookings(request):
         title = data.get("title", "English session")
     except (KeyError, User.DoesNotExist, ValueError) as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+    # The slot must be free and open — enforced here, not just in the UI, so the
+    # API can't be driven into a clash or onto a closed slot.
+    conflict = _slot_unavailable(tutor, booking_date, time_str)
+    if conflict:
+        return JsonResponse({"error": conflict}, status=409)
 
     settings = get_settings()
     is_self = request.user.role == "student"
@@ -1028,6 +1051,11 @@ def api_booking_detail(request, pk):
         b.date = date.fromisoformat(data["date"])
     if "time" in data:
         b.time = data["time"]
+    # A reschedule must land on a free, open slot — same guard as creating one.
+    if ("date" in data or "time" in data) and b.tutor_id:
+        conflict = _slot_unavailable(b.tutor, b.date, b.time, exclude_pk=b.pk)
+        if conflict:
+            return JsonResponse({"error": conflict}, status=409)
     if "notes" in data:
         b.notes = data["notes"]
     # tutorNotes and callLink are tutor-owned fields — students can't set them.
