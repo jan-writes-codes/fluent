@@ -200,8 +200,12 @@ window.INTRO_DATA = {{ intro_data|safe }};
   function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
   function keyOf(d){ return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate(); }   // 0-indexed month — matches the server
   function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
-  function seeded(str){ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return ((h>>>0)%1000)/1000; }
-  function defaultAvail(date,time,tid){ if(toMin(time)%60!==0) return false; return seeded((tid||"")+keyOf(date)+time) > 0.4; }
+  function isCustom(date,time,tid){ const dk=keyOf(date); return ((CUSTOM[tid]||{})[dk]||[]).includes(time); }
+  // Availability is opt-in: every slot starts closed (a new tutor has a blank
+  // calendar) and only opens when the tutor explicitly marks it open. A slot the
+  // tutor added by hand (a custom time) is open by default — adding it *is* the
+  // opt-in — but can still be closed again via an override.
+  function defaultAvail(date,time,tid){ return isCustom(date,time,tid); }
   function slotOpen(date,time,tid){ const m=AVAIL[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
   function dayTimes(date,tid){ const dk=keyOf(date); const extra=(CUSTOM[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }
   function bookedConflict(date,time,tid){

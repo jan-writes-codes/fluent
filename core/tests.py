@@ -888,6 +888,18 @@ class DomLessonTests(_DomProbeBase):
 
 
 class DomBookingTests(_DomProbeBase):
+    def setUp(self):
+        super().setUp()
+        # Availability is opt-in now (no seeded defaults). The app pins its
+        # calendar "today" to Mon 1 Jun 2026, so open a few of Davit's slots in
+        # that demo week for the booking flow to have something to click.
+        from core.models import AvailabilityOverride
+        for day in range(1, 6):  # Mon–Fri, 1–5 Jun 2026
+            for time in ("09:00", "10:00", "11:00", "14:00"):
+                AvailabilityOverride.objects.create(
+                    tutor=self.davit, date=date(2026, 6, day), time=time, is_open=True
+                )
+
     def test_booking_persists_with_local_date(self):
         # Run under a large positive UTC offset: the old toISOString() code
         # shifted a local-midnight date back a day here.
@@ -1535,13 +1547,20 @@ class IntroBookingTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
-# Public intro calendar — client-side opening-week behaviour (jsdom)
+# Public intro calendar — client-side availability + opening-week behaviour
+# (jsdom)
 #
-# Bug: the calendar always opened on the current Mon–Fri week, which on a weekend
-# (or late in the week) is entirely in the past, so the visitor landed on a blank
-# calendar even though the tutor had plenty of upcoming availability. The fix
-# opens on the first upcoming week that actually has a bookable slot. These run
-# the *real* intro init script with a pinned clock so the regression is
+# Two bugs guarded here:
+#   1. Availability used to be a pseudo-random "seeded" default, so EVERY tutor —
+#      including a brand-new one — appeared to have open slots they never set.
+#      Availability is now opt-in: a tutor starts with a blank calendar and only
+#      explicit overrides (or hand-added custom times) open slots.
+#   2. The calendar always opened on the current Mon–Fri week, which on a weekend
+#      is entirely in the past, so a visitor landed on a blank calendar even when
+#      the tutor had upcoming availability. It now opens on the first upcoming
+#      week that actually has a bookable slot.
+#
+# These run the *real* intro init script with a pinned clock so the behaviour is
 # deterministic regardless of the day the suite runs.
 # --------------------------------------------------------------------------- #
 class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
@@ -1550,6 +1569,16 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
         super().setUpClass()
         cls._node = _node_bin()
         cls._has_jsdom = _jsdom_installed()
+
+    def _open_davit(self, *days):
+        """Mark Davit available at 10:00 & 14:00 on the given 2026 June/July days.
+        ``days`` are (month, day) tuples."""
+        from core.models import AvailabilityOverride
+        for month, day in days:
+            for time in ("10:00", "14:00"):
+                AvailabilityOverride.objects.create(
+                    tutor=self.davit, date=date(2026, month, day), time=time, is_open=True
+                )
 
     def _probe(self, iso_now):
         if not self._node:
@@ -1575,8 +1604,29 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
         finally:
             os.unlink(path)
 
+    def test_new_tutor_starts_with_blank_calendar(self):
+        # Davit (the default selected tutor) has no overrides and no custom times,
+        # so the public calendar must show zero bookable slots — availability is
+        # opt-in, never auto-generated.
+        r = self._probe("2026-06-24T08:00:00")
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertEqual(
+            r["slotCount"], 0,
+            "a tutor who set no availability must show no slots",
+        )
+
+    def test_explicitly_opened_slots_are_shown(self):
+        # Once the tutor opens slots, exactly those appear (2 per opened day).
+        self._open_davit((6, 24), (6, 25), (6, 26))
+        r = self._probe("2026-06-24T08:00:00")
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertEqual(r["slotCount"], 6)
+        self.assertIn("24", r["dayNumbers"])
+
     def test_weekend_opens_on_first_week_with_slots(self):
         # Sun 28 Jun 2026: the current Mon–Fri week (22–26) is entirely past.
+        # Davit is available the following week.
+        self._open_davit((6, 29), (6, 30), (7, 1))
         r = self._probe("2026-06-28T12:00:00")
         self.assertEqual(r["initErrors"], [], "init must not throw")
         self.assertGreater(
@@ -1590,6 +1640,7 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
     def test_midweek_stays_on_current_week(self):
         # Wed 24 Jun 2026 morning: the current week still has bookable days, so
         # the calendar must not skip ahead and hide today's remaining slots.
+        self._open_davit((6, 24), (6, 25), (6, 26))
         r = self._probe("2026-06-24T08:00:00")
         self.assertEqual(r["initErrors"], [], "init must not throw")
         self.assertGreater(r["slotCount"], 0)

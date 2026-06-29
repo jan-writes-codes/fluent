@@ -1088,15 +1088,19 @@ window.DJANGO_DATA = {{ django_data|safe }};
     { n: 10, price: "€270", each: "€27 / session", feat: true, tag: "Beliebt" },
   ];
 
-  // deterministic availability per tutor/day/time
-  function seeded(str) { let h = 2166136261; for (let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619);} return ((h>>>0)%1000)/1000; }
   function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
   // Availability + custom times are per tutor. These helpers take a tutor id so
   // the student calendar (the selected chip, state.tutor) and the teacher
   // calendar (the signed-in tutor, state.myTutor) never read each other's slots.
   function availMap(tid){ return (state.availability[tid] = state.availability[tid] || {}); }
   function customMap(tid){ return (state.customTimes[tid] = state.customTimes[tid] || {}); }
-  function defaultAvail(date,time,tid){ if(toMin(time)%60!==0) return false; return seeded((tid||"")+keyOf(date)+time) > 0.4; }
+  function isCustomTime(date,time,tid){ const dk=keyOf(date); return ((state.customTimes[tid]||{})[dk]||[]).includes(time); }
+  // Availability is opt-in: every slot starts closed (a new tutor has a blank
+  // calendar) and only opens when the tutor explicitly marks it open in the
+  // "Verfügbarkeit bearbeiten" editor. A slot the tutor added by hand (a custom
+  // time) is open by default — adding it *is* the opt-in — but can still be
+  // closed again via an override.
+  function defaultAvail(date,time,tid){ return isCustomTime(date,time,tid); }
   function slotOpen(date,time,tid){ const m=state.availability[tid]||{}; const k=keyOf(date)+"|"+time; if(k in m) return m[k]; return defaultAvail(date,time,tid); }
   function bookingConflict(date,time,exclude,tid){ const s=toMin(time), e=s+45; return state.bookings.some(b=>{ if(b.tutorId!==tid||b===exclude||!sameDay(b.date,date)) return false; const bs=toMin(b.time), be=bs+45; return s<be && bs<e; }); }
   function dayTimes(date,tid){ const dk=keyOf(date); const extra=(state.customTimes[tid]||{})[dk]||[]; return [...new Set([...TIMES, ...extra])].sort((a,b)=>toMin(a)-toMin(b)); }

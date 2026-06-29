@@ -140,6 +140,21 @@ class Command(BaseCommand):
         Booking.objects.create(student=ines, tutor=davit, date=date(2026, 5, 21), time="10:00", title="Pronunciation drills")
         Booking.objects.create(student=omar, tutor=davit, date=date(2026, 5, 19), time="15:00", title="Business English")
 
+        self.stdout.write("Creating availability...")
+
+        # Availability is opt-in — a tutor starts blank and explicitly opens slots.
+        # Give the demo tutor (Davit) a realistic weekday pattern across the demo
+        # weeks so the seeded app/intro calendars aren't empty. Slots that collide
+        # with an existing booking are simply hidden in the UI, so no need to skip.
+        davit_hours = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"]
+        for week in (week_start, next_week_start):
+            for offset in range(5):  # Mon–Fri
+                day = week + timedelta(days=offset)
+                for hour in davit_hours:
+                    AvailabilityOverride.objects.create(
+                        tutor=davit, date=day, time=hour, is_open=True
+                    )
+
         self.stdout.write("Creating transactions and receipts...")
 
         # Helper to create a receipt
