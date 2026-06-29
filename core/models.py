@@ -58,6 +58,10 @@ class Booking(models.Model):
     guest_name = models.CharField(max_length=200, blank=True)
     guest_email = models.EmailField(blank=True)
     guest_phone = models.CharField(max_length=40, blank=True)
+    # Unguessable capability token for the public "cancel this Schnupperstunde"
+    # link mailed to both the guest and the tutor — lets either side cancel an
+    # intro without logging in. Empty for non-intro bookings.
+    cancel_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -223,6 +227,11 @@ class SiteSettings(models.Model):
                 '{"n":5,"price":"€145","each":"€29 / session","feat":false},'
                 '{"n":10,"price":"€270","each":"€27 / session","feat":true,"tag":"Popular"}]'
     )
+    # Which credit pack is highlighted as "Beliebt" on the public pricing grid,
+    # identified by its credit count (n). Single source of truth for the popular
+    # badge so it can be toggled from the admin without hand-editing packs_json.
+    # 0 = no pack highlighted.
+    popular_n = models.IntegerField(default=10)
 
     def __str__(self):
         return f'SiteSettings (credit_price={self.credit_price})'

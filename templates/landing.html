@@ -2,7 +2,8 @@
 <!DOCTYPE html>
 <html lang="de"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f5f2ea">
 <title>Nachprüfung Englisch im September – Wien | The Green Pencil</title>
 <meta name="description" content="Englisch-Nachprüfung im September in Wien? Gezielte Vorbereitung &amp; Crashkurs mit Davit — von der Schulzeit bis zur Matura. Erste Stunde unverbindlich.">
 <meta name="keywords" content="Nachprüfung Englisch, Nachprüfung Englisch September, Nachprüfung Englisch Wien, Englisch Nachhilfe Wien, Wiederholungsprüfung Englisch, Nachprüfung bestehen, Englisch Crashkurs, Matura Englisch, Prüfungsvorbereitung Englisch">
@@ -131,7 +132,9 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; overflow-x: hidden; }
+  /* Root background so Safari fills the safe-area / overscroll strips in the
+     page colour rather than white. */
+  html { scroll-behavior: smooth; overflow-x: hidden; background: var(--bg); }
   body {
     font-family: var(--font-body);
     background: var(--bg);

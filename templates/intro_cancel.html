@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f5f2ea" />
+<title>Termin absagen · The Green Pencil</title>
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --bg: #f5f2ea; --ink: #243528; --muted: #6e7d6e; --line: rgba(36,53,40,0.16);
+    --c1: #309050; --good: #3aa55c; --bad: #c2552f;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); }
+  .card { width: 100%; max-width: 440px; background: #fbf8f1; border: 1px solid var(--line);
+    border-radius: 20px; padding: 34px 30px; box-shadow: 0 26px 60px -34px rgba(31,60,34,0.45); }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 22px; line-height: 1.55; }
+  .when { background: rgba(48,144,80,0.10); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; font-size: 15px; font-weight: 600; margin: 0 0 22px; }
+  .when small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  button { width: 100%; padding: 15px; border: 0; border-radius: 12px; font-size: 16px;
+    font-weight: 600; cursor: pointer; }
+  .danger { background: var(--bad); color: #fff; }
+  .ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); margin-top: 10px;
+    text-decoration: none; display: block; text-align: center; }
+  .note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+  .ok { color: var(--good); } .err { color: var(--bad); }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+    background: rgba(48,144,80,0.12); color: var(--c1); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+  {% if state == "done" %}
+    <span class="badge">the green pencil</span>
+    <h1 class="ok">{% if is_intro %}Schnupperstunde{% else %}Stunde{% endif %} abgesagt</h1>
+    <p class="sub">Der Termin{% if when %} am <b>{{ when }}</b>{% endif %} wurde storniert.
+    Der Platz ist wieder frei.{% if not is_intro %} {% if refunded %}Die Einheit wurde gutgeschrieben.{% else %}Da der Termin innerhalb von 24 Stunden lag, verfällt die Einheit.{% endif %}{% endif %}
+    Du kannst dieses Fenster schließen.</p>
+    {% if is_intro %}<a class="ghost" href="{% url 'intro' %}">Neue Schnupperstunde buchen</a>{% endif %}
+  {% elif state == "confirm" %}
+    <span class="badge">the green pencil</span>
+    <h1>{% if is_intro %}Schnupperstunde{% else %}Stunde{% endif %} absagen?</h1>
+    <p class="sub">Möchtest du {% if is_intro %}diese kostenlose Englisch-Schnupperstunde{% else %}diese Englischstunde{% endif %} wirklich absagen?</p>
+    <div class="when">{{ when }}<small>mit {{ tutor_name }}</small></div>
+    {% if within_24h %}<p class="sub" style="color:var(--bad);margin-top:-12px;">Achtung: Der Termin liegt innerhalb von 24 Stunden — die Einheit verfällt bei einer Absage.</p>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <button class="danger" type="submit">Ja, Termin absagen</button>
+    </form>
+    <a class="ghost" href="{% if is_intro %}{% url 'intro' %}{% else %}{% url 'app' %}{% endif %}">Doch nicht — zurück</a>
+  {% else %}
+    <span class="badge">the green pencil</span>
+    <h1>Termin nicht gefunden</h1>
+    <p class="sub">Dieser Absage-Link ist nicht (mehr) gültig — der Termin wurde
+    vermutlich bereits abgesagt. Bei Fragen melde dich gerne bei Davit:
+    <a href="tel:+436763975535">+43 676 397 5535</a>.</p>
+    <a class="ghost" href="{% url 'intro' %}">Neue Schnupperstunde buchen</a>
+  {% endif %}
+  </div>
+</body>
+</html>

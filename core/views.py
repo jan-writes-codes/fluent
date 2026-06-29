@@ -315,6 +315,12 @@ def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", uni
             receipt_no=receipt_no,
         )
 
+    # Archive a copy of every purchase receipt to the studio inbox. Deferred to
+    # on_commit so it only fires once the credit grant (and any enclosing
+    # transaction) has durably committed — the sender reads the persisted receipt,
+    # and an e-mail failure can never roll back or race the credit write.
+    from . import emails
+    db_transaction.on_commit(lambda: emails.queue_email(emails.send_receipt_copy, receipt.pk))
     return receipt
 
 
@@ -460,12 +466,13 @@ def parse_body(request):
 
 def receipt_html(r_data, settings):
     """Generate receipt HTML string (mirrors JS receiptDocHtml)."""
+    # Must match the legal details published in the Impressum (templates/impressum.html).
     SUPPLIER = {
-        "name": "Davit Petrosyan e.U.",
+        "name": "Davit Hovakimyan",
         "line2": "Englisch-Privatunterricht",
-        "addr": "Lindengasse 12/4",
-        "city": "1070 Wien, Österreich",
-        "email": "davit@fluent.at",
+        "addr": "Kraygasse 94/2/6",
+        "city": "1220 Wien, Österreich",
+        "email": "davit@thegreenpencil.at",
     }
     VAT_DE = "Steuerfreigemäß § 6 Abs. 1 Z 11 UStG (Unterrichtsleistung eines Privatlehrers)."
     VAT_EN = "VAT-exempt educational service under Austrian law — no value-added tax is charged."
@@ -530,15 +537,16 @@ def landing_view(request):
             continue
         total = parse_price(p.get("price"))
         per_unit = round(total / n) if total and n > 0 else None
-        tag = (p.get("tag") or "").strip()
-        if tag.lower() == "popular":
-            tag = "Beliebt"
+        # The popular badge is driven solely by SiteSettings.popular_n so it can
+        # be toggled from the admin (a dropdown of pack sizes) rather than by
+        # hand-editing the feat/tag fields inside packs_json.
+        is_popular = n == settings.popular_n
         packs.append({
             "n": n,
             "price": p.get("price", ""),
             "per_unit": per_unit,
-            "feat": bool(p.get("feat")),
-            "tag": tag,
+            "feat": is_popular,
+            "tag": "Beliebt" if is_popular else "",
         })
     return render(request, "landing.html", {"packs": packs})
 
@@ -729,6 +737,8 @@ def api_intro_booking(request):
         is_intro=True, guest_name=name, guest_email=email, guest_phone=phone,
         # Snapshot so the tutor calendar can show the guest without a User row.
         student_name=name, student_slug="intro",
+        # Capability token for the cancel links in both confirmation e-mails.
+        cancel_token=secrets.token_urlsafe(24),
     )
     # Fire-and-forget: a mail hiccup must never fail the booking itself.
     from . import emails
@@ -739,6 +749,57 @@ def api_intro_booking(request):
         "tutorName": tutor.get_full_name() or tutor.username,
         "date": booking_date.isoformat(),
         "time": time_str,
+    })
+
+
+@require_http_methods(["GET", "POST"])
+def booking_cancel_view(request, token):
+    """Public cancel page for a booking (free intro *or* a paid lesson), reached from
+    the cancel link in the confirmation e-mails. The unguessable token is the
+    capability — no login needed — so either the student/guest or the tutor can
+    cancel. GET shows a confirmation prompt; POST performs the cancellation
+    (mutations never happen on GET, so an e-mail client prefetching the link can't
+    silently cancel the booking).
+
+    A paid lesson follows the same 24h policy as the in-app cancel: the credit is
+    refunded when cancelled more than 24h ahead, and forfeited inside that window —
+    so the e-mail link can't be used to dodge the forfeit rule."""
+    from . import emails
+    booking = Booking.objects.filter(cancel_token=token).first() if token else None
+    if request.method == "POST":
+        if not booking:
+            return render(request, "intro_cancel.html", {"state": "gone"})
+        is_intro = booking.is_intro
+        when = emails.booking_when(booking) if is_intro else emails.lesson_when(booking)
+        refunded = False
+        if not is_intro and booking.student_id:
+            from django.db import transaction as db_transaction
+            forfeit = _booking_within_24h(booking)
+            with db_transaction.atomic():
+                locked = User.objects.select_for_update().get(pk=booking.student_id)
+                if not forfeit:
+                    locked.credits += 1
+                    locked.save(update_fields=["credits"])
+                    _booking_credit_txn(locked, "Buchung storniert — Einheit erstattet", "", 1)
+                    refunded = True
+                booking.delete()
+        else:
+            booking.delete()
+        return render(request, "intro_cancel.html", {
+            "state": "done", "when": when, "is_intro": is_intro,
+            "refunded": refunded,
+        })
+    if not booking:
+        return render(request, "intro_cancel.html", {"state": "gone"})
+    tutor_name = booking.tutor_name or (
+        booking.tutor.get_full_name() if booking.tutor_id and booking.tutor else "deinem Tutor"
+    )
+    return render(request, "intro_cancel.html", {
+        "state": "confirm",
+        "is_intro": booking.is_intro,
+        "when": emails.booking_when(booking) if booking.is_intro else emails.lesson_when(booking),
+        "tutor_name": (tutor_name or "").split(" ")[0] or tutor_name,
+        "within_24h": (not booking.is_intro) and _booking_within_24h(booking),
     })
 
 
@@ -995,12 +1056,15 @@ def api_bookings(request):
             date=booking_date,
             time=time_str,
             title=title,
+            # Capability token for the cancel links in the confirmation e-mails.
+            cancel_token=secrets.token_urlsafe(24),
         )
         _booking_credit_txn(locked, "Stunde gebucht", f"{booking_date.strftime('%d.%m.%Y')} · {time_str}", -1)
         new_credits = locked.credits
 
-    # Let the tutor know a student booked one of their slots.
+    # Confirm to the student (with a cancel link) and notify the tutor.
     from . import emails
+    emails.queue_email(emails.send_lesson_student_confirmation, b.pk)
     emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
     return JsonResponse({"pk": b.pk, "credits": new_credits})
 
@@ -1084,17 +1148,28 @@ def api_credits(request, slug):
     except (User.DoesNotExist, ValueError, TypeError) as e:
         return JsonResponse({"error": str(e)}, status=400)
 
+    # The tutor must declare how the credits were settled. A Stripe top-up can't be
+    # charged from here — it needs the student's own authenticated card flow — so we
+    # never grant credits for "stripe"; we only tell the UI to point the student to
+    # their account. Cash is settled in person, so we grant and issue the receipt.
+    # ``method`` defaults to "cash" to keep older clients working.
+    method = (data.get("method") or "cash").strip().lower()
+    if method == "stripe":
+        return JsonResponse({"stripe": True, "granted": False})
+    if method != "cash":
+        return JsonResponse({"error": "invalid method"}, status=400)
+
     settings = get_settings()
     receipt = grant_credits(
         student, n, settings,
-        label="Einheiten added by tutor",
-        sub="Today · paid externally",
+        label="Einheiten vom Tutor",
+        sub="Heute · bar bezahlt",
     )
     receipt_no = receipt.number
 
     r_data = serialize_receipt(receipt)
     html = receipt_html(r_data, settings)
-    return JsonResponse({"receiptNo": receipt_no, "receiptHtml": html})
+    return JsonResponse({"receiptNo": receipt_no, "receiptHtml": html, "granted": True})
 
 
 # ---------------------------------------------------------------------------

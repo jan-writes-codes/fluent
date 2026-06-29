@@ -8,3 +8,8 @@ Thema:    {{ title }}
 
 Die Buchung steht bereits in deinem Kalender im Tutor-Portal.{% if student_email %}
 Antworte {{ student_first }} direkt unter {{ student_email }}.{% endif %}
+{% if cancel_url %}
+Musst du absagen? Hier kannst du die Stunde stornieren (Einheit wird außerhalb
+von 24 h wieder gutgeschrieben):
+{{ cancel_url }}
+{% endif %}

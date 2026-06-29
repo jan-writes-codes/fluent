@@ -9,3 +9,7 @@ Telefon:  {{ guest_phone }} (WhatsApp / Rückruf für Rückfragen)
 
 Die Buchung steht bereits in deinem Kalender im Tutor-Portal.
 Antworte dem Gast direkt unter {{ guest_email }} oder melde dich telefonisch unter {{ guest_phone }}.
+{% if cancel_url %}
+Passt der Termin nicht? Hier kannst du die Schnupperstunde absagen:
+{{ cancel_url }}
+{% endif %}

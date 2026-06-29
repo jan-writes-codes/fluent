@@ -8,6 +8,7 @@ urlpatterns = [
     path('impressum/', views.impressum_view, name='impressum'),
     path('datenschutz/', views.datenschutz_view, name='datenschutz'),
     path('intro/', views.intro_view, name='intro'),
+    path('cancel/<str:token>/', views.booking_cancel_view, name='booking_cancel'),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('api/intro-bookings/', views.api_intro_booking),

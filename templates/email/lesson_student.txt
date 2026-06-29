@@ -1,0 +1,19 @@
+Alles klar, {{ student_first }}!
+
+Deine Englischstunde mit {{ tutor_first }} ist gebucht. Eine Einheit wurde
+dafür von deinem Guthaben abgezogen.
+
+Termin: {{ when }}
+Tutor:  {{ tutor_first }}
+
+Du findest die Stunde jederzeit in deinem Konto. Kostenlos umbuchen oder
+stornieren kannst du bis 24 Stunden vorher.
+{% if cancel_url %}
+Musst du absagen? Hier kannst du die Stunde stornieren (außerhalb von 24 h
+wird dir die Einheit wieder gutgeschrieben):
+{{ cancel_url }}
+{% endif %}
+--
+The Green Pencil — Englisch-Nachhilfe · Wien, Österreich
+Impressum:   {{ site_url }}/impressum/
+Datenschutz: {{ site_url }}/datenschutz/

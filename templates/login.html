@@ -3,7 +3,8 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#f5f2ea" />
 <title>Anmelden · The Green Pencil</title>
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
@@ -44,7 +45,10 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
+  /* Background lives on the root element too so Safari paints the safe-area /
+     overscroll strips (status bar, home indicator) in the page colour instead
+     of white. */
+  html, body { height: 100%; background: var(--bg); }
   body {
     font-family: var(--font-body);
     background: var(--bg);
@@ -144,7 +148,6 @@
       <input class="t-select auth-input" id="authPass" type="password" autocomplete="current-password" placeholder="Dein Passwort" value="" />
       <div class="auth-err" id="authErr"></div>
       <button class="btn" type="submit" id="loginBtn"><span class="grainbtn"></span>Anmelden</button>
-      <div class="auth-hint">Demo-Logins — <b>maya@fluent.at</b> (Schüler) oder <b>davit@fluent.at</b> (Tutor). Passwort: <b>password</b></div>
     </form>
   </div>
 

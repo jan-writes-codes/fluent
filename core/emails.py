@@ -110,10 +110,17 @@ def _ctx(booking):
         "guest_email": booking.guest_email,
         "guest_phone": booking.guest_phone,
         "tutor_name": tutor,
+        # First name only — the studio addresses tutors informally everywhere else
+        # in the product, so the confirmation should read "mit Davit", not the full name.
+        "tutor_first": (tutor or "").split(" ")[0] or tutor,
         "when": booking_when(booking),
         "date_long": _date_long(booking.date),
         "time_range": f"{booking.time}–{_end_time(booking.time)}",
         "site_url": settings.SITE_URL,
+        # Tokenized public cancel link — works for both the guest and the tutor,
+        # no login required. Empty if the booking predates the token.
+        "cancel_url": (f"{settings.SITE_URL}/cancel/{booking.cancel_token}/"
+                       if booking.cancel_token else ""),
     }
 
 
@@ -180,12 +187,34 @@ def _lesson_ctx(booking):
         "student_first": (student_name or "").split(" ")[0] or "dein Schüler",
         "student_email": student_email,
         "tutor_name": tutor,
+        "tutor_first": (tutor or "").split(" ")[0] or tutor,
         "title": booking.title,
         "when": lesson_when(booking),
         "date_long": _date_long(booking.date),
         "time_range": f"{booking.time}–{_end_time(booking.time, LESSON_MINUTES)}",
         "site_url": settings.SITE_URL,
+        # Tokenized public cancel link for the lesson — works for student and tutor.
+        "cancel_url": (f"{settings.SITE_URL}/cancel/{booking.cancel_token}/"
+                       if booking.cancel_token else ""),
     }
+
+
+def send_lesson_student_confirmation(booking_id):
+    """Confirm a booked paid lesson to the student, with a cancel link. No-op for
+    intros (those have their own flow) or if the student has no e-mail address."""
+    booking = Booking.objects.filter(pk=booking_id).first()
+    if not booking or booking.is_intro:
+        return
+    ctx = _lesson_ctx(booking)
+    if not ctx["student_email"]:
+        return
+    subject = f"Deine Englischstunde ist gebucht · {ctx['date_long']} {ctx['time_range']}"
+    msg = _message(
+        subject, ctx["student_email"],
+        render_to_string("email/lesson_student.txt", ctx),
+        render_to_string("email/lesson_student.html", ctx),
+    )
+    msg.send()
 
 
 def send_lesson_tutor_notification(booking_id):
@@ -210,6 +239,38 @@ def send_lesson_tutor_notification(booking_id):
         render_to_string("email/lesson_tutor.html", ctx),
         reply_to=reply_to,
     )
+    msg.send()
+
+
+def send_receipt_copy(receipt_id):
+    """E-mail an issued receipt to the student it belongs to, with the studio's own
+    inbox (``DEFAULT_FROM_EMAIL``) bcc'd as an archive. Covers every purchase — a
+    tutor's cash top-up or a student's Stripe payment. If the student has no address
+    (e.g. a deleted account) the studio archive still gets it."""
+    archive = getattr(settings, "DEFAULT_FROM_EMAIL", None)
+    from .models import Receipt
+    # Lazy import: views imports this module, so importing it at module load
+    # would be circular.
+    from .views import serialize_receipt, receipt_html, get_settings
+    receipt = Receipt.objects.filter(pk=receipt_id).select_related("student").first()
+    if not receipt:
+        return
+    student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
+    to = [student_email] if student_email else ([archive] if archive else [])
+    if not to:
+        return
+    # Archive a copy to the studio inbox (skip if it's already the only recipient).
+    bcc = [archive] if archive and archive not in to else []
+    r_data = serialize_receipt(receipt)
+    html = receipt_html(r_data, get_settings())
+    subject = f"Dein Beleg {receipt.number} · {receipt.credits} Einheiten"
+    text = (f"Hallo {receipt.student_name},\n\n"
+            f"unten findest du deinen Beleg {receipt.number} über {receipt.credits} "
+            f"Einheiten (ausgestellt am {receipt.date_str}).\n\n"
+            f"The Green Pencil — Englisch-Nachhilfe")
+    msg = _message(subject, to, text, html)
+    if bcc:
+        msg.bcc = bcc
     msg.send()
 
 
