@@ -64,6 +64,10 @@ class Booking(models.Model):
         ordering = ['date', 'time']
 
     def save(self, *args, **kwargs):
+        # Detect the initial INSERT *before* super().save() flips the flag, so the
+        # credit is charged exactly once — when the booking first comes into being,
+        # never on a later reschedule/notes edit.
+        is_new = self._state.adding
         # Keep the identity snapshot in sync with the live FK while the accounts
         # exist; once an account is deleted the FK goes NULL and the last-known
         # snapshot is what remains.
@@ -74,6 +78,37 @@ class Booking(models.Model):
             self.tutor_slug = self.tutor.slug
             self.tutor_name = self.tutor.get_full_name() or self.tutor.username
         super().save(*args, **kwargs)
+        if is_new:
+            self._charge_credit()
+
+    def _charge_credit(self):
+        """Deduct one credit from the student and record it on the ledger when a
+        booking is created. Centralised here (rather than in the booking view) so
+        *every* path that brings a Booking into existence — the API, the tutor
+        calendar, the seed, the admin, a management shell — stays in sync with the
+        student's balance and history. A booking can no longer silently exist
+        without having been paid for.
+
+        Policy guards that depend on *who* is booking (a student may not go below
+        zero; a tutor may only go to the credit floor) stay in the view, which is
+        where the actor is known and a rejection can be returned — this method only
+        performs the bookkeeping once a booking is allowed to be created.
+        """
+        # Free intro sessions and guest bookings (no account) never cost a credit.
+        if self.is_intro or not self.student_id:
+            return
+        student = self.student
+        student.credits -= 1
+        student.save(update_fields=['credits'])
+        CreditTransaction.objects.create(
+            student=student,
+            student_slug=student.slug,
+            student_name=student.get_full_name() or student.username,
+            txn_type='book',
+            label='Stunde gebucht',
+            sub=f"{self.date.strftime('%d.%m.%Y')} · {self.time}",
+            amount=-1,
+        )
 
     def __str__(self):
         return f'{self.student_slug} + {self.tutor_slug} on {self.date} at {self.time}'

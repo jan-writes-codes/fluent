@@ -975,9 +975,12 @@ def api_bookings(request):
 
     settings = get_settings()
     is_self = request.user.role == "student"
-    # Every booking consumes one credit. A student may only book what they have; a
-    # tutor/admin may book a student into the negative (an unpaid lesson the student
-    # settles later) but not past the configured floor.
+    # Every booking consumes one credit — the deduction and the ledger entry are
+    # performed by Booking.save() so no creation path can skip them. The view's job
+    # is the policy guard: a student may only book what they have; a tutor/admin may
+    # book a student into the negative (an unpaid lesson the student settles later)
+    # but not past the configured floor. The check runs under the row lock so a
+    # concurrent booking can't slip a balance past the limit between check and save.
     with db_transaction.atomic():
         locked = User.objects.select_for_update().get(pk=student.pk)
         if is_self and locked.credits < 1:
@@ -987,8 +990,6 @@ def api_bookings(request):
                 {"error": "credit_floor_reached", "floor": settings.credit_floor},
                 status=409,
             )
-        locked.credits -= 1
-        locked.save(update_fields=["credits"])
         b = Booking.objects.create(
             student=locked,
             tutor=tutor,
@@ -996,7 +997,7 @@ def api_bookings(request):
             time=time_str,
             title=title,
         )
-        _booking_credit_txn(locked, "Stunde gebucht", f"{booking_date.strftime('%d.%m.%Y')} · {time_str}", -1)
+        # Booking.save() charged the credit on the locked instance; read it back.
         new_credits = locked.credits
 
     # Let the tutor know a student booked one of their slots.

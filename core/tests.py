@@ -971,7 +971,9 @@ class HistoryRetentionTests(FluentDataMixin, TestCase):
         self.assertEqual(booking.student_slug, "maya")
         self.assertEqual(booking.tutor_slug, "davit")
 
-        txn = CreditTransaction.objects.get(student=self.maya)
+        # The booking above also auto-recorded its own "book" debit, so scope to
+        # the grant transaction created by _grant().
+        txn = CreditTransaction.objects.get(student=self.maya, txn_type="buy")
         self.assertEqual(txn.student_slug, "maya")
 
         self.client.force_login(self.admin)
@@ -1474,10 +1476,13 @@ class IntroBookingTests(FluentDataMixin, TestCase):
         self.assertEqual(b.title, "Schnupperstunde (Intro)")
 
     def test_intro_does_not_touch_credits(self):
-        # A free intro must never create a receipt or credit transaction.
+        # A free intro must never create a receipt or credit transaction. Measure
+        # the delta, since the mixin's seeded booking legitimately adds a debit row.
+        receipts_before = Receipt.objects.count()
+        txns_before = CreditTransaction.objects.count()
         self._post()
-        self.assertEqual(Receipt.objects.count(), 0)
-        self.assertEqual(CreditTransaction.objects.count(), 0)
+        self.assertEqual(Receipt.objects.count(), receipts_before)
+        self.assertEqual(CreditTransaction.objects.count(), txns_before)
 
     def test_one_intro_per_email_per_tutor(self):
         self.assertEqual(self._post(time="14:00").status_code, 200)
