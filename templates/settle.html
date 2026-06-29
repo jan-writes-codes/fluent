@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Offene Einheiten begleichen · The Green Pencil</title>
+<link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --bg: #f5f2ea; --ink: #243528; --muted: #6e7d6e; --line: rgba(36,53,40,0.16);
+    --c1: #309050; --good: #3aa55c; --bad: #c2552f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); }
+  .card { width: 100%; max-width: 440px; background: #fbf8f1; border: 1px solid var(--line);
+    border-radius: 20px; padding: 34px 30px; box-shadow: 0 26px 60px -34px rgba(31,60,34,0.45); }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 24px; line-height: 1.5; }
+  .amount { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+  .amount small { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .break { font-size: 13px; color: var(--muted); margin: 8px 0 26px; }
+  button { width: 100%; padding: 15px; border: 0; border-radius: 12px; background: var(--c1);
+    color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+  .ok { color: var(--good); } .err { color: var(--bad); }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+    background: rgba(48,144,80,0.12); color: var(--c1); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+  {% if invalid %}
+    <span class="badge">the green pencil</span>
+    <h1>Link ungültig</h1>
+    <p class="sub">Dieser Zahlungslink ist nicht (mehr) gültig. Bitte fordere bei deinem
+    Tutor einen neuen an.</p>
+  {% elif paid %}
+    <span class="badge">the green pencil</span>
+    <h1 class="ok">Vielen Dank!</h1>
+    <p class="sub">Deine Zahlung wird verarbeitet und deine offenen Einheiten werden
+    gutgeschrieben. Du kannst dieses Fenster schließen.</p>
+  {% elif outstanding == 0 %}
+    <span class="badge">the green pencil</span>
+    <h1>Alles beglichen ✓</h1>
+    <p class="sub">Hallo {{ first_name }} — du hast aktuell keine offenen Einheiten.
+    Es ist nichts zu bezahlen.</p>
+  {% else %}
+    <span class="badge">the green pencil</span>
+    <h1>Hallo {{ first_name }}</h1>
+    <p class="sub">Du hast offene Einheiten aus bereits gebuchten Stunden. Gleiche sie
+    hier sicher per Karte über Stripe aus.</p>
+    <p class="amount">€ {{ amount }} <small>für {{ outstanding }} Einheit{{ outstanding|pluralize:"en" }}</small></p>
+    <p class="break">{{ outstanding }} × € {{ unit }} pro Einheit</p>
+    {% if stripe_enabled %}
+      <button id="payBtn" type="button">Jetzt sicher bezahlen</button>
+      <p class="note" id="msg">Zahlung über Stripe · du wirst kurz weitergeleitet.</p>
+    {% else %}
+      <button disabled>Online-Zahlung nicht verfügbar</button>
+      <p class="note">Bitte wende dich an deinen Tutor, um offene Einheiten zu begleichen.</p>
+    {% endif %}
+  {% endif %}
+  </div>
+
+  {% if not invalid and not paid and outstanding != 0 and stripe_enabled %}
+  <script>
+    (function () {
+      var btn = document.getElementById("payBtn");
+      var msg = document.getElementById("msg");
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        msg.textContent = "Einen Moment …";
+        fetch("/settle/{{ token }}/checkout/", { method: "POST" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (d && d.url) { window.location.href = d.url; }
+            else { btn.disabled = false; msg.className = "note err";
+                   msg.textContent = "Zahlung konnte nicht gestartet werden. Bitte später erneut versuchen."; }
+          })
+          .catch(function () {
+            btn.disabled = false; msg.className = "note err";
+            msg.textContent = "Netzwerkfehler. Bitte später erneut versuchen.";
+          });
+      });
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

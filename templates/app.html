@@ -839,6 +839,11 @@
                 <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Geplant</div></div>
                 <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Abgeschlossen</div></div>
               </div>
+              <div id="settleBox" hidden style="margin-top:22px;padding:16px;border-radius:14px;background:rgba(194,85,47,0.10);border:1px solid rgba(194,85,47,0.25);">
+                <div style="font-weight:700;color:#c2552f;font-size:14px;" id="settleTitle"></div>
+                <div class="micro" id="settleSub" style="margin:4px 0 12px;"></div>
+                <button class="btn" id="settleBtn" style="width:100%;"><span class="grainbtn"></span>Offenen Betrag begleichen</button>
+              </div>
             </div>
 
             <div class="panel" style="padding: 24px;">
@@ -1009,6 +1014,21 @@ window.DJANGO_DATA = {{ django_data|safe }};
       if (r.status === 401) { logout(); return null; }
       return r.ok ? r.json().catch(() => null) : null;
     } catch (e) { return null; }
+  }
+
+  // Like api(), but surfaces the status + parsed body so callers can react to
+  // specific failures (e.g. the credit floor / insufficient-credits guards).
+  async function apiResult(method, url, body) {
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (r.status === 401) { logout(); return { ok: false, status: 401, data: null }; }
+      const data = await r.json().catch(() => null);
+      return { ok: r.ok, status: r.status, data };
+    } catch (e) { return { ok: false, status: 0, data: null }; }
   }
 
   // Multipart upload (files). Returns the parsed JSON on success, or {error}.
@@ -1225,6 +1245,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(p){ const amt = parsePrice(p.price); if(amt && n>0) return Math.round(amt/n); }
     return state.creditPrice;
   }
+  // Per-credit settlement price for n outstanding credits: the per-credit rate of
+  // the largest pack tier whose size ≤ n (the volume tier "already reached").
+  // Mirrors settle_unit_euros server-side — display only; the charge is authoritative.
+  function settleUnitEuros(n){
+    let bestN=0, rate=null;
+    PACKS.forEach(p=>{ const pn=+p.n, amt=parsePrice(p.price); if(amt && pn>0 && pn<=n && pn>bestN){ bestN=pn; rate=amt/pn; } });
+    return Math.round(rate!=null ? rate : state.creditPrice);
+  }
   function issueReceipt(s, n, dateStr){
     const no = "RE-"+NOW.getFullYear()+"-"+String(state.receiptSeq++).padStart(4,"0");
     const unit = unitForCredits(n);
@@ -1276,7 +1304,9 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#rcptPrint").onclick = ()=>window.print();
   }
   function closeReceipt(){ $("#receiptModal").hidden=true; }
-  function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; s.credits=Math.max(0, val); if(id===state.currentUser){ state.credits=s.credits; updateCredits(); } }
+  // Balances may go negative (a tutor booking a lesson the student hasn't paid
+  // for yet); the server is authoritative, so we don't clamp here.
+  function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; s.credits=val; if(id===state.currentUser){ state.credits=s.credits; updateCredits(); } }
   function addStudentCredits(id, n){ const s=studentById(id); if(!s) return; setStudentCredits(id, s.credits + n); }
   function avatarStyle(t){ if(t && t.photo) return `background-image:url('${t.photo}'); background-size:cover; background-position:center; color:transparent;`; const c=(t&&t.c)||["#309050","#277a42"]; return `background: conic-gradient(from 140deg, ${c[0]}, ${c[1]}, ${c[0]});`; }
 
@@ -1397,8 +1427,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if(refund){ state.credits+=1; }
     const t=tutorById(b.tutorId);
     meLog().unshift({ type: refund?"buy":"done", label: refund?"Storniert \u2014 Einheit erstattet":"Storniert (innerhalb 24 h)", sub: t.name+" \u00b7 "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate(), amt: refund?"+1":"" });
-    if (b._pk) api('DELETE', '/api/bookings/' + b._pk + '/');
     if (refund) { const _s = studentById(b.studentId); if (_s) _s.credits += 1; }
+    if (b._pk) api('DELETE', '/api/bookings/' + b._pk + '/').then(r => {
+      // Server decides the refund (24h forfeit rule); reconcile to its balance.
+      if (r && typeof r.credits === 'number') {
+        state.credits = r.credits; const _s = studentById(b.studentId); if (_s) _s.credits = r.credits;
+        updateCredits(); renderAccount();
+      }
+    });
     state.managing=null; state.selected=null; state.justBooked=null;
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
     toast(refund ? "Stunde storniert \u00b7 1 Einheit erstattet" : "Stunde storniert");
@@ -1640,7 +1676,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
       date: ymd(s.date),
       time: s.time,
       title: 'Englischstunde',
-    }).then(r => { if (r && r.pk) booking._pk = r.pk; });
+    }).then(r => {
+      if (r && r.pk) booking._pk = r.pk;
+      // Reconcile with the server's authoritative balance.
+      if (r && typeof r.credits === 'number') { state.credits = r.credits; updateCredits(); renderAccount(); }
+    });
     updateCredits(); renderWeek(); renderSummary(); renderAccount(); renderTeacherWeek(); renderRoster();
     toast(`Stunde gebucht mit ${t.name.split(" ")[0]} · ${s.time}`);
   }
@@ -1652,6 +1692,29 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#coinNum").textContent = state.credits;
     $("#balanceBig").textContent = state.credits;
     $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length;
+    renderSettleBox();
+  }
+
+  // Show a "settle outstanding" CTA whenever the student's balance is negative
+  // (a tutor booked lessons they haven't paid for yet).
+  function renderSettleBox() {
+    const box = $("#settleBox"); if (!box) return;
+    const outstanding = Math.max(0, -state.credits);
+    if (outstanding <= 0 || !(state.stripe && state.stripe.enabled)) { box.hidden = true; return; }
+    const unit = settleUnitEuros(outstanding);
+    const total = unit * outstanding;
+    box.hidden = false;
+    $("#settleTitle").textContent = `${outstanding} offene Einheit${outstanding!==1?"en":""} · € ${total}`;
+    $("#settleSub").innerHTML = `${outstanding} × € ${unit} pro Einheit. Begleiche jetzt sicher per Karte, um wieder buchen zu können.`;
+    const btn = $("#settleBtn");
+    btn.disabled = false;
+    btn.onclick = () => {
+      btn.disabled = true;
+      api('POST', '/api/settle/').then(res => {
+        if (res && res.url) { window.location.href = res.url; }
+        else { btn.disabled = false; toast("Zahlung konnte nicht gestartet werden"); }
+      });
+    };
   }
 
   // ---------- Account ----------
@@ -1881,33 +1944,41 @@ window.DJANGO_DATA = {{ django_data|safe }};
 
   function teacherAssign(date, time, studentId){
     const s=studentById(studentId); if(!s) return;
-    const comp = s.credits<=0;
-    if(!comp) setStudentCredits(studentId, s.credits-1);
-    s.log.unshift({ type:"book", label: comp?"Gratis-Stunde vom Tutor gebucht":"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt: comp?"":"-1" });
-    state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title: comp?"Gratis-Stunde":"Englischstunde" });
-    api('POST', '/api/bookings/', {
+    // Server-authoritative: a tutor booking always consumes a credit and may push
+    // the student negative (an unpaid lesson), capped at the configured floor.
+    apiResult('POST', '/api/bookings/', {
       studentSlug: studentId,
       tutorSlug: state.myTutor,
       date: ymd(date),
       time,
-      title: comp ? 'Gratis-Stunde' : 'Englischstunde',
-    }).then(r => { if (r && r.pk) state.bookings[state.bookings.length-1]._pk = r.pk; });
-    state.teacherSel=null; state.teacherManage=null;
-    renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
-    toast(`${s.name.split(" ")[0]} eingetragen · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
+      title: 'Englischstunde',
+    }).then(res => {
+      if (res.status === 409) { toast(`${s.name.split(" ")[0]} hat das Limit offener Einheiten erreicht — bitte zuerst begleichen`); return; }
+      if (!res.ok || !res.data) { toast("Buchung fehlgeschlagen"); return; }
+      const r = res.data;
+      state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title:"Englischstunde", _pk:r.pk });
+      if (typeof r.credits === 'number') setStudentCredits(studentId, r.credits);
+      s.log.unshift({ type:"book", label:"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt:"-1" });
+      state.teacherSel=null; state.teacherManage=null;
+      renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
+      toast(`${s.name.split(" ")[0]} eingetragen · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
+    });
   }
 
   function teacherRemove(bk){
     const i=state.bookings.indexOf(bk); if(i<0) return;
     const s=studentById(bk.studentId);  // null for a free guest/intro booking
     state.bookings.splice(i,1);
-    if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/');
-    // Only refund a credit when an actual student paid for the slot. A free intro
-    // never consumed one, so removing it just frees the time.
+    // Only refund a credit when an actual student held the slot. A free intro
+    // never consumed one, so removing it just frees the time. The server performs
+    // the refund and returns the authoritative balance.
     if (s) {
       addStudentCredits(bk.studentId, 1);
       s.log.unshift({ type:"buy", label:"Buchung vom Tutor entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Einheit zurück", amt:"+1" });
     }
+    if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/').then(r => {
+      if (s && r && typeof r.credits === 'number') { setStudentCredits(bk.studentId, r.credits); }
+    });
     state.teacherManage=null; state.teacherSel=null;
     renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
     const who = s ? s.name.split(" ")[0] : (bk.guestName || "Schnupperstunde");
@@ -2055,6 +2126,12 @@ window.DJANGO_DATA = {{ django_data|safe }};
             <button class="mini-btn" data-madd="10">+10</button>
           </div>
         </div>
+        ${s.credits < 0 ? `
+        <div class="modal-add" style="background:rgba(194,85,47,0.08);border-color:rgba(194,85,47,0.25);">
+          <span class="ma-label" style="color:#c2552f;">Offene Einheiten begleichen<em>${-s.credits} × € ${settleUnitEuros(-s.credits)} = € ${settleUnitEuros(-s.credits)*(-s.credits)}</em></span>
+          <button class="mini-btn" id="settleLinkBtn" style="white-space:nowrap;">Zahlungslink</button>
+        </div>
+        <div id="settleLinkOut" hidden style="margin:-4px 2px 4px;font-size:12px;color:var(--muted);word-break:break-all;"></div>` : ``}
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Notizen</h2></div>
         <div class="snote-add">
           <input class="bf-input snote-input" id="snoteInput" placeholder="Notiz zu ${escHtml(s.name.split(' ')[0])}…">
@@ -2072,6 +2149,19 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#modalCard").onclick = (e)=>e.stopPropagation();
     $("#modalX").onclick = closeStudentModal;
     $("#studentModal").querySelectorAll("[data-madd]").forEach(btn=> btn.onclick=()=>topUp(s, +btn.dataset.madd, true));
+    const settleLinkBtn = $("#settleLinkBtn");
+    if (settleLinkBtn) settleLinkBtn.onclick = () => {
+      settleLinkBtn.disabled = true; settleLinkBtn.textContent = "…";
+      api('POST', '/api/students/' + s.id + '/settle-link/').then(res => {
+        settleLinkBtn.disabled = false; settleLinkBtn.textContent = "Zahlungslink";
+        const out = $("#settleLinkOut");
+        if (res && res.url) {
+          if (out) { out.hidden = false; out.textContent = res.url; }
+          if (navigator.clipboard) navigator.clipboard.writeText(res.url).then(()=>toast("Link kopiert — an den Schüler senden")).catch(()=>{});
+          else toast("Zahlungslink erstellt");
+        } else { toast("Link konnte nicht erstellt werden"); }
+      });
+    };
     $("#snoteAdd").onclick=()=>addStudentNote(s);
     $("#snoteInput").addEventListener("keydown", e=>{ if(e.key==="Enter") addStudentNote(s); });
     $("#studentModal").querySelectorAll(".cm-les[data-lesson]").forEach(b=> b.onclick=()=>{ toggleLesson(s, b.dataset.lesson); renderStudentModal(); });
