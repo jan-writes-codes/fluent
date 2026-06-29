@@ -162,6 +162,59 @@ On a PaaS, use that as the **start command**, and
 
 For a single-tutor business, **(B)** is the lower-maintenance choice.
 
+## Custom domains (Render + GoDaddy)
+
+Pointing a domain at a Render service is three steps that must agree:
+**Render** has to accept the hostname, **DNS** has to route it to Render, and
+**Django** has to allow it. Example below wires the prod service to the apex
+`thegreenpencil.at` (with `www` redirecting to it).
+
+The apex (root) domain is the tricky part: it **cannot** be a `CNAME`, so it
+needs `A` records pointing at Render's IPs. `www` is a subdomain, so it uses a
+`CNAME` as usual.
+
+1. **Render — add the custom domain(s).** Open the *prod* web service →
+   **Settings → Custom Domains → Add Custom Domain** → add `thegreenpencil.at`,
+   then add `www.thegreenpencil.at` too (Render auto-redirects `www` → apex).
+   For the apex, Render shows one or more **`A` record IP addresses**; for `www`
+   it shows the `*.onrender.com` CNAME target. Copy those values.
+
+2. **GoDaddy — add the DNS records.** In **My Products → Domain → DNS →
+   Manage DNS**, add:
+
+   | Type | Name | Value | TTL |
+   | ---- | ---- | ----- | --- |
+   | `A` | `@` | the IP(s) Render showed for the apex (one row per IP) | default (1 hr) |
+   | `CNAME` | `www` | `green-pencil-prod.onrender.com` (the target Render showed) | default (1 hr) |
+
+   `@` is GoDaddy's notation for the root domain itself. If GoDaddy already has
+   a parked/forwarding `A` record on `@` (it usually does on a fresh domain),
+   **edit/delete it** so the only `@` `A` records are Render's — leftover parking
+   records will send visitors to a GoDaddy placeholder. Also remove any GoDaddy
+   "Domain Forwarding" on the root for the same reason.
+
+3. **Django — allow the host.** In the prod service's env vars on Render, make
+   sure `DJANGO_ALLOWED_HOSTS` includes both hosts, then redeploy:
+
+   ```
+   DJANGO_ALLOWED_HOSTS=thegreenpencil.at,www.thegreenpencil.at
+   ```
+
+   Without this, Django answers `400 Bad Request (DisallowedHost)` even though
+   DNS and TLS are correct. (Same-origin form posts/CSRF work without extra
+   config — Django matches the request's own origin and `SECURE_PROXY_SSL_HEADER`
+   already accounts for Render's TLS-terminating proxy.)
+
+Then wait for propagation. Render auto-issues a Let's Encrypt certificate once
+it can resolve the records (usually minutes, up to ~an hour while DNS spreads);
+each domain shows **Verified** in Render when ready. Check progress with:
+
+```bash
+dig +short thegreenpencil.at             # should return Render's A-record IP(s)
+dig +short www.thegreenpencil.at         # should return the Render CNAME target
+curl -I https://thegreenpencil.at        # expect 200/302, valid TLS
+```
+
 ## Quick checklist per environment
 
 - [ ] `DJANGO_SECRET_KEY` set (unique), `DJANGO_DEBUG=false`, `DJANGO_ALLOWED_HOSTS` set
