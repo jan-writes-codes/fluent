@@ -472,7 +472,7 @@ def receipt_html(r_data, settings):
         "line2": "Englisch-Privatunterricht",
         "addr": "Kraygasse 94/2/6",
         "city": "1220 Wien, Österreich",
-        "email": "davit18h@gmail.com",
+        "email": "davit@thegreenpencil.at",
     }
     VAT_DE = "Steuerfreigemäß § 6 Abs. 1 Z 11 UStG (Unterrichtsleistung eines Privatlehrers)."
     VAT_EN = "VAT-exempt educational service under Austrian law — no value-added tax is charged."
