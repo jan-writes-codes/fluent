@@ -2,7 +2,8 @@
 <!DOCTYPE html>
 <html lang="de"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f5f2ea">
 <meta name="csrf-token" content="{{ csrf_token }}">
 <meta name="robots" content="noindex">
 <title>Erste Stunde buchen — kostenlos &amp; unverbindlich | The Green Pencil</title>
@@ -25,6 +26,9 @@
     --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Root background so Safari fills the safe-area / overscroll strips in the
+     page colour rather than white. */
+  html { background: var(--bg); }
   body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; overflow-x: hidden; }
   .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.42; mix-blend-mode: multiply; }
@@ -36,7 +40,10 @@
 
   header.top { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(14px);
     background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22)); border-bottom: 1px solid var(--line-2); }
-  .top-in { display: flex; align-items: center; gap: 20px; padding: 14px 0; }
+  /* Set only the vertical padding so the .wrap horizontal gutter (0 28px) is
+     preserved — using the `padding` shorthand here would zero it and let the
+     header bleed to the screen edge (the rest of the page keeps its 28px margin). */
+  .top-in { display: flex; align-items: center; gap: 20px; padding-top: 14px; padding-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
   .mark { width: 40px; height: 40px; border-radius: 12px; overflow: hidden; display: grid; place-items: center;
     background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%); box-shadow: 0 12px 26px -10px rgba(58,165,92,0.55); }
@@ -87,7 +94,7 @@
   .weeknav .today-btn { width: auto; padding: 0 14px; font-weight: 600; font-size: 13.5px; }
 
   .cal-scroll { overflow-x: auto; }
-  .days-row { display: grid; grid-template-columns: repeat(5, minmax(118px, 1fr)); gap: 10px; min-width: 600px; }
+  .days-row { display: grid; grid-template-columns: repeat(7, minmax(116px, 1fr)); gap: 10px; min-width: 820px; }
   .day-col { background: rgba(255,255,255,0.4); border: 1px solid var(--line-2); border-radius: 14px; padding: 10px; }
   .day-name { text-align: center; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line-2); position: relative; }
   .day-name .dn { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -184,8 +191,8 @@ window.INTRO_DATA = {{ intro_data|safe }};
   const AVAIL = DATA.availability || {};         // {slug: {"key|time": bool}}
   const CUSTOM = DATA.customTimes || {};         // {slug: {key: [times]}}
   const BOOKED = DATA.booked || {};              // {slug: ["key|time", ...]}
-  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=18*60+30; m+=15){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
-  const DOW = ["Mo","Di","Mi","Do","Fr"];
+  const TIMES = (()=>{ const out=[]; for(let m=9*60; m<=20*60; m+=15){ out.push(String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")); } return out; })();
+  const DOW = ["Mo","Di","Mi","Do","Fr","Sa","So"];
   const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
   const MONTHS_S = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
   const DOW_FULL = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
@@ -217,11 +224,11 @@ window.INTRO_DATA = {{ intro_data|safe }};
     if(sameDay(date, REAL)) return toMin(time) <= (REAL.getHours()*60 + REAL.getMinutes());
     return false;
   }
-  // True if the Mon–Fri week at `offset` has at least one bookable slot for the
-  // current tutor — i.e. an open, not-yet-past, unbooked slot.
+  // True if the week at `offset` has at least one bookable slot for the current
+  // tutor — i.e. an open, not-yet-past, unbooked slot.
   function weekHasSlot(offset){
     const ws = addDays(startOfWeek(NOW), offset*7);
-    for(let i=0;i<5;i++){
+    for(let i=0;i<7;i++){
       const date = addDays(ws,i);
       if(date < NOW && !sameDay(date, REAL)) continue;   // skip fully-past days
       const open = dayTimes(date, state.tutor).some(time =>
@@ -263,7 +270,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
 
   function renderWeek(){
     const weekStart = addDays(startOfWeek(NOW), state.weekOffset*7);
-    const firstMonth = weekStart.getMonth(), lastMonth = addDays(weekStart,4).getMonth();
+    const firstMonth = weekStart.getMonth(), lastMonth = addDays(weekStart,6).getMonth();
     $("#monthLabel").textContent = firstMonth===lastMonth
       ? MONTHS[firstMonth]+" "+weekStart.getFullYear()
       : MONTHS_S[firstMonth]+" – "+MONTHS_S[lastMonth]+" "+weekStart.getFullYear();
@@ -271,7 +278,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
     $("#nextWeek").disabled = state.weekOffset>=8;
 
     const row=$("#daysRow"); row.innerHTML="";
-    for(let i=0;i<5;i++){
+    for(let i=0;i<7;i++){
       const date=addDays(weekStart,i);
       const isToday=sameDay(date,REAL);
       const isPastDay = date < NOW && !isToday;

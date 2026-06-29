@@ -137,7 +137,7 @@ class LoginPageTests(FluentDataMixin, TestCase):
         self.assertContains(resp, "€270")
         # Per-unit price is derived server-side (145 / 5 = 29).
         self.assertContains(resp, "€29 pro Einheit")
-        # English default tag is shown in German on the German page.
+        # The popular pack (SiteSettings.popular_n, default 10) is badged "Beliebt".
         self.assertContains(resp, "Beliebt")
 
     def test_anonymous_app_redirects_to_login(self):
@@ -1759,12 +1759,27 @@ class LessonBookingEmailTests(FluentDataMixin, TestCase):
         # HTML alternative present.
         self.assertTrue(any(ct == "text/html" for _, ct in msg.alternatives))
 
-    def test_no_mail_when_tutor_has_no_address(self):
+    def test_student_gets_confirmation_with_cancel_link(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        self.assertEqual(len(student_mail), 1, "the student must get a booking confirmation")
+        msg = student_mail[0]
+        self.assertIn("gebucht", msg.subject)
+        # The confirmation carries a public cancel link.
+        b = Booking.objects.get(student=self.maya, time="09:00")
+        self.assertTrue(b.cancel_token, "a paid booking must mint a cancel token")
+        self.assertIn(f"/cancel/{b.cancel_token}/", msg.body)
+
+    def test_no_tutor_mail_when_tutor_has_no_address(self):
         from django.core import mail
         self.davit.email = ""
         self.davit.save()
         self.assertEqual(self._book().status_code, 200)
-        self.assertEqual(len(mail.outbox), 0)
+        # The tutor can't be notified without an address, but the student still
+        # gets their confirmation.
+        self.assertEqual([m for m in mail.outbox if "Neue Buchung" in m.subject], [])
+        self.assertEqual(len([m for m in mail.outbox if m.to == ["maya@fluent.at"]]), 1)
 
     def test_email_failure_never_breaks_booking(self):
         with mock.patch(
