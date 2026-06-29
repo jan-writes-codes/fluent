@@ -38,7 +38,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from .models import (
     User, Booking, Receipt, CreditTransaction, ActiveLesson, LessonFile,
-    SiteSettings,
+    SiteSettings, AvailabilityOverride,
 )
 
 
@@ -1216,6 +1216,51 @@ class NegativeCreditBookingTests(FluentDataMixin, TestCase):
         self.assertFalse(resp.json()["refunded"])
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.credits, after_book)   # forfeited
+
+
+class BookingSlotValidationTests(FluentDataMixin, TestCase):
+    """Slot conflicts/closures must be enforced on the API, not just in the UI."""
+
+    def _post(self, actor, student_slug, d, t):
+        self.client.force_login(actor)
+        return self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": student_slug, "tutorSlug": "davit",
+                             "date": d, "time": t, "title": "x"}),
+            content_type="application/json",
+        )
+
+    def test_cannot_double_book_taken_slot(self):
+        self._post(self.maya, "maya", "2026-07-02", "09:00")            # maya takes it
+        before = Booking.objects.count()
+        self.ines.refresh_from_db(); ines_credits = self.ines.credits
+        resp = self._post(self.ines, "ines", "2026-07-02", "09:00")     # ines clashes
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "slot_taken")
+        self.assertEqual(Booking.objects.count(), before)               # no booking
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.credits, ines_credits)               # no deduction
+
+    def test_cannot_book_closed_slot(self):
+        AvailabilityOverride.objects.create(
+            tutor=self.davit, date=date(2026, 7, 3), time="11:00", is_open=False)
+        resp = self._post(self.maya, "maya", "2026-07-03", "11:00")
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "slot_closed")
+
+    def test_cannot_reschedule_onto_taken_slot(self):
+        self._post(self.maya, "maya", "2026-07-04", "09:00")
+        self._post(self.ines, "ines", "2026-07-04", "10:00")
+        mine = Booking.objects.get(student=self.ines, date=date(2026, 7, 4), time="10:00")
+        self.client.force_login(self.ines)
+        resp = self.client.put(
+            f"/api/bookings/{mine.pk}/",
+            data=json.dumps({"time": "09:00"}),                          # collide with maya
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 409)
+        mine.refresh_from_db()
+        self.assertEqual(mine.time, "10:00")                            # unchanged
 
 
 # --------------------------------------------------------------------------- #
