@@ -18,6 +18,10 @@ class User(AbstractUser):
     billing_city = models.CharField(max_length=100, blank=True)
     billing_country = models.CharField(max_length=100, default='Österreich')
     receipt_seq = models.IntegerField(default=1000)
+    # Capability token for the public "settle outstanding credits" link a tutor
+    # can hand to a student. Empty until first generated; a fresh, unguessable
+    # value lets the student pay their negative balance without logging in.
+    settle_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
 
     class Meta:
         db_table = 'core_user'
@@ -209,6 +213,11 @@ class LessonFile(models.Model):
 
 class SiteSettings(models.Model):
     credit_price = models.IntegerField(default=30)  # EUR
+    # The most negative a balance may be pushed by a tutor booking a session for a
+    # student who is out of credits (students themselves can never go below 0). Acts
+    # as a ceiling on unpaid lessons before the student must settle. -10 ≈ ten
+    # lessons of trust.
+    credit_floor = models.IntegerField(default=-10)
     packs_json = models.TextField(
         default='[{"n":1,"price":"€32","each":"€32 / session","feat":false},'
                 '{"n":5,"price":"€145","each":"€29 / session","feat":false},'

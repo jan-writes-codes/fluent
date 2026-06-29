@@ -38,6 +38,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from .models import (
     User, Booking, Receipt, CreditTransaction, ActiveLesson, LessonFile,
+    SiteSettings,
 )
 
 
@@ -1123,6 +1124,215 @@ class StripeCheckoutTests(FluentDataMixin, TestCase):
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.credits, start)
         self.assertEqual(Receipt.objects.filter(stripe_session_id="cs_unpaid").count(), 0)
+
+
+# --------------------------------------------------------------------------- #
+# Negative credits: tutor books on tab, student/tutor settle the balance
+# --------------------------------------------------------------------------- #
+class NegativeCreditBookingTests(FluentDataMixin, TestCase):
+    def _book(self, actor, student_slug, d="2026-07-01", t="09:30"):
+        self.client.force_login(actor)
+        return self.client.post(
+            "/api/bookings/",
+            data=json.dumps({
+                "studentSlug": student_slug, "tutorSlug": "davit",
+                "date": d, "time": t, "title": "English session",
+            }),
+            content_type="application/json",
+        )
+
+    def test_booking_deducts_one_credit(self):
+        start = self.maya.credits
+        resp = self._book(self.maya, "maya")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["credits"], start - 1)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start - 1)
+        # The consumption is recorded on the ledger.
+        txn = CreditTransaction.objects.filter(student=self.maya, txn_type="book").latest("created_at")
+        self.assertEqual(txn.amount, -1)
+
+    def test_tutor_can_book_student_into_negative(self):
+        self.ines.credits = 0
+        self.ines.save()
+        resp = self._book(self.davit, "ines")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["credits"], -1)
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.credits, -1)
+
+    def test_student_cannot_book_without_credits(self):
+        self.ines.credits = 0
+        self.ines.save()
+        resp = self._book(self.ines, "ines")
+        self.assertEqual(resp.status_code, 402)
+        self.assertEqual(resp.json()["error"], "insufficient_credits")
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.credits, 0)            # no deduction
+        self.assertFalse(Booking.objects.filter(student=self.ines, time="09:30").exists())
+
+    def test_student_cannot_book_when_already_negative(self):
+        self.maya.credits = -2
+        self.maya.save()
+        resp = self._book(self.maya, "maya")
+        self.assertEqual(resp.status_code, 402)
+
+    def test_credit_floor_blocks_tutor(self):
+        s = SiteSettings.objects.first() or SiteSettings.objects.create()
+        s.credit_floor = -3
+        s.save()
+        self.ines.credits = -3                            # already at the floor
+        self.ines.save()
+        resp = self._book(self.davit, "ines")
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.json()["error"], "credit_floor_reached")
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.credits, -3)           # unchanged
+
+    def test_tutor_delete_refunds_credit(self):
+        self.maya.credits = 0
+        self.maya.save()
+        self._book(self.davit, "maya")                    # -> -1
+        b = Booking.objects.filter(student=self.maya, time="09:30").latest("id")
+        self.client.force_login(self.davit)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["refunded"])
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, 0)            # back to zero
+
+    def test_student_cancel_within_24h_forfeits(self):
+        # A booking later *today* is inside the 24h window -> no refund.
+        self.maya.credits = 5
+        self.maya.save()
+        today = date.today().isoformat()
+        self._book(self.maya, "maya", d=today, t="23:59")
+        self.maya.refresh_from_db()
+        after_book = self.maya.credits                    # 4
+        b = Booking.objects.filter(student=self.maya).latest("id")
+        self.client.force_login(self.maya)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["refunded"])
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, after_book)   # forfeited
+
+
+# --------------------------------------------------------------------------- #
+# Settlement pricing (tier rule) + settle flow
+# --------------------------------------------------------------------------- #
+class SettlePricingTests(TestCase):
+    def setUp(self):
+        from core.models import SiteSettings
+        self.s = SiteSettings.objects.create(credit_price=30, packs_json=json.dumps([
+            {"n": 1, "price": "€32"}, {"n": 5, "price": "€145"}, {"n": 10, "price": "€270"},
+        ]))
+
+    def test_tier_unit_price(self):
+        from core.views import settle_unit_euros
+        # Largest pack whose size <= n sets the per-credit rate.
+        self.assertEqual(settle_unit_euros(self.s, 4), 32)    # only the 1-pack reached
+        self.assertEqual(settle_unit_euros(self.s, 8), 29)    # 5-pack tier (145/5)
+        self.assertEqual(settle_unit_euros(self.s, 13), 27)   # 10-pack tier (270/10)
+
+    def test_total_cents(self):
+        from core.views import settle_total_cents
+        self.assertEqual(settle_total_cents(self.s, 8), 8 * 29 * 100)
+        self.assertEqual(settle_total_cents(self.s, 13), 13 * 27 * 100)
+
+
+class SettleFlowTests(FluentDataMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        SiteSettings.objects.create(credit_price=30, packs_json=json.dumps([
+            {"n": 1, "price": "€32"}, {"n": 5, "price": "€145"}, {"n": 10, "price": "€270"},
+        ]))
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_student_settle_creates_session_for_outstanding(self):
+        self.maya.credits = -8
+        self.maya.save()
+        self.client.force_login(self.maya)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.create.return_value = mock.Mock(url="https://pay/cs_s1", id="cs_s1")
+            resp = self.client.post("/api/settle/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["url"], "https://pay/cs_s1")
+        _, kwargs = st.checkout.Session.create.call_args
+        li = kwargs["line_items"][0]
+        self.assertEqual(li["quantity"], 8)
+        self.assertEqual(li["price_data"]["unit_amount"], 29 * 100)   # tier rate
+        self.assertEqual(kwargs["metadata"], {
+            "student_slug": "maya", "credits": "8", "kind": "settle", "unit": "29",
+        })
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_settle_rejects_when_nothing_outstanding(self):
+        self.client.force_login(self.maya)                # maya has 8 (positive)
+        resp = self.client.post("/api/settle/")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_tutor_settle_link_requires_debt(self):
+        self.client.force_login(self.davit)
+        # Positive balance -> nothing to settle.
+        resp = self.client.post("/api/students/maya/settle-link/")
+        self.assertEqual(resp.status_code, 400)
+        # Negative balance -> a token + link is minted.
+        self.ines.credits = -5
+        self.ines.save()
+        resp = self.client.post("/api/students/ines/settle-link/")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.ines.refresh_from_db()
+        self.assertTrue(self.ines.settle_token)
+        self.assertIn(self.ines.settle_token, body["url"])
+        self.assertEqual(body["outstanding"], 5)
+        self.assertEqual(body["amount"], 5 * 29)          # 5-pack tier
+
+    def test_students_cannot_mint_settle_link(self):
+        self.client.force_login(self.maya)
+        resp = self.client.post("/api/students/ines/settle-link/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_public_settle_page_renders_and_validates_token(self):
+        self.maya.credits = -8
+        self.maya.settle_token = "tok_abc"
+        self.maya.save()
+        resp = self.client.get("/settle/tok_abc/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Maya")
+        self.assertContains(resp, "8 Einheit")
+        self.assertContains(resp, "232")                  # 8 × €29
+        # Unknown token -> 404 page, no leak.
+        self.assertEqual(self.client.get("/settle/nope/").status_code, 404)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_token_checkout_then_webhook_settles_to_zero(self):
+        self.maya.credits = -8
+        self.maya.settle_token = "tok_pay"
+        self.maya.save()
+        # Public token checkout creates the session...
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.create.return_value = mock.Mock(url="https://pay/cs_set", id="cs_set")
+            resp = self.client.post("/settle/tok_pay/checkout/")
+        self.assertEqual(resp.status_code, 200)
+        _, kwargs = st.checkout.Session.create.call_args
+        self.assertEqual(kwargs["metadata"]["kind"], "settle")
+        # ...and the webhook (source of truth) credits them back to zero, once.
+        event = json.dumps({
+            "type": "checkout.session.completed",
+            "data": {"object": {
+                "id": "cs_set", "payment_status": "paid",
+                "metadata": {"student_slug": "maya", "credits": "8", "kind": "settle", "unit": "29"},
+            }},
+        })
+        self.client.post("/api/stripe/webhook/", data=event, content_type="application/json")
+        self.client.post("/api/stripe/webhook/", data=event, content_type="application/json")
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, 0)
+        r = Receipt.objects.get(stripe_session_id="cs_set")
+        self.assertEqual(r.credits, 8)
+        self.assertEqual(r.unit_price_cents, 29)          # tier unit on the receipt
 
 
 # --------------------------------------------------------------------------- #

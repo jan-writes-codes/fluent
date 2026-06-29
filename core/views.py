@@ -1,6 +1,6 @@
 import json
 import secrets
-from datetime import date
+from datetime import date, datetime, time as dtime, timedelta
 from functools import wraps
 from django.conf import settings as dj_settings
 from django.core.exceptions import ValidationError
@@ -229,10 +229,44 @@ def receipt_unit_price(settings, n):
     return settings.credit_price
 
 
-def grant_credits(student, n, settings, *, label, sub, stripe_session_id=""):
+def settle_unit_euros(settings, n):
+    """Per-credit price (whole euros) for settling ``n`` outstanding credits: the
+    per-credit rate of the *largest configured pack whose size is ≤ n* — i.e. the
+    volume tier the student has "already reached". Falls back to the flat
+    per-credit price when no pack qualifies. Server-authoritative.
+
+    Example with packs {1:€32, 5:€145, 10:€270}: settling 8 → the 5-pack tier is
+    reached (€145/5 = €29) → €29/credit; settling 13 → the 10-pack tier (€27)."""
+    try:
+        packs = json.loads(settings.packs_json)
+    except (ValueError, TypeError):
+        packs = []
+    best_n, best_rate = 0, None
+    for p in packs:
+        try:
+            pn = int(p.get("n"))
+            amt = parse_price(p.get("price"))
+        except (ValueError, TypeError):
+            continue
+        if amt and pn > 0 and pn <= n and pn > best_n:
+            best_n, best_rate = pn, amt / pn
+    rate = best_rate if best_rate is not None else settings.credit_price
+    return round(rate)
+
+
+def settle_total_cents(settings, n):
+    """Total settlement charge in cents for ``n`` outstanding credits (tier rule)."""
+    return settle_unit_euros(settings, n) * 100 * n
+
+
+def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", unit_euros=None):
     """Add ``n`` credits to ``student`` and issue the matching receipt + ledger
     entry, atomically. Shared by the tutor "add credits" action and the Stripe
     checkout flow so both produce identical, auditable records.
+
+    ``unit_euros`` overrides the per-credit price stamped on the receipt (used by
+    the settlement flow, where the price follows the tier rule rather than an exact
+    pack match); when omitted it falls back to ``receipt_unit_price``.
 
     The receipt and transaction capture a *snapshot* of the student's identity and
     billing address at issue time: these are immutable financial records that must
@@ -266,7 +300,7 @@ def grant_credits(student, n, settings, *, label, sub, stripe_session_id=""):
             billing_country=student.billing_country,
             date_str=date_str,
             credits=n,
-            unit_price_cents=receipt_unit_price(settings, n),
+            unit_price_cents=unit_euros if unit_euros is not None else receipt_unit_price(settings, n),
             stripe_session_id=stripe_session_id,
         )
 
@@ -336,11 +370,23 @@ def credit_from_stripe_session(session):
     student = User.objects.filter(slug=slug, role="student").first()
     if not student:
         return None
+    # A settlement charge prices each credit by the tier rule, not an exact pack;
+    # the unit is carried in metadata so the receipt matches what was charged.
+    unit_euros = None
+    if meta.get("unit"):
+        try:
+            unit_euros = int(round(float(meta.get("unit"))))
+        except (ValueError, TypeError):
+            unit_euros = None
+    if meta.get("kind") == "settle":
+        label, sub = "Offener Betrag beglichen", "Online bezahlt"
+    else:
+        label, sub = "Einheiten via Stripe", "Online bezahlt"
     settings = get_settings()
     try:
         return grant_credits(
             student, n, settings,
-            label="Einheiten via Stripe", sub="Online bezahlt", stripe_session_id=sid,
+            label=label, sub=sub, stripe_session_id=sid, unit_euros=unit_euros,
         )
     except IntegrityError:
         # A concurrent caller (webhook vs. redirect) won the race; reuse its receipt.
@@ -860,9 +906,37 @@ def api_logout(request):
 # Bookings API
 # ---------------------------------------------------------------------------
 
+def _booking_credit_txn(student, label, sub, amount):
+    """Record a booking-related movement on the credit ledger (book = -1,
+    refund = +1) with the identity snapshot, mirroring grant_credits' bookkeeping."""
+    CreditTransaction.objects.create(
+        student=student,
+        student_slug=student.slug,
+        student_name=student.get_full_name() or student.username,
+        txn_type="book" if amount < 0 else "buy",
+        label=label,
+        sub=sub,
+        amount=amount,
+    )
+
+
+def _booking_within_24h(b):
+    """True when booking ``b`` starts less than 24h from now (or is in the past) —
+    the window in which a student forfeits the credit on cancellation."""
+    from django.utils import timezone
+    try:
+        hh, mm = (int(x) for x in b.time.split(":"))
+    except (ValueError, AttributeError):
+        hh, mm = 0, 0
+    naive = datetime.combine(b.date, dtime(hh, mm))
+    start = timezone.make_aware(naive, timezone.get_current_timezone())
+    return start - timezone.now() < timedelta(hours=24)
+
+
 @require_http_methods(["POST"])
 @require_roles("student", "tutor", "admin")
 def api_bookings(request):
+    from django.db import transaction as db_transaction
     data = parse_body(request)
     try:
         student = User.objects.get(slug=data["studentSlug"], role="student")
@@ -873,19 +947,39 @@ def api_bookings(request):
         booking_date = date.fromisoformat(data["date"])
         time_str = data["time"]
         title = data.get("title", "English session")
+    except (KeyError, User.DoesNotExist, ValueError) as e:
+        return JsonResponse({"error": str(e)}, status=400)
+
+    settings = get_settings()
+    is_self = request.user.role == "student"
+    # Every booking consumes one credit. A student may only book what they have; a
+    # tutor/admin may book a student into the negative (an unpaid lesson the student
+    # settles later) but not past the configured floor.
+    with db_transaction.atomic():
+        locked = User.objects.select_for_update().get(pk=student.pk)
+        if is_self and locked.credits < 1:
+            return JsonResponse({"error": "insufficient_credits"}, status=402)
+        if not is_self and locked.credits - 1 < settings.credit_floor:
+            return JsonResponse(
+                {"error": "credit_floor_reached", "floor": settings.credit_floor},
+                status=409,
+            )
+        locked.credits -= 1
+        locked.save(update_fields=["credits"])
         b = Booking.objects.create(
-            student=student,
+            student=locked,
             tutor=tutor,
             date=booking_date,
             time=time_str,
             title=title,
         )
-        # Let the tutor know a student booked one of their slots.
-        from . import emails
-        emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
-        return JsonResponse({"pk": b.pk})
-    except (KeyError, User.DoesNotExist, ValueError) as e:
-        return JsonResponse({"error": str(e)}, status=400)
+        _booking_credit_txn(locked, "Stunde gebucht", f"{booking_date.strftime('%d.%m.%Y')} · {time_str}", -1)
+        new_credits = locked.credits
+
+    # Let the tutor know a student booked one of their slots.
+    from . import emails
+    emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
+    return JsonResponse({"pk": b.pk, "credits": new_credits})
 
 
 @require_http_methods(["PUT", "DELETE"])
@@ -903,8 +997,28 @@ def api_booking_detail(request, pk):
         return JsonResponse({"error": "forbidden"}, status=403)
 
     if request.method == "DELETE":
-        b.delete()
-        return JsonResponse({"ok": True})
+        from django.db import transaction as db_transaction
+        student = b.student
+        refunded = False
+        new_credits = None
+        if student is not None:
+            # A tutor/admin removal always returns the credit; a student cancelling
+            # inside the 24h window forfeits it (mirrors the booking UI's policy).
+            forfeit = is_student and _booking_within_24h(b)
+            with db_transaction.atomic():
+                locked = User.objects.select_for_update().get(pk=student.pk)
+                if not forfeit:
+                    locked.credits += 1
+                    locked.save(update_fields=["credits"])
+                    _booking_credit_txn(
+                        locked, "Buchung storniert — Einheit erstattet", "", 1
+                    )
+                    refunded = True
+                new_credits = locked.credits
+                b.delete()
+        else:
+            b.delete()
+        return JsonResponse({"ok": True, "refunded": refunded, "credits": new_credits})
 
     # PUT
     data = parse_body(request)
@@ -1093,6 +1207,143 @@ def api_stripe_webhook(request):
     if event_type == "checkout.session.completed":
         credit_from_stripe_session(event["data"]["object"])
     return JsonResponse({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Settle outstanding (negative) credits via Stripe
+# ---------------------------------------------------------------------------
+
+def _create_settle_checkout(request, student, n, settings, *, success_path, cancel_path):
+    """Create a Stripe Checkout session that charges ``student`` for ``n`` credits
+    at the tier settlement rate, tagged so the webhook/redirect credit them back to
+    zero. Returns the hosted-payment URL, or None on a Stripe error."""
+    unit_euros = settle_unit_euros(settings, n)
+    origin = request.build_absolute_uri("/").rstrip("/")
+    client = stripe_client()
+    try:
+        session = client.checkout.Session.create(
+            mode="payment",
+            line_items=[{
+                "quantity": n,
+                "price_data": {
+                    "currency": "eur",
+                    "unit_amount": unit_euros * 100,
+                    "product_data": {
+                        "name": f"{n} offene Einheiten — the green pencil",
+                        "description": "Begleichung offener Einheiten · 1 Einheit = 45 Minuten",
+                    },
+                },
+            }],
+            # Server-trusted facts: who to credit, how many, the settlement unit
+            # price (so the receipt matches), and the flow kind.
+            metadata={
+                "student_slug": student.slug, "credits": str(n),
+                "kind": "settle", "unit": str(unit_euros),
+            },
+            client_reference_id=student.slug,
+            customer_email=student.email or None,
+            success_url=f"{origin}{success_path}",
+            cancel_url=f"{origin}{cancel_path}",
+        )
+    except Exception:
+        return None
+    return session.url
+
+
+@require_http_methods(["POST"])
+@require_roles("student")
+def api_settle(request):
+    """Student self-service: pay off one's own negative balance. Charges exactly the
+    outstanding amount so the balance returns to zero."""
+    if not stripe_enabled():
+        return JsonResponse({"error": "stripe_disabled"}, status=503)
+    outstanding = max(0, -request.user.credits)
+    if outstanding <= 0:
+        return JsonResponse({"error": "nothing_outstanding"}, status=400)
+    settings = get_settings()
+    url = _create_settle_checkout(
+        request, request.user, outstanding, settings,
+        success_path="/app/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+        cancel_path="/app/?checkout=cancel",
+    )
+    if not url:
+        return JsonResponse({"error": "stripe_error"}, status=502)
+    return JsonResponse({"url": url})
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_settle_link(request, slug):
+    """Tutor/admin: mint (or reuse) the distributable settlement link for a student
+    who owes credits. The student can open it without logging in and pay."""
+    student = User.objects.filter(slug=slug, role="student").first()
+    if not student:
+        return JsonResponse({"error": "not found"}, status=404)
+    outstanding = max(0, -student.credits)
+    if outstanding <= 0:
+        return JsonResponse({"error": "nothing_outstanding"}, status=400)
+    if not student.settle_token:
+        student.settle_token = secrets.token_urlsafe(24)
+        student.save(update_fields=["settle_token"])
+    origin = request.build_absolute_uri("/").rstrip("/")
+    settings = get_settings()
+    return JsonResponse({
+        "url": f"{origin}/settle/{student.settle_token}/",
+        "outstanding": outstanding,
+        "amount": settle_total_cents(settings, outstanding) // 100,
+    })
+
+
+def _settle_student_for_token(token):
+    return (
+        User.objects.filter(settle_token=token, role="student").first()
+        if token else None
+    )
+
+
+def settle_page(request, token):
+    """Public capability-URL page where a student settles outstanding credits. No
+    login required — possession of the unguessable token authorizes payment."""
+    student = _settle_student_for_token(token)
+    if not student:
+        return render(request, "settle.html", {"invalid": True}, status=404)
+    outstanding = max(0, -student.credits)
+    settings = get_settings()
+    return render(request, "settle.html", {
+        "invalid": False,
+        "token": token,
+        "first_name": student.first_name or student.username,
+        "outstanding": outstanding,
+        "unit": settle_unit_euros(settings, outstanding) if outstanding else 0,
+        "amount": settle_total_cents(settings, outstanding) // 100 if outstanding else 0,
+        "stripe_enabled": stripe_enabled(),
+        "paid": request.GET.get("paid") == "1",
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_settle_token_checkout(request, token):
+    """Public: create the Checkout session for a token's current outstanding amount.
+    CSRF-exempt because the URL token is the capability (worst case a stranger pays
+    someone's debt — harmless) and the page may be opened without a session."""
+    if not stripe_enabled():
+        return JsonResponse({"error": "stripe_disabled"}, status=503)
+    student = _settle_student_for_token(token)
+    if not student:
+        return JsonResponse({"error": "not found"}, status=404)
+    outstanding = max(0, -student.credits)
+    if outstanding <= 0:
+        return JsonResponse({"error": "nothing_outstanding"}, status=400)
+    settings = get_settings()
+    url = _create_settle_checkout(
+        request, student, outstanding, settings,
+        success_path=f"/settle/{token}/?paid=1",
+        cancel_path=f"/settle/{token}/",
+    )
+    if not url:
+        return JsonResponse({"error": "stripe_error"}, status=502)
+    return JsonResponse({"url": url})
 
 
 # ---------------------------------------------------------------------------
