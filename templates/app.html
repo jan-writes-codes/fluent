@@ -1108,6 +1108,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     role: "Englisch-Tutor",
     c: [t.color1 || "#309050", t.color2 || "#277a42"],
     i: t.initials || "T",
+    photo: t.photo || null,  // so the booking calendar shows the tutor's photo, not just initials
   })) : [
     { id: "davit", name: "Davit", role: "Englisch-Tutor · Konversation & Prüfungen", c: ["#309050","#277a42"], i: "D" },
   ];
@@ -2560,7 +2561,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         id:r.slug, role:"tutor", name:r.name, email:r.email,
         i:r.initials||"NT", c:[r.color1, r.color2], photo:r.photo||null, password:r.tempPassword||"",
       });
-      TUTORS.push({ id:r.slug, name:(r.name||"Tutor").split(" ")[0], role:"Englisch-Tutor", c:[r.color1, r.color2], i:r.initials||"T" });
+      TUTORS.push({ id:r.slug, name:(r.name||"Tutor").split(" ")[0], role:"Englisch-Tutor", c:[r.color1, r.color2], i:r.initials||"T", photo:r.photo||null });
       state.adminSel=r.slug; renderAdmin();
       toast("Tutor hinzugefügt — Passwort unter „Details“ ablesen und weitergeben");
     });

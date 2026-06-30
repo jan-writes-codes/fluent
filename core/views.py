@@ -615,6 +615,7 @@ def public_booking_payload():
             "initials": t.initials,
             "color1": t.color1,
             "color2": t.color2,
+            "photo": t.photo,
         }
         for t in tutors
     ]
