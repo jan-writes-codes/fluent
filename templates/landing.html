@@ -160,8 +160,15 @@
      at the fixed layer's edge. Over-extending past the viewport (negative
      vertical inset) means the collapsing iOS toolbar never reveals an
      unpainted strip. */
+  /* Promote the field to its own compositor layer (translateZ + backface)
+     so iOS Safari rasterises the blurred, blend-mode blobs once into a stable
+     backing store instead of repainting them into the scrolling layer — that
+     lazy repaint is what dropped tiles to white and made a white block drift
+     up and down while scrolling. */
   .field { position: fixed; inset: -12vh 0; z-index: 0; overflow: hidden; pointer-events: none;
-    background: var(--bg); isolation: isolate; }
+    background: var(--bg); isolation: isolate;
+    transform: translateZ(0); -webkit-transform: translateZ(0);
+    -webkit-backface-visibility: hidden; backface-visibility: hidden; will-change: transform; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.5; mix-blend-mode: multiply; }
   .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw;
     background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); animation: drift1 26s ease-in-out infinite; }
