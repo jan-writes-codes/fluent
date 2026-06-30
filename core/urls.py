@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import TemplateView
 from . import views
 
 urlpatterns = [
@@ -7,6 +8,8 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('impressum/', views.impressum_view, name='impressum'),
     path('datenschutz/', views.datenschutz_view, name='datenschutz'),
+    # Static FAQ page — pure content, so a TemplateView is enough (no view fn).
+    path('faq/', TemplateView.as_view(template_name='faq.html'), name='faq'),
     path('intro/', views.intro_view, name='intro'),
     path('cancel/<str:token>/', views.booking_cancel_view, name='booking_cancel'),
     path('robots.txt', views.robots_txt, name='robots_txt'),

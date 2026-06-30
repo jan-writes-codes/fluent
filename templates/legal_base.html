@@ -14,7 +14,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#f5f2ea" />
-<meta name="robots" content="noindex" />
+{% block robots %}<meta name="robots" content="noindex" />{% endblock %}
 <title>{% block title %}{% endblock %} · The Green Pencil</title>
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
@@ -76,6 +76,7 @@
   .foot-in a { color: var(--muted); text-decoration: none; }
   .foot-in a:hover { color: var(--c1); }
 </style>
+{% block extrahead %}{% endblock %}
 </head>
 <body>
   <header class="top">
@@ -96,7 +97,7 @@
   <footer class="foot">
     <div class="wrap foot-in">
       <a href="/">← Zur Startseite</a>
-      <span><a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a></span>
+      <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a></span>
     </div>
   </footer>
 </body>
