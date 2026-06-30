@@ -361,6 +361,8 @@ window.INTRO_DATA = {{ intro_data|safe }};
       const data = await r.json().catch(()=>({}));
       state.booking=false;
       if(r.ok && data.ok){
+        // Google Ads: count a "Book appointment" conversion on a real, successful booking.
+        if(typeof gtag==="function"){ gtag("event","ads_conversion_Book_appointment_1",{}); }
         // Block the slot locally so it disappears from the calendar.
         (BOOKED[sel.tutorSlug]=BOOKED[sel.tutorSlug]||[]).push(sel.key+"|"+sel.time);
         showConfirmation(name, data);
