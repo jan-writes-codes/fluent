@@ -219,6 +219,95 @@ class GdprComplianceTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Credit packs: popular badge from SiteSettings.popular_n  +  photo persistence
+# --------------------------------------------------------------------------- #
+class CreditPackPopularTests(FluentDataMixin, TestCase):
+    def _set_packs(self):
+        s = SiteSettings.objects.first() or SiteSettings.objects.create()
+        s.packs_json = json.dumps([
+            {"n": 1, "price": "€45", "each": "€45 / session"},
+            {"n": 5, "price": "€210", "each": "€42 / session"},
+            {"n": 10, "price": "€400", "each": "€40 / session"},
+        ])
+        return s
+
+    def test_app_popular_badge_follows_popular_n_not_packs_json(self):
+        # The in-app "Einheiten aufladen" screen must derive the badge from the
+        # DB value (popular_n), so it can't be stuck on a pack hand-flagged in
+        # packs_json. Set popular_n to 5 and confirm only the 5-pack is featured.
+        s = self._set_packs()
+        s.popular_n = 5
+        s.save()
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        packs = {p["n"]: p for p in payload["settings"]["packs"]}
+        self.assertTrue(packs[5]["feat"])
+        self.assertEqual(packs[5]["tag"], "Beliebt")
+        self.assertFalse(packs[1]["feat"])
+        self.assertFalse(packs[10]["feat"])
+        self.assertEqual(payload["settings"]["popularN"], 5)
+
+    def test_admin_can_change_popular_pack_via_settings_api(self):
+        # The admin UI moves the badge by PUTting popularN — verify it persists
+        # and that stale feat/tag flags sent alongside are stripped from storage.
+        self._set_packs().save()
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            "/api/settings/",
+            data=json.dumps({
+                "popularN": 10,
+                "packs": [
+                    {"n": 1, "price": "€45", "feat": True, "tag": "Beliebt"},
+                    {"n": 5, "price": "€210"},
+                    {"n": 10, "price": "€400"},
+                ],
+            }),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        s = SiteSettings.objects.first()
+        self.assertEqual(s.popular_n, 10)
+        stored = json.loads(s.packs_json)
+        self.assertTrue(all("feat" not in p and "tag" not in p for p in stored))
+        # GET reflects the new value.
+        got = self.client.get("/api/settings/").json()
+        self.assertEqual(got["popularN"], 10)
+
+
+class ProfilePhotoPersistenceTests(FluentDataMixin, TestCase):
+    def test_admin_set_photo_persists_and_is_served_to_student(self):
+        # A photo set by the admin must survive to the DB (not only client
+        # state), so the student sees it when signing in on another device.
+        data_url = "data:image/png;base64,iVBORw0KGgo="
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            f"/api/users/{self.maya.slug}/",
+            data=json.dumps({"photo": data_url}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.photo, data_url)
+        # The student's own payload carries the photo on next load.
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload["currentUser"]["photo"], data_url)
+
+    def test_photo_can_be_removed(self):
+        self.maya.photo = "data:image/png;base64,iVBORw0KGgo="
+        self.maya.save()
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            f"/api/users/{self.maya.slug}/",
+            data=json.dumps({"photo": None}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertIsNone(self.maya.photo)
+
+
+# --------------------------------------------------------------------------- #
 # Booking persistence + cross-user visibility  (Bug A, backend half)
 # --------------------------------------------------------------------------- #
 class BookingPersistenceTests(FluentDataMixin, TestCase):

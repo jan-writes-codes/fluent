@@ -154,7 +154,14 @@
   }
 
   /* ---------- Ambient grainy gradient field ---------- */
-  .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  /* Opaque base + `isolation` keeps the blobs' multiply blend self-contained
+     instead of blending against the separately-composited page behind it — on
+     iOS Safari that backdrop dependency is what paints a hard rectangular seam
+     at the fixed layer's edge. Over-extending past the viewport (negative
+     vertical inset) means the collapsing iOS toolbar never reveals an
+     unpainted strip. */
+  .field { position: fixed; inset: -12vh 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background: var(--bg); isolation: isolate; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.5; mix-blend-mode: multiply; }
   .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw;
     background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); animation: drift1 26s ease-in-out infinite; }

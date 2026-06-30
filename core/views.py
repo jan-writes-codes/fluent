@@ -892,8 +892,18 @@ def app_view(request):
     for lf in lf_qs:
         lesson_files.setdefault(lf.lesson_id, []).append(serialize_lesson_file(lf))
 
-    # Settings
+    # Settings — the "Beliebt" badge is driven solely by SiteSettings.popular_n
+    # (the single source of truth shared with the public landing page) rather
+    # than by per-pack feat/tag flags inside packs_json, so the in-app
+    # "Einheiten aufladen" screen and the marketing page never drift apart.
     packs = json.loads(settings.packs_json)
+    for p in packs:
+        try:
+            is_popular = int(p.get("n")) == settings.popular_n
+        except (ValueError, TypeError):
+            is_popular = False
+        p["feat"] = is_popular
+        p["tag"] = "Beliebt" if is_popular else ""
     # receiptSeq: compute from max receipt number
     try:
         import re
@@ -923,6 +933,7 @@ def app_view(request):
         "settings": {
             "creditPrice": settings.credit_price,
             "packs": packs,
+            "popularN": settings.popular_n,
             "receiptSeq": max_seq,
         },
         "stripe": {
@@ -1702,6 +1713,11 @@ def api_user_detail(request, slug):
         u.email = new_email
     if "password" in data and data["password"]:
         u.set_password(data["password"])
+    if "photo" in data:
+        # Profile photo as a base64 data URL; null/empty removes it. Persisting
+        # here (rather than only in client state) is what makes an admin-set
+        # photo visible when the student later signs in on another device.
+        u.photo = data["photo"] or None
     if "credits" in data:
         try:
             u.credits = int(data["credits"])
@@ -1735,6 +1751,7 @@ def api_settings(request):
         return JsonResponse({
             "creditPrice": settings.credit_price,
             "packs": json.loads(settings.packs_json),
+            "popularN": settings.popular_n,
         })
 
     # PUT
@@ -1747,6 +1764,18 @@ def api_settings(request):
         except (ValueError, TypeError):
             pass
     if "packs" in data:
-        settings.packs_json = json.dumps(data["packs"])
+        # popular_n is the single source of truth for the badge, so strip any
+        # per-pack feat/tag flags before persisting to keep packs_json clean.
+        cleaned = []
+        for p in data["packs"]:
+            if isinstance(p, dict):
+                p = {k: v for k, v in p.items() if k not in ("feat", "tag")}
+            cleaned.append(p)
+        settings.packs_json = json.dumps(cleaned)
+    if "popularN" in data:
+        try:
+            settings.popular_n = int(data["popularN"])
+        except (ValueError, TypeError):
+            pass
     settings.save()
     return JsonResponse({"ok": True})
