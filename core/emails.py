@@ -242,6 +242,81 @@ def send_lesson_tutor_notification(booking_id):
     msg.send()
 
 
+def _cancel_snapshot(booking, *, refunded=False):
+    """Capture everything the cancellation e-mails need *before* the booking row is
+    deleted, so the senders never depend on a row that no longer exists (cancelling
+    deletes the booking). Mirrors the confirmation recipients: an intro notifies the
+    guest and the studio inbox; a paid lesson notifies the student and that lesson's
+    own tutor."""
+    is_intro = booking.is_intro
+    tutor_name = booking.tutor_name or (
+        booking.tutor.get_full_name() if booking.tutor_id and booking.tutor else "Tutor"
+    )
+    if is_intro:
+        person_name = booking.guest_name or "Gast"
+        person_email = booking.guest_email or ""
+        # Intros go to the studio-wide inbox, just like the booking notification.
+        tutor_email = settings.TUTOR_NOTIFY_EMAIL or ""
+        when = booking_when(booking)
+        time_range = f"{booking.time}–{_end_time(booking.time)}"
+    else:
+        student = booking.student if booking.student_id else None
+        person_name = (
+            (student.get_full_name() or student.username) if student else booking.student_name
+        ) or "Schüler"
+        person_email = (student.email if student else "") or ""
+        # Paid lessons go to that lesson's own tutor, not the studio inbox.
+        tutor_email = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
+        when = lesson_when(booking)
+        time_range = f"{booking.time}–{_end_time(booking.time, LESSON_MINUTES)}"
+    return {
+        "is_intro": is_intro,
+        "person_name": person_name,
+        "person_first": (person_name or "").split(" ")[0] or "du",
+        "person_email": person_email,
+        "tutor_name": tutor_name,
+        "tutor_first": (tutor_name or "").split(" ")[0] or tutor_name,
+        "tutor_email": tutor_email,
+        "when": when,
+        "date_long": _date_long(booking.date),
+        "time_range": time_range,
+        # Only meaningful for paid lessons — whether the credit was returned.
+        "refunded": refunded,
+        "site_url": settings.SITE_URL,
+    }
+
+
+def send_cancellation_notifications(snapshot):
+    """E-mail both sides that a booking was cancelled. Takes a snapshot dict (see
+    ``_cancel_snapshot``) rather than a booking id, because the row is already gone by
+    the time this runs. Skips any recipient without an address."""
+    is_intro = snapshot["is_intro"]
+    label = "Schnupperstunde" if is_intro else "Englischstunde"
+
+    # The person who booked: the guest for an intro, the student for a paid lesson.
+    if snapshot.get("person_email"):
+        subject = f"Storniert: deine {label} · {snapshot['date_long']}"
+        msg = _message(
+            subject, snapshot["person_email"],
+            render_to_string("email/cancellation_student.txt", snapshot),
+            render_to_string("email/cancellation_student.html", snapshot),
+        )
+        msg.send()
+
+    # The tutor: the lesson's own tutor for a paid lesson, the studio inbox for an intro.
+    if snapshot.get("tutor_email"):
+        subject = f"Storniert: {snapshot['person_name']} · {label} · {snapshot['date_long']}"
+        # Reply lands with the person who cancelled, so the tutor can follow up directly.
+        reply_to = [snapshot["person_email"]] if snapshot.get("person_email") else None
+        msg = _message(
+            subject, snapshot["tutor_email"],
+            render_to_string("email/cancellation_tutor.txt", snapshot),
+            render_to_string("email/cancellation_tutor.html", snapshot),
+            reply_to=reply_to,
+        )
+        msg.send()
+
+
 def send_receipt_copy(receipt_id):
     """E-mail an issued receipt to the student it belongs to, with the studio's own
     inbox (``DEFAULT_FROM_EMAIL``) bcc'd as an archive. Covers every purchase — a

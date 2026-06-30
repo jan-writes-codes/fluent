@@ -782,9 +782,13 @@ def booking_cancel_view(request, token):
                     locked.save(update_fields=["credits"])
                     _booking_credit_txn(locked, "Buchung storniert — Einheit erstattet", "", 1)
                     refunded = True
+                snapshot = emails._cancel_snapshot(booking, refunded=refunded)
                 booking.delete()
         else:
+            snapshot = emails._cancel_snapshot(booking, refunded=refunded)
             booking.delete()
+        # Notify both sides (student/guest and tutor/studio) that it's off.
+        emails.queue_email(emails.send_cancellation_notifications, snapshot)
         return render(request, "intro_cancel.html", {
             "state": "done", "when": when, "is_intro": is_intro,
             "refunded": refunded,
@@ -1097,6 +1101,7 @@ def api_booking_detail(request, pk):
 
     if request.method == "DELETE":
         from django.db import transaction as db_transaction
+        from . import emails
         student = b.student
         refunded = False
         new_credits = None
@@ -1114,9 +1119,13 @@ def api_booking_detail(request, pk):
                     )
                     refunded = True
                 new_credits = locked.credits
+                snapshot = emails._cancel_snapshot(b, refunded=refunded)
                 b.delete()
         else:
+            snapshot = emails._cancel_snapshot(b, refunded=refunded)
             b.delete()
+        # Notify both sides (student/guest and tutor/studio) that it's off.
+        emails.queue_email(emails.send_cancellation_notifications, snapshot)
         return JsonResponse({"ok": True, "refunded": refunded, "credits": new_credits})
 
     # PUT

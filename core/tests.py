@@ -25,6 +25,7 @@ Map of bug -> guarding test:
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import tempfile
@@ -1893,3 +1894,91 @@ class LessonBookingEmailTests(FluentDataMixin, TestCase):
         )
         emails.send_lesson_tutor_notification(b.pk)
         self.assertEqual(len(mail.outbox), 0)
+
+
+# --------------------------------------------------------------------------- #
+# Transactional e-mail when a booking is cancelled
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
+)
+class CancellationEmailTests(FluentDataMixin, TestCase):
+    def _future(self, days=5):
+        return date.today() + timedelta(days=days)
+
+    def test_lesson_cancel_notifies_student_and_tutor_with_refund(self):
+        # Cancel a paid lesson well outside 24h: both sides hear about it and the
+        # student's mail confirms the credit came back.
+        from django.core import mail
+        b = Booking.objects.create(
+            student=self.maya, tutor=self.davit, date=self._future(),
+            time="09:00", title="English session",
+            cancel_token=secrets.token_urlsafe(8),
+        )
+        self.client.force_login(self.maya)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["refunded"])
+
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        tutor_mail = [m for m in mail.outbox if m.to == ["davit@fluent.at"]]
+        self.assertEqual(len(student_mail), 1, "the student must be told their lesson was cancelled")
+        self.assertEqual(len(tutor_mail), 1, "the tutor must be told their lesson was cancelled")
+        self.assertIn("Storniert", student_mail[0].subject)
+        self.assertIn("gutgeschrieben", student_mail[0].body)
+        self.assertIn("Maya Karlsson", tutor_mail[0].subject)
+        # Tutor can reply straight to the student who cancelled.
+        self.assertEqual(tutor_mail[0].reply_to, ["maya@fluent.at"])
+
+    def test_lesson_cancel_within_24h_reports_no_refund(self):
+        from django.core import mail
+        from django.utils import timezone
+        soon = timezone.localtime(timezone.now()).date()
+        b = Booking.objects.create(
+            student=self.maya, tutor=self.davit, date=soon,
+            time="23:59", title="English session",
+            cancel_token=secrets.token_urlsafe(8),
+        )
+        self.client.force_login(self.maya)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["refunded"])
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        self.assertEqual(len(student_mail), 1)
+        self.assertIn("nicht zurückerstattet", student_mail[0].body)
+
+    @override_settings(TUTOR_NOTIFY_EMAIL="studio@thegreenpencil.at")
+    def test_intro_cancel_notifies_guest_and_studio(self):
+        # Cancelling an intro via the public tokened link notifies the guest and,
+        # when configured, the studio inbox — mirroring the booking notification.
+        from django.core import mail
+        token = secrets.token_urlsafe(8)
+        Booking.objects.create(
+            tutor=self.davit, date=self._future(), time="14:00", is_intro=True,
+            guest_name="Lena Gast", guest_email="lena@example.at",
+            student_name="Lena Gast", student_slug="intro", cancel_token=token,
+        )
+        resp = self.client.post(f"/cancel/{token}/")
+        self.assertEqual(resp.status_code, 200)
+        guest_mail = [m for m in mail.outbox if m.to == ["lena@example.at"]]
+        studio_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
+        self.assertEqual(len(guest_mail), 1, "the guest must be told their intro was cancelled")
+        self.assertEqual(len(studio_mail), 1, "the studio inbox must hear about the cancellation")
+        self.assertIn("Schnupperstunde", guest_mail[0].subject)
+        self.assertIn("Lena Gast", studio_mail[0].subject)
+
+    def test_cancel_email_failure_never_breaks_cancellation(self):
+        # Even if the mail layer throws, the cancellation itself must succeed.
+        b = Booking.objects.create(
+            student=self.maya, tutor=self.davit, date=self._future(),
+            time="09:00", title="English session",
+            cancel_token=secrets.token_urlsafe(8),
+        )
+        self.client.force_login(self.maya)
+        with mock.patch(
+            "core.emails.send_cancellation_notifications", side_effect=RuntimeError("ESP down")
+        ):
+            resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Booking.objects.filter(pk=b.pk).exists())
