@@ -35,7 +35,9 @@ class Command(BaseCommand):
         maya = User.objects.create_user(
             username="maya", email="maya@fluent.at", password="password",
             role="student", slug="maya", initials="MK",
-            credits=8, color1="#309050", color2="#277a42",
+            # Starting grant; the 6 bookings created below each debit one credit
+            # (Booking.save() now charges on creation), leaving the demo balance at 8.
+            credits=14, color1="#309050", color2="#277a42",
             first_name="Maya", last_name="Karlsson",
             billing_name="Maya Karlsson",
             billing_line1="Mariahilfer Straße 45/12",
@@ -45,7 +47,7 @@ class Command(BaseCommand):
         theo = User.objects.create_user(
             username="theo", email="theo@fluent.at", password="password",
             role="student", slug="theo", initials="TN",
-            credits=3, color1="#4cb56b", color2="#3a8f52",
+            credits=5, color1="#4cb56b", color2="#3a8f52",  # 2 bookings -> balance 3
             first_name="Theo", last_name="Nguyen",
             billing_name="Theo Nguyen",
             billing_line1="Praterstraße 8/3",
@@ -55,7 +57,7 @@ class Command(BaseCommand):
         ines = User.objects.create_user(
             username="ines", email="ines@fluent.at", password="password",
             role="student", slug="ines", initials="IR",
-            credits=0, color1="#7cb342", color2="#5a9e3f",
+            credits=1, color1="#7cb342", color2="#5a9e3f",  # 1 booking -> balance 0
             first_name="Inés", last_name="Romero",
             billing_name="Inés Romero",
             billing_line1="Getreidegasse 21",
@@ -65,7 +67,7 @@ class Command(BaseCommand):
         omar = User.objects.create_user(
             username="omar", email="omar@fluent.at", password="password",
             role="student", slug="omar", initials="OH",
-            credits=12, color1="#52a86a", color2="#2f8a4d",
+            credits=15, color1="#52a86a", color2="#2f8a4d",  # 3 bookings -> balance 12
             first_name="Omar", last_name="Haddad",
             billing_name="Omar Haddad",
             billing_line1="Herrengasse 12",
@@ -75,7 +77,7 @@ class Command(BaseCommand):
         lena = User.objects.create_user(
             username="lena", email="lena@fluent.at", password="password",
             role="student", slug="lena", initials="LF",
-            credits=1, color1="#6bbf86", color2="#3f9a5e",
+            credits=2, color1="#6bbf86", color2="#3f9a5e",  # 1 booking -> balance 1
             first_name="Lena", last_name="Fischer",
             billing_name="Lena Fischer",
             billing_line1="Maria-Theresien-Str. 18",
@@ -180,6 +182,10 @@ class Command(BaseCommand):
         # SiteSettings must exist first
         site_settings = SiteSettings.objects.create(credit_price=30)
 
+        # Note: "book" (-1) ledger entries are no longer hand-written here — every
+        # Booking created above already recorded its own debit via Booking.save().
+        # These remaining rows are the grants/completions that creation can't infer.
+
         # Maya transactions (oldest to newest so unshift order is correct)
         CreditTransaction.objects.create(
             student=maya, txn_type="buy", label="Welcome bonus", sub="May 20", amount=2,
@@ -190,18 +196,12 @@ class Command(BaseCommand):
         CreditTransaction.objects.create(
             student=maya, txn_type="buy", label="Purchased 5-credit pack", sub="May 28 · €145", amount=5,
         )
-        CreditTransaction.objects.create(
-            student=maya, txn_type="book", label="Booked with Davit", sub="IELTS speaking · Jun 4", amount=-1,
-        )
 
         # Theo transactions
         theo_receipt = make_receipt(theo, 3, "30.05.2026")
         CreditTransaction.objects.create(
             student=theo, txn_type="buy", label="Einheiten added by tutor",
             sub="May 30 · paid externally", amount=3, receipt_no=theo_receipt.number,
-        )
-        CreditTransaction.objects.create(
-            student=theo, txn_type="book", label="Session booked by tutor", sub="Jun 2 · 12:00", amount=-1,
         )
 
         # Ines transactions
@@ -218,16 +218,10 @@ class Command(BaseCommand):
             student=omar, txn_type="buy", label="Einheiten added by tutor",
             sub="May 25 · paid externally", amount=10, receipt_no=omar_receipt.number,
         )
-        CreditTransaction.objects.create(
-            student=omar, txn_type="book", label="Session booked by tutor", sub="Jun 3 · 09:00", amount=-1,
-        )
 
         # Lena transactions
         CreditTransaction.objects.create(
             student=lena, txn_type="buy", label="Welcome bonus", sub="May 28", amount=2,
-        )
-        CreditTransaction.objects.create(
-            student=lena, txn_type="book", label="Session booked by tutor", sub="Jun 4 · 18:30", amount=-1,
         )
 
         self.stdout.write("Creating student notes...")
