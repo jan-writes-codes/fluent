@@ -338,6 +338,16 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
         self.assertIn("mit Davit", txn.sub)
         self.assertIn("09:30", txn.sub)
 
+    def test_cancellation_refund_entry_names_the_tutor(self):
+        # The refund entry (shown under "Stunden") must also name the tutor.
+        pk = self._book("maya", "davit", "2026-06-08", "09:30").json()["pk"]
+        self.client.force_login(self.davit)  # tutor cancels → credit refunded
+        self.client.delete(f"/api/bookings/{pk}/")
+        ref = CreditTransaction.objects.filter(
+            student=self.maya, label__icontains="storniert"
+        ).latest("created_at")
+        self.assertIn("mit Davit", ref.sub)
+
     def test_tutor_sees_students_booking(self):
         self._book("maya", "davit", "2026-06-08", "09:30")
         self.client.force_login(self.davit)

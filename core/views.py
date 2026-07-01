@@ -1143,8 +1143,11 @@ def api_logout(request):
 def _booking_txn_sub(booking):
     """Ledger sub-line for a booking movement: which tutor, plus the lesson's
     date/time — so the credit history says who the lesson was (or would have been)
-    with."""
-    tutor_first = (booking.tutor_name or "").split(" ")[0]
+    with. Prefers the frozen snapshot, falling back to the live tutor FK."""
+    tutor_name = booking.tutor_name or (
+        booking.tutor.get_full_name() if booking.tutor_id and booking.tutor else ""
+    )
+    tutor_first = (tutor_name or "").split(" ")[0]
     when = f"{booking.date.strftime('%d.%m.%Y')} · {booking.time}"
     return f"mit {tutor_first} · {when}" if tutor_first else when
 
