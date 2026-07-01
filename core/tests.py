@@ -1151,6 +1151,11 @@ class StripeCheckoutTests(FluentDataMixin, TestCase):
 
     @override_settings(STRIPE_SECRET_KEY="sk_test_x", STRIPE_PUBLISHABLE_KEY="pk_test_x")
     def test_checkout_creates_session(self):
+        # A receipt address is required before a student can pay.
+        self.maya.billing_line1 = "Hauptstraße 1"
+        self.maya.billing_postcode = "1010"
+        self.maya.billing_city = "Wien"
+        self.maya.save()
         self.client.force_login(self.maya)
         with mock.patch("core.views.stripe") as st:
             st.checkout.Session.create.return_value = mock.Mock(
@@ -1175,6 +1180,19 @@ class StripeCheckoutTests(FluentDataMixin, TestCase):
             content_type="application/json",
         )
         self.assertEqual(resp.status_code, 403)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_checkout_requires_billing_address(self):
+        # maya has no billing address in the fixture -> checkout is blocked.
+        self.client.force_login(self.maya)
+        with mock.patch("core.views.stripe") as st:
+            resp = self.client.post(
+                "/api/checkout/", data=json.dumps({"n": 5}),
+                content_type="application/json",
+            )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["error"], "billing_required")
+        st.checkout.Session.create.assert_not_called()  # no session without an address
 
     @override_settings(STRIPE_SECRET_KEY="sk_test_x")
     def test_confirm_credits_student_once(self):
@@ -1377,6 +1395,44 @@ class CreditCancellationTests(FluentDataMixin, TestCase):
         self.assertEqual(payload.get("allTransactions", []), [])
 
 
+# --------------------------------------------------------------------------- #
+# Receipt PDF download
+# --------------------------------------------------------------------------- #
+class ReceiptPdfTests(FluentDataMixin, TestCase):
+    def _grant(self, n):
+        from core.views import grant_credits, get_settings
+        return grant_credits(self.maya, n, get_settings(), label="Kauf", sub="bar")
+
+    def test_student_downloads_own_receipt_pdf(self):
+        receipt = self._grant(5)
+        self.client.force_login(self.maya)
+        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        body = b"".join(resp.streaming_content) if resp.streaming else resp.content
+        self.assertTrue(body.startswith(b"%PDF"), "response must be a real PDF")
+
+    def test_student_cannot_download_another_students_receipt(self):
+        receipt = self._grant(5)  # maya's receipt
+        self.client.force_login(self.ines)
+        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_admin_downloads_any_receipt_pdf(self):
+        receipt = self._grant(5)
+        self.client.force_login(self.admin)
+        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_unknown_receipt_is_404(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get("/api/receipts/RE-2026-9999/pdf/").status_code, 404)
+
+    def test_pdf_requires_auth(self):
+        receipt = self._grant(5)
+        self.assertEqual(self.client.get(f"/api/receipts/{receipt.number}/pdf/").status_code, 401)
+
+
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
@@ -1391,6 +1447,9 @@ class PurchaseAndCancellationEmailTests(FluentDataMixin, TestCase):
             stripe_session_id=stripe_session_id,
         )
 
+    def _pdf_attachments(self, msg):
+        return [a for a in msg.attachments if len(a) == 3 and a[2] == "application/pdf"]
+
     def test_purchase_notifies_student_and_business(self):
         from django.core import mail
         with self.captureOnCommitCallbacks(execute=True):
@@ -1401,6 +1460,12 @@ class PurchaseAndCancellationEmailTests(FluentDataMixin, TestCase):
         self.assertEqual(len(studio_mail), 1, "the business must be notified of the purchase")
         self.assertIn("Beleg", student_mail[0].subject)
         self.assertIn("Neuer Kauf", studio_mail[0].subject)
+        # Each notification carries the receipt as a PDF attachment.
+        for msg in (student_mail[0], studio_mail[0]):
+            pdfs = self._pdf_attachments(msg)
+            self.assertEqual(len(pdfs), 1, "the receipt PDF must be attached")
+            self.assertTrue(pdfs[0][0].endswith(".pdf"))
+            self.assertTrue(pdfs[0][1].startswith(b"%PDF"), "attachment must be a real PDF")
 
     def test_cancellation_notifies_student_and_business(self):
         from django.core import mail
@@ -1589,6 +1654,9 @@ class SettleFlowTests(FluentDataMixin, TestCase):
     @override_settings(STRIPE_SECRET_KEY="sk_test_x")
     def test_student_settle_creates_session_for_outstanding(self):
         self.maya.credits = -8
+        self.maya.billing_line1 = "Hauptstraße 1"
+        self.maya.billing_postcode = "1010"
+        self.maya.billing_city = "Wien"
         self.maya.save()
         self.client.force_login(self.maya)
         with mock.patch("core.views.stripe") as st:
