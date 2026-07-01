@@ -1758,6 +1758,54 @@ def api_custom_times(request):
 
 
 # ---------------------------------------------------------------------------
+# Opening balance (migration)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("admin")
+def api_opening_credit(request, slug):
+    """Admin-only: set a student's one-time opening balance (Eröffnungsguthaben).
+
+    For students migrating onto the platform with credits they already hold from
+    outside it. It replaces the old free-form credit reset (which changed a balance
+    silently, with no trail — a fraud risk). The opening balance is booked as an
+    audited ledger transaction that the student can see; it carries no receipt,
+    because the credits were paid for elsewhere and issuing one would invent
+    revenue. Allowed once per student.
+    """
+    student = User.objects.filter(slug=slug, role="student").first()
+    if not student:
+        return JsonResponse({"error": "not found"}, status=404)
+    data = parse_body(request)
+    try:
+        n = int(data.get("n"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "invalid amount"}, status=400)
+    if n == 0:
+        return JsonResponse({"error": "invalid amount"}, status=400)
+    note = (data.get("note") or "").strip()[:200]
+
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        locked = User.objects.select_for_update().get(pk=student.pk)
+        # One opening balance per student — the migration is a single event.
+        if CreditTransaction.objects.filter(student=locked, txn_type="open").exists():
+            return JsonResponse({"error": "already_set"}, status=409)
+        locked.credits += n
+        locked.save(update_fields=["credits"])
+        txn = CreditTransaction.objects.create(
+            student=locked,
+            student_slug=locked.slug,
+            student_name=locked.get_full_name() or locked.username,
+            txn_type="open",
+            label="Eröffnungsguthaben",
+            sub=note or "Übertrag bestehender Einheiten",
+            amount=n,
+        )
+    return JsonResponse({"ok": True, "credits": locked.credits, "txn": serialize_transaction(txn)})
+
+
+# ---------------------------------------------------------------------------
 # Notes API
 # ---------------------------------------------------------------------------
 
@@ -2004,11 +2052,10 @@ def api_user_detail(request, slug):
         # here (rather than only in client state) is what makes an admin-set
         # photo visible when the student later signs in on another device.
         u.photo = data["photo"] or None
-    if "credits" in data:
-        try:
-            u.credits = int(data["credits"])
-        except (ValueError, TypeError):
-            pass
+    # NB: credits are intentionally NOT settable here. A free-form reset left no
+    # audit trail (a fraud risk); balances now only move through booked
+    # transactions — purchases, bookings, and the one-time opening balance
+    # (api_opening_credit).
     if "billing" in data:
         b = data["billing"]
         if isinstance(b, dict):

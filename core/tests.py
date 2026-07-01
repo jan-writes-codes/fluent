@@ -466,7 +466,6 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
                 "name": "Jan Heissenberger",
                 "email": "jan@fluent.at",
                 "password": "geheim123",
-                "credits": 2,
             }),
             content_type="application/json",
         )
@@ -474,7 +473,6 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         # persisted to the DB
         u = User.objects.get(slug=slug)
         self.assertEqual(u.email, "jan@fluent.at")
-        self.assertEqual(u.credits, 2)
         # initials recomputed from the new name -> avatar is correct after reload
         self.assertEqual(u.initials, "JH")
         self.assertEqual(resp.json()["initials"], "JH")
@@ -498,6 +496,58 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         )
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.initials, "MO")
+
+    def test_admin_cannot_reset_credits_directly(self):
+        # The old fraud vector: a free-form credit reset. The PUT must ignore it.
+        self.client.force_login(self.admin)
+        before = self.maya.credits
+        resp = self.client.put(
+            "/api/users/maya/",
+            data=json.dumps({"credits": 999}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before, "credits must not be settable via the user editor")
+
+    def test_admin_sets_opening_balance_as_receiptless_transaction(self):
+        self.client.force_login(self.admin)
+        before = self.maya.credits
+        resp = self.client.post(
+            "/api/students/maya/opening-credit/",
+            data=json.dumps({"n": 8}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before + 8)
+        txn = CreditTransaction.objects.get(student=self.maya, txn_type="open")
+        self.assertEqual(txn.amount, 8)
+        self.assertEqual(txn.receipt_no, "", "an opening balance carries no receipt")
+        self.assertFalse(Receipt.objects.filter(student=self.maya).exists())
+
+    def test_opening_balance_is_one_time(self):
+        self.client.force_login(self.admin)
+        first = self.client.post(
+            "/api/students/maya/opening-credit/",
+            data=json.dumps({"n": 5}), content_type="application/json",
+        )
+        self.assertEqual(first.status_code, 200)
+        second = self.client.post(
+            "/api/students/maya/opening-credit/",
+            data=json.dumps({"n": 5}), content_type="application/json",
+        )
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(second.json()["error"], "already_set")
+        self.assertEqual(CreditTransaction.objects.filter(student=self.maya, txn_type="open").count(), 1)
+
+    def test_only_admin_sets_opening_balance(self):
+        self.client.force_login(self.davit)  # tutor
+        resp = self.client.post(
+            "/api/students/maya/opening-credit/",
+            data=json.dumps({"n": 5}), content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
 
     def test_admin_saves_student_billing_address(self):
         # The path used when an admin edits a student's address (incl. while
@@ -992,7 +1042,7 @@ class DomAdminTests(_DomProbeBase):
         # mask (the bug: the locally-mirrored account had no role, so it rendered
         # as a tutor with no credits/billing fields).
         self.assertEqual(s["editorRole"], "Schüler")
-        self.assertTrue(s["hasCreditsField"], "student editor must show the Credits field")
+        self.assertTrue(s["hasOpeningField"], "student editor must show the opening-balance control")
         self.assertTrue(s["hasRemoveStudent"], "student editor must offer 'Schüler entfernen'")
 
     def test_admin_add_tutor_button_creates_and_selects_tutor(self):
