@@ -174,17 +174,20 @@ def render_receipt_pdf(receipt):
     label(M, y, "Leistungserbringer · From")
     label(col2, y, "Empfänger · Billed to")
     y2 = y - 14
-    lines(M, y2, [
-        SUPPLIER["name"], SUPPLIER["line2"], SUPPLIER["addr"],
-        SUPPLIER["city"], SUPPLIER["email"],
-    ])
     recipient = [
         receipt.billing_name or receipt.student_name,
         receipt.billing_line1,
         (f"{receipt.billing_postcode} {receipt.billing_city}").strip(),
         receipt.billing_country,
     ]
-    y = lines(col2, y2, [r for r in recipient if r]) - 8
+    # Draw both columns and start the table below the taller one (smaller y), so a
+    # short recipient block never lets the line item overlap the supplier address.
+    y_supplier = lines(M, y2, [
+        SUPPLIER["name"], SUPPLIER["line2"], SUPPLIER["addr"],
+        SUPPLIER["city"], SUPPLIER["email"],
+    ])
+    y_recipient = lines(col2, y2, [r for r in recipient if r])
+    y = min(y_supplier, y_recipient) - 10
 
     # ---- Line-item table ---------------------------------------------------
     y -= 6
