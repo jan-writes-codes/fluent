@@ -117,6 +117,9 @@ def render_receipt_pdf(receipt):
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
+    # PDF /Title — what the browser tab / viewer shows (e.g. "Beleg RE-2026-1001").
+    c.setTitle(f"{'Storno' if is_storno else 'Beleg'} {receipt.number}")
+    c.setAuthor("The Green Pencil")
     W, H = A4
     M = 48  # page margin
     right = W - M
@@ -205,7 +208,7 @@ def render_receipt_pdf(receipt):
     c.drawString(c_desc, y - 9, "BESCHREIBUNG")
     c.drawRightString(c_einzel, y - 9, "EINZEL")
     c.drawRightString(c_betrag, y - 9, "BETRAG")
-    y -= row_h + 4
+    y -= row_h + 18  # breathing room between the header band and the line item
 
     c.setFillColorRGB(*_INK)
     c.setFont("Helvetica", 10)

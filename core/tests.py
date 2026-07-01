@@ -1412,6 +1412,13 @@ class ReceiptPdfTests(FluentDataMixin, TestCase):
         resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
         self.assertEqual(resp.status_code, 200)
 
+    def test_tutor_downloads_any_receipt_pdf(self):
+        # Studio staff manage billing, so a tutor may fetch a student's receipt.
+        receipt = self._grant(5)
+        self.client.force_login(self.davit)
+        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
+        self.assertEqual(resp.status_code, 200)
+
     def test_unknown_receipt_is_404(self):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get("/api/receipts/RE-2026-9999/pdf/").status_code, 404)
