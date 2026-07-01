@@ -2551,7 +2551,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     s.billing = { line1:$("#bfLine1").value.trim(), postcode:$("#bfZip").value.trim(), city:$("#bfCity").value.trim(), country:$("#bfCountry").value.trim()||"Österreich" };
     $("#acctHello").textContent="Hallo, "+s.name.split(" ")[0]+".";
     setIdentity(s); renderAccount();
-    api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
+    // "Ansehen als" is client-only — the server session is still the admin — so
+    // /me/ would write to the admin's own record. When impersonating a student,
+    // persist to that student via the admin endpoint instead.
+    if (state.impersonating) {
+      api('PUT', '/api/users/' + s.id + '/', { name: s.name, billing: s.billing });
+    } else {
+      api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
+    }
     toast("Rechnungsdaten gespeichert");
   }
 
