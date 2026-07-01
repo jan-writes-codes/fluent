@@ -113,6 +113,9 @@
   .slot { font-family: var(--font-body); font-size: 13.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 8px 0; cursor: pointer; transition: 0.13s; }
   .slot:hover { border-color: var(--c1); color: var(--c1); transform: translateY(-1px); }
   .no-slot { text-align: center; color: var(--faint); font-size: 13px; padding: 8px 0; }
+  /* Time-of-day labels grouping a day's slots (Vormittag / Nachmittag / Abend). */
+  .band-lbl { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 10px 2px 4px; }
+  .slots > .band-lbl:first-child { margin-top: 0; }
 
   .modal-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(20,30,22,0.5); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 20px; }
   .modal-overlay[hidden] { display: none; }
@@ -277,6 +280,12 @@ window.INTRO_DATA = {{ intro_data|safe }};
     });
   }
 
+  // Vormittag < 12:00 · Nachmittag 12:00–17:00 · Abend ab 17:00 (by start hour).
+  const BANDS = [
+    { label: "Vormittag",  test: h => h < 12 },
+    { label: "Nachmittag", test: h => h >= 12 && h < 17 },
+    { label: "Abend",      test: h => h >= 17 },
+  ];
   function renderWeek(){
     const weekStart = addDays(startOfWeek(NOW), state.weekOffset*7);
     const firstMonth = weekStart.getMonth(), lastMonth = addDays(weekStart,6).getMonth();
@@ -298,14 +307,20 @@ window.INTRO_DATA = {{ intro_data|safe }};
       const slots=document.createElement("div"); slots.className="slots";
       let any=false;
       if(!isPastDay){
-        dayTimes(date,state.tutor).forEach(time=>{
-          if(isPastSlot(date,time)) return;
-          if(!slotOpen(date,time,state.tutor)) return;
-          if(bookedConflict(date,time,state.tutor)) return;
+        const avail = dayTimes(date,state.tutor).filter(time =>
+          !isPastSlot(date,time) && slotOpen(date,time,state.tutor) && !bookedConflict(date,time,state.tutor));
+        // Group the day's free slots under Vormittag / Nachmittag / Abend.
+        BANDS.forEach(band=>{
+          const items = avail.filter(t => band.test(parseInt(t.split(":")[0],10)));
+          if(!items.length) return;
           any=true;
-          const b=document.createElement("button"); b.className="slot"; b.textContent=time;
-          b.onclick=()=>openBook(date,time);
-          slots.appendChild(b);
+          const lbl=document.createElement("div"); lbl.className="band-lbl"; lbl.textContent=band.label;
+          slots.appendChild(lbl);
+          items.forEach(time=>{
+            const b=document.createElement("button"); b.className="slot"; b.textContent=time;
+            b.onclick=()=>openBook(date,time);
+            slots.appendChild(b);
+          });
         });
       }
       if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent=isPastDay?"—":"Voll"; slots.appendChild(n); }
