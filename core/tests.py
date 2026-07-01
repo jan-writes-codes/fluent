@@ -2655,3 +2655,81 @@ class CalendarFeedTests(FluentDataMixin, TestCase):
         self.client.logout()
         resp = self.client.get(f"/calendar/{self.davit.calendar_token}.ics")
         self.assertEqual(resp.status_code, 200)
+
+
+# --------------------------------------------------------------------------- #
+# Retroactive cancellation of completed ("Abgeschlossene") lessons
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,
+)
+class RetroactiveCancelTests(FluentDataMixin, TestCase):
+    """Undoing a lesson that already shows as completed: the booking goes away,
+    the student gets the Einheit back, and a ledger entry naming the actor
+    keeps the correction fully transparent — with no cancellation e-mails for
+    a lesson that is already in the past."""
+
+    def _past_booking(self, days=7):
+        return Booking.objects.create(
+            student=self.maya, tutor=self.davit,
+            date=date.today() - timedelta(days=days), time="15:00",
+            title="Englischstunde", cancel_token=secrets.token_urlsafe(8),
+        )
+
+    def test_admin_undo_refunds_and_writes_named_ledger_entry(self):
+        from django.core import mail
+        b = self._past_booking()  # creating it charges maya one credit
+        self.maya.refresh_from_db()
+        before = self.maya.credits
+        self.client.force_login(self.admin)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["refunded"])
+        self.assertTrue(data["retroactive"])
+        self.assertFalse(Booking.objects.filter(pk=b.pk).exists())
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before + 1)
+        txn = CreditTransaction.objects.filter(student=self.maya).latest("id")
+        self.assertEqual(txn.label, "Stunde rückwirkend storniert — Einheit erstattet")
+        self.assertEqual(txn.amount, 1)
+        # Full transparency: the entry names who undid it and which lesson.
+        self.assertIn("von Studio Admin", txn.sub)
+        self.assertIn("mit Davit", txn.sub)
+        self.assertIn("15:00", txn.sub)
+        # The echoed txn lets the client mirror the ledger without a reload.
+        self.assertEqual(data["txn"]["label"], txn.label)
+        self.assertEqual(data["txn"]["amt"], "+1")
+        # A bookkeeping correction of a past lesson sends no cancellation mail.
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_future_cancellation_keeps_normal_wording_and_mails(self):
+        from django.core import mail
+        b = Booking.objects.create(
+            student=self.maya, tutor=self.davit,
+            date=date.today() + timedelta(days=7), time="15:00",
+            title="Englischstunde", cancel_token=secrets.token_urlsafe(8),
+        )
+        self.client.force_login(self.davit)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["retroactive"])
+        txn = CreditTransaction.objects.filter(student=self.maya).latest("id")
+        self.assertEqual(txn.label, "Buchung storniert — Einheit erstattet")
+        self.assertNotIn("von ", txn.sub)
+        # A genuinely upcoming lesson still notifies both sides.
+        self.assertGreater(len(mail.outbox), 0)
+
+    def test_student_cannot_refund_their_own_past_lesson(self):
+        # The undo is a staff correction — a student deleting their own past
+        # booking still forfeits the credit (24h rule), retroactive or not.
+        b = self._past_booking()
+        self.maya.refresh_from_db()
+        before = self.maya.credits
+        self.client.force_login(self.maya)
+        resp = self.client.delete(f"/api/bookings/{b.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["refunded"])
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before)

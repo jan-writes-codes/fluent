@@ -2653,7 +2653,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${s.i}</div>
       <div class="info"><div class="t">${b.title}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time, lessonMins(b))}</div>${b.notes?`<div class="note-line">${escHtml(b.notes)}</div>`:""}</div>
-      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?'<span class="pill2 done">Abgeschlossen</span>':`<span class="pill2">${lessonMins(b)} Min.</span>`}</div>
+      <div class="tail">${(!completed&&b.callLink)?`<a class="join-mini" href="${escHtml(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?`${(DJ.role==="admin"&&b._pk)?`<button class="mini-btn" data-undo="${b._pk}" title="Rückwirkend stornieren — Einheit zurück an den Schüler">Stornieren</button>`:""}<span class="pill2 done">Abgeschlossen</span>`:`<span class="pill2">${lessonMins(b)} Min.</span>`}</div>
     </div>`;
   }
   function renderTutorLists(){
@@ -2663,6 +2663,51 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const past = state.bookings.filter(b=> b.date<NOW && !sameDay(b.date,NOW)).sort((a,b)=> b.date-a.date || toMin(b.time)-toMin(a.time));
     up.innerHTML = upcoming.length ? upcoming.map(b=>tutorRow(b,false)).join("") : `<div class="empty-list">Keine geplanten Stunden.</div>`;
     done.innerHTML = past.length ? past.map(b=>tutorRow(b,true)).join("") : `<div class="empty-list">Noch keine abgeschlossenen Stunden.</div>`;
+    // Admin-only: retroactively undo a completed lesson (see openUndoCompleted).
+    done.querySelectorAll("[data-undo]").forEach(btn=>{
+      btn.onclick=(e)=>{ e.stopPropagation(); openUndoCompleted(+btn.dataset.undo); };
+    });
+  }
+  // Admin correction for a lesson that shows as "Abgeschlossen" but didn't
+  // actually happen: the booking is removed, the student gets the Einheit
+  // back, and the server writes a named ledger entry ("… rückwirkend
+  // storniert · von <Admin>") so the correction stays fully transparent in
+  // everyone's credit history. No cancellation e-mails — the ledger is the record.
+  function openUndoCompleted(pk){
+    const b = state.bookings.find(x=>x._pk===pk); if(!b) return;
+    const s = bookingStudent(b);
+    const isGuest = s.isGuest;
+    const m=$("#buyModal");
+    m.innerHTML=`<div class="modal-card buy-card" id="buyCard">
+      <button class="modal-x" id="buyX" aria-label="Close">×</button>
+      <h3 class="buy-h">Stunde rückwirkend stornieren?</h3>
+      <p class="buy-p"><b>${escHtml(s.name)}</b>${isGuest?" · Intro":""} · ${fmtLong(b.date)} · ${b.time}</p>
+      <p class="buy-p">${isGuest
+        ? "Eine Schnupperstunde kostet keine Einheit — sie wird nur aus der Liste entfernt."
+        : "Die Stunde wird entfernt und die Einheit dem Schüler zurückgebucht. Der Vorgang wird mit deinem Namen im Einheiten-Verlauf protokolliert."}</p>
+      <button class="btn" id="undoConfirm"><span class="grainbtn"></span>${isGuest?"Stunde entfernen":"Stornieren &amp; Einheit erstatten"}</button>
+      <button class="btn ghost" id="undoCancel" style="margin-top:10px;">Abbrechen</button>
+    </div>`;
+    m.hidden=false;
+    $("#buyCard").onclick=(e)=>e.stopPropagation();
+    $("#buyX").onclick=closeBuy;
+    $("#undoCancel").onclick=closeBuy;
+    $("#undoConfirm").onclick=()=>doUndoCompleted(b);
+  }
+  async function doUndoCompleted(b){
+    const r = await api('DELETE', '/api/bookings/'+b._pk+'/');
+    if(!r || !r.ok){ toast("Stornieren fehlgeschlagen"); return; }
+    const i=state.bookings.indexOf(b); if(i>=0) state.bookings.splice(i,1);
+    const s=studentById(b.studentId);
+    if(s && r.refunded){
+      if(typeof r.credits==='number') setStudentCredits(b.studentId, r.credits);
+      // Mirror the server's ledger entry into the student history and the
+      // consolidated admin ledger, exactly like applyCancellation does.
+      if(r.txn){ s.log.unshift(r.txn); if(state.allTransactions) state.allTransactions.unshift(r.txn); }
+    }
+    closeBuy();
+    renderTutorLists(); renderRoster(); renderAccount(); renderAdminTxns();
+    toast(s && r.refunded ? "Stunde rückwirkend storniert · 1 Einheit erstattet" : "Stunde entfernt");
   }
 
   // ---------- Billing (student receipt address) ----------
