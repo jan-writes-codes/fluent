@@ -324,57 +324,98 @@ def _business_inbox():
             getattr(settings, "DEFAULT_FROM_EMAIL", "") or "")
 
 
-def _receipt_html_for(receipt):
-    """Render a receipt (purchase or Storno) to HTML. Lazy import: views imports
-    this module, so importing it at module load would be circular."""
-    from .views import serialize_receipt, receipt_html, get_settings
-    return receipt_html(serialize_receipt(receipt), get_settings())
+def _receipt_pdf(receipt):
+    """Render a receipt (purchase or Storno) to PDF bytes, or None if it can't be
+    produced. Lazy import: views imports this module, so importing at module load
+    would be circular; reportlab is imported inside the renderer."""
+    try:
+        from .receipts_pdf import render_receipt_pdf
+        return render_receipt_pdf(receipt)
+    except Exception:
+        logger.exception("receipt PDF render failed for %s", getattr(receipt, "number", "?"))
+        return None
+
+
+def _mail_html(lines):
+    """A plain, branded HTML body from a list of paragraph strings."""
+    body = "".join(f"<p style='margin:0 0 12px'>{ln}</p>" for ln in lines)
+    return (
+        "<div style=\"font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;"
+        "font-size:14px;line-height:1.6;color:#243528\">"
+        f"{body}"
+        "<p style='margin:20px 0 0;color:#7a8b7f;font-size:12px'>"
+        "The Green Pencil — Englisch-Nachhilfe</p></div>"
+    )
+
+
+def _send_with_pdf(subject, to, text_lines, html_lines, pdf, pdf_name):
+    """Send a notification with the receipt PDF attached. Bodies just describe what
+    the attachment is; the PDF is the actual document."""
+    text = "\n".join(text_lines) + "\n\nThe Green Pencil — Englisch-Nachhilfe"
+    msg = _message(subject, to, text, _mail_html(html_lines))
+    if pdf:
+        msg.attach(pdf_name, pdf, "application/pdf")
+    msg.send()
 
 
 def send_purchase_notifications(receipt_id):
-    """Tell the student and the business that a credit purchase went through.
+    """Tell the student and the business that a credit purchase went through, with
+    the receipt attached as a PDF.
 
     Covers every purchase path — a tutor's cash top-up or a student's Stripe
-    payment. The student receives their receipt; the business inbox gets a
-    notification (with the receipt attached as HTML) for its records. If the student
-    has no address (e.g. a deleted account) the business is still notified."""
+    payment. If the student has no address (e.g. a deleted account) the business is
+    still notified."""
     from .models import Receipt
     receipt = Receipt.objects.filter(pk=receipt_id).select_related("student").first()
     if not receipt:
         return
-    html = _receipt_html_for(receipt)
+    pdf = _receipt_pdf(receipt)
+    pdf_name = f"Beleg-{receipt.number}.pdf"
     student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
     business = _business_inbox()
 
     if student_email:
         subject = f"Dein Beleg {receipt.number} · {receipt.credits} Einheiten"
-        text = (f"Hallo {receipt.student_name},\n\n"
-                f"unten findest du deinen Beleg {receipt.number} über {receipt.credits} "
-                f"Einheiten (ausgestellt am {receipt.date_str}).\n\n"
-                f"The Green Pencil — Englisch-Nachhilfe")
-        _message(subject, [student_email], text, html).send()
+        _send_with_pdf(
+            subject, [student_email],
+            [f"Hallo {receipt.student_name},", "",
+             f"vielen Dank für deinen Kauf von {receipt.credits} Einheiten! Im Anhang "
+             f"findest du deinen Beleg {receipt.number} vom {receipt.date_str} als PDF.",
+             "Deine Einheiten stehen dir ab sofort zur Verfügung."],
+            [f"Hallo {receipt.student_name},",
+             f"vielen Dank für deinen Kauf von <strong>{receipt.credits} Einheiten</strong>! "
+             f"Im Anhang findest du deinen Beleg <strong>{receipt.number}</strong> vom "
+             f"{receipt.date_str} als PDF.",
+             "Deine Einheiten stehen dir ab sofort zur Verfügung."],
+            pdf, pdf_name,
+        )
 
     # Notify the business — skip only if it's the very same address the student got.
     if business and business != student_email:
         subject = f"Neuer Kauf: {receipt.student_name} · {receipt.credits} Einheiten ({receipt.number})"
-        text = (f"{receipt.student_name} hat {receipt.credits} Einheiten gekauft.\n\n"
-                f"Beleg:   {receipt.number}\n"
-                f"Datum:   {receipt.date_str}\n\n"
-                f"The Green Pencil — Englisch-Nachhilfe")
-        _message(subject, [business], text, html).send()
+        _send_with_pdf(
+            subject, [business],
+            [f"{receipt.student_name} hat {receipt.credits} Einheiten gekauft.",
+             f"Der Beleg {receipt.number} vom {receipt.date_str} ist als PDF angehängt."],
+            [f"<strong>{receipt.student_name}</strong> hat "
+             f"<strong>{receipt.credits} Einheiten</strong> gekauft.",
+             f"Der Beleg <strong>{receipt.number}</strong> vom {receipt.date_str} ist als PDF angehängt."],
+            pdf, pdf_name,
+        )
 
 
 def send_storno_notifications(receipt_id):
-    """Tell the student and the business that a purchase was cancelled.
+    """Tell the student and the business that a purchase was cancelled, with the
+    Storno credit note attached as a PDF.
 
-    Takes the *Storno* receipt id. The student receives the credit-note receipt
-    confirming the reversal/refund; the business inbox is notified for its records.
-    Skips any recipient without an address (e.g. a deleted student account)."""
+    Takes the *Storno* receipt id. Skips any recipient without an address (e.g. a
+    deleted student account)."""
     from .models import Receipt
     receipt = Receipt.objects.filter(pk=receipt_id).select_related("student", "reverses").first()
     if not receipt:
         return
-    html = _receipt_html_for(receipt)
+    pdf = _receipt_pdf(receipt)
+    pdf_name = f"Storno-{receipt.number}.pdf"
     student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
     business = _business_inbox()
     n = -receipt.credits  # credits reversed (receipt.credits is negative)
@@ -382,22 +423,31 @@ def send_storno_notifications(receipt_id):
 
     if student_email:
         subject = f"Storniert: dein Kauf · Storno {receipt.number}"
-        text = (f"Hallo {receipt.student_name},\n\n"
-                f"dein Kauf von {n} Einheiten (Beleg {original_no}) wurde storniert. "
-                f"Der Betrag wurde erstattet.\n\n"
-                f"Storno-Beleg: {receipt.number}\n"
-                f"Datum:        {receipt.date_str}\n\n"
-                f"The Green Pencil — Englisch-Nachhilfe")
-        _message(subject, [student_email], text, html).send()
+        _send_with_pdf(
+            subject, [student_email],
+            [f"Hallo {receipt.student_name},", "",
+             f"dein Kauf von {n} Einheiten (Beleg {original_no}) wurde storniert und der "
+             f"Betrag erstattet. Im Anhang findest du den Storno-Beleg {receipt.number} "
+             f"vom {receipt.date_str} als PDF."],
+            [f"Hallo {receipt.student_name},",
+             f"dein Kauf von <strong>{n} Einheiten</strong> (Beleg {original_no}) wurde "
+             f"storniert und der Betrag erstattet. Im Anhang findest du den Storno-Beleg "
+             f"<strong>{receipt.number}</strong> vom {receipt.date_str} als PDF."],
+            pdf, pdf_name,
+        )
 
     if business and business != student_email:
         subject = f"Storniert: {receipt.student_name} · {n} Einheiten (Storno {receipt.number})"
-        text = (f"Der Kauf von {receipt.student_name} über {n} Einheiten (Beleg {original_no}) "
-                f"wurde storniert und erstattet.\n\n"
-                f"Storno-Beleg: {receipt.number}\n"
-                f"Datum:        {receipt.date_str}\n\n"
-                f"The Green Pencil — Englisch-Nachhilfe")
-        _message(subject, [business], text, html).send()
+        _send_with_pdf(
+            subject, [business],
+            [f"Der Kauf von {receipt.student_name} über {n} Einheiten (Beleg {original_no}) "
+             f"wurde storniert und erstattet.",
+             f"Der Storno-Beleg {receipt.number} vom {receipt.date_str} ist als PDF angehängt."],
+            [f"Der Kauf von <strong>{receipt.student_name}</strong> über "
+             f"<strong>{n} Einheiten</strong> (Beleg {original_no}) wurde storniert und erstattet.",
+             f"Der Storno-Beleg <strong>{receipt.number}</strong> vom {receipt.date_str} ist als PDF angehängt."],
+            pdf, pdf_name,
+        )
 
 
 # --------------------------------------------------------------------------- #

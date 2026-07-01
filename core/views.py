@@ -545,6 +545,18 @@ def require_auth(request):
     return None
 
 
+def billing_complete(user):
+    """True when the student has a usable receipt address on file. The account's
+    name supplies the recipient line, so we require the postal fields: street,
+    postcode and city. Gate self-service purchases on this so every Stripe receipt
+    is issued to a real address."""
+    return bool(
+        (user.billing_line1 or "").strip()
+        and (user.billing_postcode or "").strip()
+        and (user.billing_city or "").strip()
+    )
+
+
 def require_roles(*roles):
     """Endpoint guard: 401 if anonymous, 403 if the user's role isn't allowed.
 
@@ -1431,6 +1443,11 @@ def api_checkout(request):
     except (ValueError, TypeError):
         return JsonResponse({"error": "invalid amount"}, status=400)
 
+    # A purchase always issues a receipt, so the student must have a receipt
+    # address on file before they can pay.
+    if not billing_complete(request.user):
+        return JsonResponse({"error": "billing_required"}, status=400)
+
     settings = get_settings()
     amount = pack_price_cents(settings, n)
     origin = request.build_absolute_uri("/").rstrip("/")
@@ -1574,6 +1591,9 @@ def api_settle(request):
     outstanding = max(0, -request.user.credits)
     if outstanding <= 0:
         return JsonResponse({"error": "nothing_outstanding"}, status=400)
+    # Settling issues a receipt too — require an address first.
+    if not billing_complete(request.user):
+        return JsonResponse({"error": "billing_required"}, status=400)
     settings = get_settings()
     url = _create_settle_checkout(
         request, request.user, outstanding, settings,
@@ -1812,6 +1832,35 @@ def api_lesson_file_download(request, file_id):
     # as an attachment (+ global nosniff) so nothing renders inline.
     safe = lf.original_name.replace('"', "").replace("\r", "").replace("\n", "") or "lesson"
     resp["Content-Disposition"] = f'attachment; filename="{safe}"'
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# Receipt PDF
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["GET"])
+def api_receipt_pdf(request, number):
+    """Serve an issued receipt (or Storno credit note) as a formatted PDF.
+
+    Any authenticated user may fetch a receipt; a student is limited to their own.
+    Rendered on the fly from the frozen receipt snapshot, so it reads the same
+    forever and needs no stored file."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "auth"}, status=401)
+    receipt = Receipt.objects.filter(number=number).select_related("student", "reverses").first()
+    if not receipt:
+        raise Http404
+    if request.user.role == "student" and receipt.student_id != request.user.pk:
+        return JsonResponse({"error": "forbidden"}, status=403)
+    try:
+        from .receipts_pdf import render_receipt_pdf
+        pdf = render_receipt_pdf(receipt)
+    except Exception:
+        # reportlab missing or a render error — don't 500 the client.
+        return JsonResponse({"error": "pdf_unavailable"}, status=503)
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'inline; filename="Beleg-{receipt.number}.pdf"'
     return resp
 
 

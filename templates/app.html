@@ -1408,15 +1408,20 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <button class="modal-x" id="rcptX" aria-label="Close">×</button>
       ${receiptDocHtml(r)}
       <div class="receipt-actions">
-        <button class="btn ghost" id="rcptClose">Done</button>
-        <button class="btn" id="rcptPrint"><span class="grainbtn"></span>Print / Save PDF</button>
+        <button class="btn ghost" id="rcptClose">Fertig</button>
+        <button class="btn" id="rcptPdf"><span class="grainbtn"></span>Beleg als PDF</button>
       </div>
     </div>`;
     m.hidden=false;
     $("#receiptShell").onclick=(e)=>e.stopPropagation();
     $("#rcptX").onclick = closeReceipt;
     $("#rcptClose").onclick = closeReceipt;
-    $("#rcptPrint").onclick = ()=>window.print();
+    // Open the server-rendered PDF (formatted, with logo) in a new tab to view,
+    // print or save. Falls back to the browser print dialog if it can't be opened.
+    $("#rcptPdf").onclick = ()=>{
+      const w = window.open('/api/receipts/'+encodeURIComponent(r.no)+'/pdf/', '_blank');
+      if(!w) window.print();
+    };
   }
   function closeReceipt(){ $("#receiptModal").hidden=true; }
   // Balances may go negative (a tutor booking a lesson the student hasn't paid
@@ -1823,10 +1828,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     const btn = $("#settleBtn");
     btn.disabled = false;
     btn.onclick = () => {
+      // Settling issues a receipt too — require the address first.
+      if (!billingComplete(studentById(state.currentUser))) { goToBilling(); return; }
       btn.disabled = true;
-      api('POST', '/api/settle/').then(res => {
-        if (res && res.url) { window.location.href = res.url; }
-        else { btn.disabled = false; toast("Zahlung konnte nicht gestartet werden"); }
+      apiResult('POST', '/api/settle/').then(res => {
+        if (res.ok && res.data && res.data.url) { window.location.href = res.data.url; return; }
+        btn.disabled = false;
+        if (res.data && res.data.error === "billing_required") { goToBilling(); return; }
+        toast("Zahlung konnte nicht gestartet werden");
       });
     };
   }
@@ -1844,9 +1853,26 @@ window.DJANGO_DATA = {{ django_data|safe }};
       el.appendChild(d);
     });
   }
+  // A purchase always issues a receipt, so the student must have a receipt address
+  // on file first. Mirrors billing_complete() server-side (name comes from the
+  // account; the postal fields are what we require here).
+  function billingComplete(s){
+    const b = (s && s.billing) || {};
+    return !!((b.line1||"").trim() && (b.postcode||"").trim() && (b.city||"").trim());
+  }
+  // Send the student to their billing form to fill the receipt address, then come
+  // back and buy. Used both as a pre-check and as the server 400 fallback.
+  function goToBilling(){
+    closeBuy();
+    setView("account");
+    setTimeout(()=>{ const el=$("#bfLine1"); if(el){ el.scrollIntoView({behavior:"smooth", block:"center"}); el.focus(); } }, 60);
+    toast("Bitte zuerst deine Rechnungsadresse hinterlegen.");
+  }
   function openBuyInfo(p){
     const m=$("#buyModal");
     const stripeOn = !!(state.stripe && state.stripe.enabled);
+    // Card payments issue a receipt → require the address first.
+    const needBilling = stripeOn && !billingComplete(studentById(state.currentUser));
     // Every tutor in the system (with their e-mail), so the student can pick who
     // to ask for a manual top-up — keyed on the tutor's real e-mail address.
     const tutors = (tutorAccounts && tutorAccounts.length)
@@ -1863,12 +1889,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic">${stripeOn ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>` : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>`}</div>
-      ${stripeOn ? `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
+      ${stripeOn ? (needBilling ? `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
+      <p class="buy-p">Bevor du bezahlen kannst, hinterlege bitte deine <b>Rechnungsadresse</b> — sie erscheint auf deinem Beleg (PDF).</p>
+      <button class="btn" id="buyBilling"><span class="grainbtn"></span>Rechnungsadresse hinterlegen</button>
+      <button class="btn ghost" id="buyClose">Schließen</button>`
+      : `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
       <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) sicher per Karte. Deine <b>${p.n} Einheiten</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       <button class="btn" id="buyStripe"><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
       <a class="btn ghost" id="buyMail" href="${mailHref(t0)}">Lieber Tutor schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
-      <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`
+      <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
       : `<h3 class="buy-h">Einheiten fügt dein Tutor hinzu</h3>
       <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) schreib <b id="buyTutorName">${esc(firstName(t0))}</b>. Die Einheiten werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       ${tutorPicker}
@@ -1879,6 +1909,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     m.hidden=false;
     $("#buyCard").onclick=(e)=>e.stopPropagation();
     $("#buyX").onclick=closeBuy; $("#buyClose").onclick=closeBuy;
+    if ($("#buyBilling")) $("#buyBilling").onclick=goToBilling;
     if (stripeOn && $("#buyStripe")) $("#buyStripe").onclick=()=>startStripeCheckout(p);
     const selEl=$("#buyTutorSel");
     if(selEl){ selEl.onchange=()=>{
@@ -1892,9 +1923,11 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function startStripeCheckout(p){
     const btn=$("#buyStripe");
     if(btn){ btn.disabled=true; btn.style.opacity="0.6"; }
-    api('POST', '/api/checkout/', { n: p.n }).then(res => {
-      if (res && res.url) { window.location.href = res.url; return; }
+    apiResult('POST', '/api/checkout/', { n: p.n }).then(res => {
+      if (res.ok && res.data && res.data.url) { window.location.href = res.data.url; return; }
       if(btn){ btn.disabled=false; btn.style.opacity=""; }
+      // Server guard fallback: address missing → route to the billing form.
+      if (res.data && res.data.error === "billing_required") { goToBilling(); return; }
       toast("Zahlung konnte nicht gestartet werden — bitte schreib deinem Tutor.");
     });
   }

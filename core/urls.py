@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/bookings/<int:pk>/', views.api_booking_detail),
     path('api/credits/<str:slug>/', views.api_credits),
     path('api/transactions/<int:txn_id>/cancel/', views.api_cancel_transaction),
+    path('api/receipts/<str:number>/pdf/', views.api_receipt_pdf),
     path('api/checkout/', views.api_checkout),
     path('api/checkout/confirm/', views.api_checkout_confirm),
     path('api/stripe/webhook/', views.api_stripe_webhook),
