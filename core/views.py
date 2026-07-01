@@ -1180,8 +1180,9 @@ def _booking_txn_sub(booking):
 
 def _booking_credit_txn(student, label, sub, amount):
     """Record a booking-related movement on the credit ledger (book = -1,
-    refund = +1) with the identity snapshot, mirroring grant_credits' bookkeeping."""
-    CreditTransaction.objects.create(
+    refund = +1) with the identity snapshot, mirroring grant_credits' bookkeeping.
+    Returns the created transaction so callers can echo it to the client."""
+    return CreditTransaction.objects.create(
         student=student,
         student_slug=student.slug,
         student_name=student.get_full_name() or student.username,
@@ -1297,12 +1298,21 @@ def api_booking_detail(request, pk):
 
     if request.method == "DELETE":
         from django.db import transaction as db_transaction
+        from django.utils import timezone
         from . import emails
         student = b.student
         # Auto-created Zoom/Teams meeting reference, captured before the row dies.
         video_ref = (b.tutor_id, b.video_provider, b.video_meeting_id)
+        # A booking whose day is already over is "abgeschlossen" in the UI, so
+        # deleting it is a retroactive correction (the lesson never actually
+        # happened) rather than a normal cancellation. It gets its own ledger
+        # wording — naming who undid it, for a fully transparent audit trail —
+        # and sends no cancellation e-mails (there is nothing to call off; the
+        # refund shows up in the student's credit history instead).
+        retroactive = b.date < timezone.localdate()
         refunded = False
         new_credits = None
+        refund_txn = None
         if student is not None:
             # A tutor/admin removal always returns the credit; a student cancelling
             # inside the 24h window forfeits it (mirrors the booking UI's policy).
@@ -1312,10 +1322,14 @@ def api_booking_detail(request, pk):
                 if not forfeit:
                     locked.credits += 1
                     locked.save(update_fields=["credits"])
-                    _booking_credit_txn(
-                        locked, "Buchung storniert — Einheit erstattet",
-                        _booking_txn_sub(b), 1,
-                    )
+                    if retroactive:
+                        actor = request.user.get_full_name() or request.user.username
+                        label = "Stunde rückwirkend storniert — Einheit erstattet"
+                        sub = f"{_booking_txn_sub(b)} · von {actor}"
+                    else:
+                        label = "Buchung storniert — Einheit erstattet"
+                        sub = _booking_txn_sub(b)
+                    refund_txn = _booking_credit_txn(locked, label, sub, 1)
                     refunded = True
                 new_credits = locked.credits
                 snapshot = emails._cancel_snapshot(b, refunded=refunded)
@@ -1323,11 +1337,17 @@ def api_booking_detail(request, pk):
         else:
             snapshot = emails._cancel_snapshot(b, refunded=refunded)
             b.delete()
-        # Notify both sides (student/guest and tutor/studio) that it's off.
-        emails.queue_email(emails.send_cancellation_notifications, snapshot)
+        # Notify both sides (student/guest and tutor/studio) that it's off —
+        # unless this was a retroactive correction of a past lesson.
+        if not retroactive:
+            emails.queue_email(emails.send_cancellation_notifications, snapshot)
         if video_ref[2]:
             emails.queue_email(video.cleanup_meeting, *video_ref)
-        return JsonResponse({"ok": True, "refunded": refunded, "credits": new_credits})
+        return JsonResponse({
+            "ok": True, "refunded": refunded, "credits": new_credits,
+            "retroactive": retroactive,
+            "txn": serialize_transaction(refund_txn) if refund_txn else None,
+        })
 
     # PUT
     data = parse_body(request)
