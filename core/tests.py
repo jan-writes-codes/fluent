@@ -294,6 +294,25 @@ class ProfilePhotoPersistenceTests(FluentDataMixin, TestCase):
         payload = extract_payload(self.client.get(reverse("app")).content.decode())
         self.assertEqual(payload["currentUser"]["photo"], data_url)
 
+    def test_tutor_photo_reaches_booking_calendars(self):
+        # The booking calendars render tutor avatars from the tutor payload, so a
+        # tutor's photo must travel both to the logged-in app and to the public
+        # intro page — otherwise students only ever see initials.
+        data_url = "data:image/png;base64,iVBORw0KGgo="
+        self.davit.photo = data_url
+        self.davit.save()
+        # Logged-in app payload (student view).
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        davit = next(t for t in payload["tutors"] if t["slug"] == "davit")
+        self.assertEqual(davit["photo"], data_url)
+        # Public intro booking page payload.
+        self.client.logout()
+        from core.views import public_booking_payload
+        pub = public_booking_payload()
+        pub_davit = next(t for t in pub["tutors"] if t["slug"] == "davit")
+        self.assertEqual(pub_davit["photo"], data_url)
+
     def test_photo_can_be_removed(self):
         self.maya.photo = "data:image/png;base64,iVBORw0KGgo="
         self.maya.save()

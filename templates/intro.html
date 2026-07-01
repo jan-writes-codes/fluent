@@ -258,7 +258,12 @@ window.INTRO_DATA = {{ intro_data|safe }};
   function endTime(t){ const [h,m]=t.split(":").map(Number); let tm=h*60+m+15; return String(Math.floor(tm/60)).padStart(2,"0")+":"+String(tm%60).padStart(2,"0"); }
   function tutorBySlug(s){ return TUTORS.find(t=>t.slug===s) || TUTORS[0] || {}; }
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-  function avStyle(t){ return `background:linear-gradient(135deg, ${t.color1||'#309050'}, ${t.color2||'#277a42'})`; }
+  function avStyle(t){
+    // Use the tutor's uploaded photo when present (color:transparent hides the
+    // initials underneath); otherwise fall back to the gradient + initials.
+    if(t && t.photo) return `background-image:url('${t.photo}'); background-size:cover; background-position:center; color:transparent;`;
+    return `background:linear-gradient(135deg, ${t.color1||'#309050'}, ${t.color2||'#277a42'})`;
+  }
 
   let toastTimer;
   function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),3200); }
