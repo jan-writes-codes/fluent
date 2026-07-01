@@ -317,36 +317,87 @@ def send_cancellation_notifications(snapshot):
         msg.send()
 
 
-def send_receipt_copy(receipt_id):
-    """E-mail an issued receipt to the student it belongs to, with the studio's own
-    inbox (``DEFAULT_FROM_EMAIL``) bcc'd as an archive. Covers every purchase — a
-    tutor's cash top-up or a student's Stripe payment. If the student has no address
-    (e.g. a deleted account) the studio archive still gets it."""
-    archive = getattr(settings, "DEFAULT_FROM_EMAIL", None)
-    from .models import Receipt
-    # Lazy import: views imports this module, so importing it at module load
-    # would be circular.
+def _business_inbox():
+    """The studio/business address that hears about purchases and cancellations —
+    the dedicated notify inbox if configured, else the studio's own From address."""
+    return (getattr(settings, "TUTOR_NOTIFY_EMAIL", "") or
+            getattr(settings, "DEFAULT_FROM_EMAIL", "") or "")
+
+
+def _receipt_html_for(receipt):
+    """Render a receipt (purchase or Storno) to HTML. Lazy import: views imports
+    this module, so importing it at module load would be circular."""
     from .views import serialize_receipt, receipt_html, get_settings
+    return receipt_html(serialize_receipt(receipt), get_settings())
+
+
+def send_purchase_notifications(receipt_id):
+    """Tell the student and the business that a credit purchase went through.
+
+    Covers every purchase path — a tutor's cash top-up or a student's Stripe
+    payment. The student receives their receipt; the business inbox gets a
+    notification (with the receipt attached as HTML) for its records. If the student
+    has no address (e.g. a deleted account) the business is still notified."""
+    from .models import Receipt
     receipt = Receipt.objects.filter(pk=receipt_id).select_related("student").first()
     if not receipt:
         return
+    html = _receipt_html_for(receipt)
     student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
-    to = [student_email] if student_email else ([archive] if archive else [])
-    if not to:
+    business = _business_inbox()
+
+    if student_email:
+        subject = f"Dein Beleg {receipt.number} · {receipt.credits} Einheiten"
+        text = (f"Hallo {receipt.student_name},\n\n"
+                f"unten findest du deinen Beleg {receipt.number} über {receipt.credits} "
+                f"Einheiten (ausgestellt am {receipt.date_str}).\n\n"
+                f"The Green Pencil — Englisch-Nachhilfe")
+        _message(subject, [student_email], text, html).send()
+
+    # Notify the business — skip only if it's the very same address the student got.
+    if business and business != student_email:
+        subject = f"Neuer Kauf: {receipt.student_name} · {receipt.credits} Einheiten ({receipt.number})"
+        text = (f"{receipt.student_name} hat {receipt.credits} Einheiten gekauft.\n\n"
+                f"Beleg:   {receipt.number}\n"
+                f"Datum:   {receipt.date_str}\n\n"
+                f"The Green Pencil — Englisch-Nachhilfe")
+        _message(subject, [business], text, html).send()
+
+
+def send_storno_notifications(receipt_id):
+    """Tell the student and the business that a purchase was cancelled.
+
+    Takes the *Storno* receipt id. The student receives the credit-note receipt
+    confirming the reversal/refund; the business inbox is notified for its records.
+    Skips any recipient without an address (e.g. a deleted student account)."""
+    from .models import Receipt
+    receipt = Receipt.objects.filter(pk=receipt_id).select_related("student", "reverses").first()
+    if not receipt:
         return
-    # Archive a copy to the studio inbox (skip if it's already the only recipient).
-    bcc = [archive] if archive and archive not in to else []
-    r_data = serialize_receipt(receipt)
-    html = receipt_html(r_data, get_settings())
-    subject = f"Dein Beleg {receipt.number} · {receipt.credits} Einheiten"
-    text = (f"Hallo {receipt.student_name},\n\n"
-            f"unten findest du deinen Beleg {receipt.number} über {receipt.credits} "
-            f"Einheiten (ausgestellt am {receipt.date_str}).\n\n"
-            f"The Green Pencil — Englisch-Nachhilfe")
-    msg = _message(subject, to, text, html)
-    if bcc:
-        msg.bcc = bcc
-    msg.send()
+    html = _receipt_html_for(receipt)
+    student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
+    business = _business_inbox()
+    n = -receipt.credits  # credits reversed (receipt.credits is negative)
+    original_no = receipt.reverses.number if receipt.reverses_id and receipt.reverses else ""
+
+    if student_email:
+        subject = f"Storniert: dein Kauf · Storno {receipt.number}"
+        text = (f"Hallo {receipt.student_name},\n\n"
+                f"dein Kauf von {n} Einheiten (Beleg {original_no}) wurde storniert. "
+                f"Der Betrag wurde erstattet.\n\n"
+                f"Storno-Beleg: {receipt.number}\n"
+                f"Datum:        {receipt.date_str}\n\n"
+                f"The Green Pencil — Englisch-Nachhilfe")
+        _message(subject, [student_email], text, html).send()
+
+    if business and business != student_email:
+        subject = f"Storniert: {receipt.student_name} · {n} Einheiten (Storno {receipt.number})"
+        text = (f"Der Kauf von {receipt.student_name} über {n} Einheiten (Beleg {original_no}) "
+                f"wurde storniert und erstattet.\n\n"
+                f"Storno-Beleg: {receipt.number}\n"
+                f"Datum:        {receipt.date_str}\n\n"
+                f"The Green Pencil — Englisch-Nachhilfe")
+        _message(subject, [business], text, html).send()
 
 
 # --------------------------------------------------------------------------- #

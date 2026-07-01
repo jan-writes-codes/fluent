@@ -126,11 +126,20 @@ class CreditTransaction(models.Model):
     )
     student_slug = models.CharField(max_length=50, blank=True)
     student_name = models.CharField(max_length=200, blank=True)
-    txn_type = models.CharField(max_length=10)  # book, buy, done
+    txn_type = models.CharField(max_length=10)  # book, buy, done, storno
     label = models.CharField(max_length=200)
     sub = models.CharField(max_length=200, blank=True)
     amount = models.IntegerField(default=0)
     receipt_no = models.CharField(max_length=30, blank=True)
+    # A purchase ("buy") an admin has since cancelled. Once set the credits have
+    # been reversed and a Storno receipt issued, so it can no longer be cancelled
+    # and the admin history stops offering the action. Only meaningful for buys.
+    cancelled = models.BooleanField(default=False)
+    # For a "storno" entry, the original purchase transaction it reverses. SET_NULL
+    # so the reversal record survives even if the original is ever removed.
+    reverses = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='reversals'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -161,6 +170,15 @@ class Receipt(models.Model):
     # Stripe Checkout session that paid for this receipt (empty for receipts the
     # tutor added manually). Used to make webhook/redirect crediting idempotent.
     stripe_session_id = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    # A Storno (cancellation / credit note) receipt points at the original purchase
+    # receipt it reverses; its ``credits`` (and therefore its totals) are negative.
+    # NULL for ordinary purchase receipts.
+    reverses = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='reversals'
+    )
+    # The Stripe refund created when a Stripe-paid purchase is cancelled. Empty for
+    # cash purchases, when Stripe isn't involved, or if the refund could not be made.
+    stripe_refund_id = models.CharField(max_length=255, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

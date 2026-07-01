@@ -1250,6 +1250,176 @@ class StripeCheckoutTests(FluentDataMixin, TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# Credit purchase cancellation (admin) + Storno receipts + Stripe refunds
+# --------------------------------------------------------------------------- #
+class CreditCancellationTests(FluentDataMixin, TestCase):
+    def _grant(self, n, stripe_session_id=""):
+        from core.views import grant_credits, get_settings
+        return grant_credits(
+            self.maya, n, get_settings(),
+            label="Einheiten vom Tutor", sub="Heute · bar bezahlt",
+            stripe_session_id=stripe_session_id,
+        )
+
+    def _buy_txn(self, receipt):
+        return CreditTransaction.objects.get(receipt_no=receipt.number, txn_type="buy")
+
+    def test_admin_cancels_cash_purchase_reverses_credits_and_issues_storno(self):
+        start = self.maya.credits
+        receipt = self._grant(10)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start + 10)
+        txn = self._buy_txn(receipt)
+
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["ok"])
+        self.assertFalse(body["refundedStripe"])  # cash purchase, no Stripe refund
+
+        # Credits are reversed back to where they started.
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, start)
+
+        # The original purchase is now flagged cancelled and can't be cancelled twice.
+        txn.refresh_from_db()
+        self.assertTrue(txn.cancelled)
+
+        # A negative Storno receipt was issued, cross-referencing the original.
+        storno = Receipt.objects.get(reverses=receipt)
+        self.assertEqual(storno.credits, -10)
+        self.assertEqual(storno.unit_price_cents, receipt.unit_price_cents)
+        self.assertEqual(storno.number, receipt.number.replace("RE-", "ST-", 1))
+
+        # A storno ledger entry visible to the student was created.
+        storno_txn = CreditTransaction.objects.get(txn_type="storno", reverses=txn)
+        self.assertEqual(storno_txn.amount, -10)
+        self.assertEqual(storno_txn.student_id, self.maya.pk)
+
+    def test_double_cancel_is_rejected(self):
+        receipt = self._grant(5)
+        txn = self._buy_txn(receipt)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.post(f"/api/transactions/{txn.pk}/cancel/").status_code, 200)
+        # Second attempt: already cancelled.
+        second = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(second.status_code, 400)
+        # Exactly one Storno receipt / one storno ledger row exists.
+        self.assertEqual(Receipt.objects.filter(reverses=receipt).count(), 1)
+        self.assertEqual(CreditTransaction.objects.filter(txn_type="storno", reverses=txn).count(), 1)
+
+    def test_only_admin_can_cancel(self):
+        receipt = self._grant(5)
+        txn = self._buy_txn(receipt)
+        # Student
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.post(f"/api/transactions/{txn.pk}/cancel/").status_code, 403)
+        # Tutor
+        self.client.force_login(self.davit)
+        self.assertEqual(self.client.post(f"/api/transactions/{txn.pk}/cancel/").status_code, 403)
+        # Nothing was reversed.
+        txn.refresh_from_db()
+        self.assertFalse(txn.cancelled)
+
+    def test_non_buy_transaction_is_not_cancellable(self):
+        # A booking charge (txn_type="book") must not be cancellable via this path.
+        book_txn = CreditTransaction.objects.create(
+            student=self.maya, student_slug="maya", student_name="Maya Karlsson",
+            txn_type="book", label="Stunde gebucht", amount=-1,
+        )
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/api/transactions/{book_txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 400)
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_stripe_purchase_cancellation_refunds_payment(self):
+        receipt = self._grant(10, stripe_session_id="cs_paid_9")
+        txn = self._buy_txn(receipt)
+        self.client.force_login(self.admin)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.retrieve.return_value = {"payment_intent": "pi_9"}
+            st.Refund.create.return_value = {"id": "re_9"}
+            resp = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["refundedStripe"])
+        # The refund was issued against the original session's payment intent...
+        st.Refund.create.assert_called_once_with(payment_intent="pi_9")
+        # ...and recorded on the Storno receipt.
+        storno = Receipt.objects.get(reverses=receipt)
+        self.assertEqual(storno.stripe_refund_id, "re_9")
+
+    @override_settings(STRIPE_SECRET_KEY="sk_test_x")
+    def test_stripe_refund_failure_still_cancels(self):
+        # A Stripe outage must not block the reversal — the Storno still stands.
+        receipt = self._grant(10, stripe_session_id="cs_paid_10")
+        txn = self._buy_txn(receipt)
+        self.client.force_login(self.admin)
+        with mock.patch("core.views.stripe") as st:
+            st.checkout.Session.retrieve.side_effect = RuntimeError("stripe down")
+            resp = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["refundedStripe"])
+        self.assertTrue(Receipt.objects.filter(reverses=receipt).exists())
+        txn.refresh_from_db()
+        self.assertTrue(txn.cancelled)
+
+    def test_consolidated_ledger_is_admin_only(self):
+        self._grant(5)
+        # Admin sees the consolidated ledger with the buy entry.
+        self.client.force_login(self.admin)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertIn("allTransactions", payload)
+        self.assertTrue(any(t["type"] == "buy" and t["cancellable"] for t in payload["allTransactions"]))
+        # Student never receives the consolidated ledger.
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload.get("allTransactions", []), [])
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
+    TUTOR_NOTIFY_EMAIL="studio@thegreenpencil.at",
+)
+class PurchaseAndCancellationEmailTests(FluentDataMixin, TestCase):
+    def _grant(self, n, stripe_session_id=""):
+        from core.views import grant_credits, get_settings
+        return grant_credits(
+            self.maya, n, get_settings(),
+            label="Einheiten vom Tutor", sub="Heute · bar bezahlt",
+            stripe_session_id=stripe_session_id,
+        )
+
+    def test_purchase_notifies_student_and_business(self):
+        from django.core import mail
+        with self.captureOnCommitCallbacks(execute=True):
+            self._grant(10)
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        studio_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
+        self.assertEqual(len(student_mail), 1, "the student must get their receipt")
+        self.assertEqual(len(studio_mail), 1, "the business must be notified of the purchase")
+        self.assertIn("Beleg", student_mail[0].subject)
+        self.assertIn("Neuer Kauf", studio_mail[0].subject)
+
+    def test_cancellation_notifies_student_and_business(self):
+        from django.core import mail
+        receipt = self._grant(10)
+        txn = CreditTransaction.objects.get(receipt_no=receipt.number, txn_type="buy")
+        mail.outbox = []  # ignore the purchase mails
+        self.client.force_login(self.admin)
+        with self.captureOnCommitCallbacks(execute=True):
+            resp = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 200)
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        studio_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
+        self.assertEqual(len(student_mail), 1, "the student must hear their purchase was cancelled")
+        self.assertEqual(len(studio_mail), 1, "the business must hear about the cancellation")
+        self.assertIn("Storniert", student_mail[0].subject)
+        self.assertIn("Storniert", studio_mail[0].subject)
+
+
+# --------------------------------------------------------------------------- #
 # Negative credits: tutor books on tab, student/tutor settle the balance
 # --------------------------------------------------------------------------- #
 class NegativeCreditBookingTests(FluentDataMixin, TestCase):

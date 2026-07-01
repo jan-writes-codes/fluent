@@ -153,11 +153,20 @@ def serialize_transaction(t):
     else:
         amt_str = ""
     return {
+        "id": t.pk,
         "type": t.txn_type,
+        "studentId": t.student_slug,
+        "studentName": t.student_name,
         "label": t.label,
         "sub": t.sub,
         "amt": amt_str,
         "receiptNo": t.receipt_no or None,
+        "date": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
+        # A purchase still holding its receipt may be reversed by an admin; once
+        # cancelled the action is gone. Flags are advisory — the server re-checks.
+        "cancelled": t.cancelled,
+        "cancellable": (t.txn_type == "buy" and bool(t.receipt_no) and not t.cancelled),
+        "isStorno": t.txn_type == "storno",
     }
 
 
@@ -180,6 +189,10 @@ def serialize_receipt(r):
         "unit": r.unit_price_cents,  # already in EUR (stored as integer EUR)
         "net": r.credits * r.unit_price_cents,
         "total": r.credits * r.unit_price_cents,
+        # A Storno (credit note) receipt: negative credits/totals, and a pointer to
+        # the original purchase receipt it reverses so both documents cross-reference.
+        "isStorno": r.reverses_id is not None,
+        "reversesNo": (r.reverses.number if r.reverses_id and r.reverses else ""),
     }
 
 
@@ -315,12 +328,13 @@ def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", uni
             receipt_no=receipt_no,
         )
 
-    # Archive a copy of every purchase receipt to the studio inbox. Deferred to
-    # on_commit so it only fires once the credit grant (and any enclosing
-    # transaction) has durably committed — the sender reads the persisted receipt,
-    # and an e-mail failure can never roll back or race the credit write.
+    # Notify the student (with their receipt) and the business inbox that a
+    # purchase went through. Deferred to on_commit so it only fires once the credit
+    # grant (and any enclosing transaction) has durably committed — the sender reads
+    # the persisted receipt, and an e-mail failure can never roll back or race the
+    # credit write.
     from . import emails
-    db_transaction.on_commit(lambda: emails.queue_email(emails.send_receipt_copy, receipt.pk))
+    db_transaction.on_commit(lambda: emails.queue_email(emails.send_purchase_notifications, receipt.pk))
     return receipt
 
 
@@ -397,6 +411,112 @@ def credit_from_stripe_session(session):
     except IntegrityError:
         # A concurrent caller (webhook vs. redirect) won the race; reuse its receipt.
         return Receipt.objects.filter(stripe_session_id=sid).first()
+
+
+def _storno_number(original_number):
+    """The Storno (credit note) number paired with a purchase receipt: the same
+    running number under an ``ST-`` prefix (e.g. RE-2026-1001 -> ST-2026-1001). One
+    Storno per purchase — guarded by the ``cancelled`` flag — so this stays unique."""
+    if original_number.startswith("RE-"):
+        return "ST-" + original_number[len("RE-"):]
+    return "ST-" + original_number
+
+
+def cancel_purchase(txn):
+    """Reverse a completed credit purchase, atomically and idempotently.
+
+    Deducts the purchased credits back off the student, issues a negative Storno
+    (credit-note) receipt cross-referencing the original, records a matching
+    ``storno`` ledger entry visible to both the student and the admin, and marks the
+    original purchase ``cancelled`` so it can't be reversed twice.
+
+    Returns the created (storno_receipt, storno_txn), or ``None`` if the purchase
+    was already cancelled (a concurrent caller won). The Stripe refund, if any, is
+    made by the caller afterwards so a payment-provider outage never rolls back the
+    bookkeeping."""
+    from django.db import transaction as db_transaction
+    from django.utils import timezone
+
+    original = Receipt.objects.filter(number=txn.receipt_no).first()
+    if not original:
+        return None
+
+    with db_transaction.atomic():
+        # Lock the purchase row so two concurrent cancels can't both pass the guard.
+        locked = CreditTransaction.objects.select_for_update().get(pk=txn.pk)
+        if locked.cancelled:
+            return None
+        n = locked.amount  # credits originally granted (positive)
+
+        # Snapshot identity from the purchase row; the account may since be deleted.
+        student = locked.student
+        student_slug = locked.student_slug
+        student_name = locked.student_name
+        if student is not None:
+            student = User.objects.select_for_update().get(pk=student.pk)
+            student.credits -= n
+            student.save(update_fields=["credits"])
+            student_slug = student.slug
+            student_name = student.get_full_name() or student.username
+
+        now = timezone.localtime()
+        storno_no = _storno_number(original.number)
+        storno_receipt = Receipt.objects.create(
+            number=storno_no,
+            student=student,
+            student_slug=student_slug,
+            student_name=student_name,
+            # Freeze the original's billing snapshot — a credit note must mirror the
+            # document it reverses, not the student's current address.
+            billing_name=original.billing_name,
+            billing_line1=original.billing_line1,
+            billing_postcode=original.billing_postcode,
+            billing_city=original.billing_city,
+            billing_country=original.billing_country,
+            date_str=now.strftime("%d.%m.%Y"),
+            credits=-n,
+            unit_price_cents=original.unit_price_cents,
+            reverses=original,
+        )
+        storno_txn = CreditTransaction.objects.create(
+            student=student,
+            student_slug=student_slug,
+            student_name=student_name,
+            txn_type="storno",
+            label="Kauf storniert",
+            sub=f"Storno zu {original.number}",
+            amount=-n,
+            receipt_no=storno_no,
+            reverses=locked,
+        )
+        locked.cancelled = True
+        locked.save(update_fields=["cancelled"])
+
+    return storno_receipt, storno_txn
+
+
+def refund_stripe_purchase(original, storno_receipt):
+    """Refund the Stripe payment behind ``original`` in full and record the refund
+    id on the Storno receipt. No-op (returns None) for cash purchases or when Stripe
+    is unavailable; swallows provider errors so a failed refund never blocks the
+    cancellation — the Storno document still stands and the studio can refund by
+    hand."""
+    if not original.stripe_session_id or not stripe_enabled():
+        return None
+    client = stripe_client()
+    try:
+        session = client.checkout.Session.retrieve(original.stripe_session_id)
+        payment_intent = session.get("payment_intent")
+        if not payment_intent:
+            return None
+        refund = client.Refund.create(payment_intent=payment_intent)
+        refund_id = refund.get("id") if isinstance(refund, dict) else getattr(refund, "id", "")
+        if refund_id:
+            storno_receipt.stripe_refund_id = refund_id
+            storno_receipt.save(update_fields=["stripe_refund_id"])
+        return refund_id
+    except Exception:
+        return None
 
 
 def finalize_history_snapshots(user):
@@ -492,11 +612,21 @@ def receipt_html(r_data, settings):
     else:
         billing_lines = r_data["studentName"]
 
+    is_storno = r_data.get("isStorno")
+    reverses_no = r_data.get("reversesNo") or ""
+    head_label = "Storno · Cancellation" if is_storno else "Beleg · Receipt"
+    storno_note = (
+        f'<div class="r-storno">Storno-Beleg (Gutschrift) zu Beleg Nr. {reverses_no}. '
+        f'Der ursprüngliche Kauf wurde storniert und der Betrag erstattet.</div>'
+        if is_storno else ""
+    )
+
     return f"""<div class="receipt-doc">
       <div class="r-top">
         <div class="r-brand"><div class="mark"></div><div><b>the green pencil</b><span>Englisch-Nachhilfe</span></div></div>
-        <div class="r-meta"><div class="r-h">Beleg · Receipt</div><div>Nr. {r_data['no']}</div><div>{r_data['dateStr']}</div></div>
+        <div class="r-meta"><div class="r-h">{head_label}</div><div>Nr. {r_data['no']}</div><div>{r_data['dateStr']}</div></div>
       </div>
+      {storno_note}
       <div class="r-parties">
         <div><div class="r-lbl">Leistungserbringer · From</div>{SUPPLIER['name']}<br/>{SUPPLIER['line2']}<br/>{SUPPLIER['addr']}<br/>{SUPPLIER['city']}<br/>{SUPPLIER['email']}</div>
         <div><div class="r-lbl">Empfänger · Billed to</div>{billing_lines}</div>
@@ -511,7 +641,7 @@ def receipt_html(r_data, settings):
         <div class="r-row r-grand"><span>Gesamt · Total</span><span>€ {money(r_data['total'])}</span></div>
       </div>
       <div class="r-vat"><b>{VAT_DE}</b><br/>{VAT_EN}</div>
-      <div class="r-foot"><div>Zahlung · Payment: Externe Überweisung — bezahlt</div><div>Automatisch ausgestellter Beleg</div></div>
+      <div class="r-foot"><div>Zahlung · Payment: {"Storniert — Betrag erstattet" if is_storno else "Externe Überweisung — bezahlt"}</div><div>Automatisch ausgestellter Beleg</div></div>
     </div>"""
 
 
@@ -849,11 +979,23 @@ def app_view(request):
         txns = list(s.transactions.all())
         transactions[s.slug] = [serialize_transaction(t) for t in txns]
 
+    # Consolidated ledger for the tutor/admin: every student's credit movements in
+    # one chronological list, so the admin can review purchases (and cancel them)
+    # without drilling into each student. Students never receive this.
+    all_transactions = []
+    if not is_student:
+        all_transactions = [
+            serialize_transaction(t)
+            for t in CreditTransaction.objects.all().select_related("student")
+        ]
+
     # Receipts: only the viewer's own for students; all for tutor/admin
     if is_student:
-        all_receipts = list(Receipt.objects.filter(student=user).select_related("student"))
+        all_receipts = list(
+            Receipt.objects.filter(student=user).select_related("student", "reverses")
+        )
     else:
-        all_receipts = list(Receipt.objects.all().select_related("student"))
+        all_receipts = list(Receipt.objects.all().select_related("student", "reverses"))
     receipts_data = [serialize_receipt(r) for r in all_receipts]
 
     # Availability overrides, keyed per tutor so two tutors' calendars never
@@ -929,6 +1071,7 @@ def app_view(request):
         "tutors": [serialize_user(t) for t in tutors],
         "bookings": bookings_payload,
         "transactions": transactions,
+        "allTransactions": all_transactions,
         "receipts": receipts_data,
         "availability": availability,
         "customTimes": custom_times,
@@ -1192,6 +1335,53 @@ def api_credits(request, slug):
     r_data = serialize_receipt(receipt)
     html = receipt_html(r_data, settings)
     return JsonResponse({"receiptNo": receipt_no, "receiptHtml": html, "granted": True})
+
+
+@require_http_methods(["POST"])
+@require_roles("admin")
+def api_cancel_transaction(request, txn_id):
+    """Admin-only: cancel a completed credit purchase.
+
+    Reverses the credits, issues a Storno (credit-note) receipt and a ``storno``
+    ledger entry that both the student and the admin can see, refunds the original
+    Stripe payment when there was one, and notifies the student and the business.
+    Only a ``buy`` that still holds its receipt and hasn't been cancelled qualifies.
+    """
+    txn = CreditTransaction.objects.filter(pk=txn_id).first()
+    if not txn:
+        return JsonResponse({"error": "not found"}, status=404)
+    if txn.txn_type != "buy" or not txn.receipt_no or txn.cancelled:
+        return JsonResponse({"error": "not_cancellable"}, status=400)
+
+    result = cancel_purchase(txn)
+    if not result:
+        # Lost the race (already cancelled) or the original receipt is missing.
+        return JsonResponse({"error": "not_cancellable"}, status=400)
+    storno_receipt, storno_txn = result
+
+    original = storno_receipt.reverses
+    refunded_stripe = bool(refund_stripe_purchase(original, storno_receipt)) if original else False
+
+    # Notify the student and the business once the reversal has committed.
+    from django.db import transaction as db_transaction
+    from . import emails
+    db_transaction.on_commit(
+        lambda: emails.queue_email(emails.send_storno_notifications, storno_receipt.pk)
+    )
+
+    settings = get_settings()
+    r_data = serialize_receipt(storno_receipt)
+    student = storno_txn.student
+    return JsonResponse({
+        "ok": True,
+        "refundedStripe": refunded_stripe,
+        "credits": student.credits if student is not None else None,
+        "stornoTxn": serialize_transaction(storno_txn),
+        "cancelledTxnId": txn.pk,
+        "receiptNo": storno_receipt.number,
+        "receipt": r_data,
+        "receiptHtml": receipt_html(r_data, settings),
+    })
 
 
 # ---------------------------------------------------------------------------
