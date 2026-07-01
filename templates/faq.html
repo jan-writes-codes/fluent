@@ -1,0 +1,197 @@
+{% extends "legal_base.html" %}
+{% load static %}
+
+{% block robots %}<meta name="robots" content="index, follow" />{% endblock %}
+{% block title %}Häufige Fragen (FAQ){% endblock %}
+
+{% block extrahead %}
+<meta name="description" content="Antworten auf häufige Fragen zur Englisch-Nachhilfe bei The Green Pencil in Wien — Ablauf, Online-Unterricht, Nachprüfung im September, Preise und Termine." />
+<link rel="canonical" href="https://thegreenpencil.at/faq/" />
+<style>
+  .lead { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
+  details.faq { border: 1px solid var(--line); border-radius: 12px; padding: 4px 18px;
+    margin: 10px 0; background: rgba(251,248,241,0.5); transition: border-color .16s; }
+  details.faq[open] { border-color: rgba(48,144,80,0.4); }
+  details.faq summary { font-family: var(--font-display); font-weight: 700; font-size: 17px;
+    letter-spacing: -0.01em; cursor: pointer; list-style: none; padding: 14px 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after { content: "+"; font-weight: 600; color: var(--c1);
+    font-size: 22px; line-height: 1; flex: 0 0 auto; transition: transform .18s; }
+  details.faq[open] summary::after { transform: rotate(45deg); }
+  details.faq .ans { padding: 0 0 16px; }
+  details.faq .ans p { margin-bottom: 10px; }
+  details.faq .ans p:last-child { margin-bottom: 0; }
+  .faq-cat { margin: 38px 0 6px; }
+  .faq-cat:first-of-type { margin-top: 8px; }
+  .faq-contact { margin-top: 40px; padding: 22px 22px; border: 1px solid var(--line);
+    border-radius: 14px; background: rgba(48,144,80,0.06); }
+  .faq-contact p { margin-bottom: 14px; }
+  .faq-contact .btn { display: inline-block; background: var(--c1); color: #fff;
+    text-decoration: none; font-weight: 600; padding: 11px 20px; border-radius: 11px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Häufige Fragen</h1>
+<p class="lead">Alles, was du vor der ersten Stunde wissen möchtest — von Ablauf und Online-Unterricht
+bis Nachprüfung, Preisen und Terminen. Ist deine Frage nicht dabei? <a href="mailto:davit@thegreenpencil.at">Schreib mir einfach.</a></p>
+
+<h2 class="faq-cat">Ablauf &amp; erste Stunde</h2>
+
+<details class="faq">
+  <summary>Wie läuft die erste Stunde ab?</summary>
+  <div class="ans"><p>Die erste Einheit ist ein unverbindliches Kennenlernen. Wir schauen uns deinen
+  Lernstand und dein Ziel an, klären offene Fragen und entscheiden gemeinsam, wie es weitergeht — ganz
+  ohne Verpflichtung.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Wie schnell kann ich starten?</summary>
+  <div class="ans"><p>Sofort. Du wählst einfach einen freien Termin im Kalender — alles Weitere klären
+  wir im Kennenlernen.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Wie buche ich eine Stunde?</summary>
+  <div class="ans"><p>Über den Button <a href="{% url 'intro' %}">„Erste Stunde buchen“</a>. Du suchst dir
+  einen freien Termin aus und bekommst eine Bestätigung per E-Mail.</p></div>
+</details>
+
+<h2 class="faq-cat">Unterricht &amp; Format</h2>
+
+<details class="faq">
+  <summary>Findet der Unterricht online oder vor Ort statt?</summary>
+  <div class="ans"><p>Standardmäßig findet der Unterricht online per Video statt — flexibel und
+  ortsunabhängig, egal wo in Wien (oder darüber hinaus) du bist. Vor-Ort-Termine sind nach
+  Absprache mit Davit möglich.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Wie lang ist eine Einheit?</summary>
+  <div class="ans"><p>Eine Einheit dauert 45 Minuten.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Für wen ist der Unterricht geeignet?</summary>
+  <div class="ans"><p>Für Schüler*innen, Studierende und Erwachsene — alle Altersstufen und alle Niveaus
+  von A1 bis C1, vom ersten Satz bis zur Matura.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Welche Niveaus werden unterrichtet?</summary>
+  <div class="ans"><p>A1 bis C1 — vom Einstieg bis fortgeschritten.</p></div>
+</details>
+
+<h2 class="faq-cat">Nachprüfung im September</h2>
+
+<details class="faq">
+  <summary>Wie bereite ich mich auf die Nachprüfung in Englisch im September vor?</summary>
+  <div class="ans"><p>Mit einem gezielten Plan: zuerst eine kurze Standortbestimmung, dann fokussiertes
+  Training genau der Themen, die in der Nachprüfung gefragt werden, und abschließend Prüfungssimulationen.
+  Genau so läuft die Vorbereitung bei The Green Pencil ab.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Reicht die Zeit bis zur Nachprüfung noch?</summary>
+  <div class="ans"><p>In den meisten Fällen ja — entscheidend ist gezieltes, regelmäßiges Üben statt
+  Masse. Im Kennenlernen schätzen wir gemeinsam realistisch ein, was bis September machbar ist.</p></div>
+</details>
+
+<h2 class="faq-cat">Preise &amp; Bezahlung</h2>
+
+<details class="faq">
+  <summary>Was kostet der Unterricht?</summary>
+  <div class="ans"><p>Es gibt klare Einheiten-Pakete zu fairen Preisen — je größer das Paket, desto
+  günstiger die einzelne Einheit. Die aktuellen Preise findest du im Abschnitt
+  <a href="/#preise">„Preise“</a> auf der Startseite.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Muss ich gleich ein großes Paket kaufen?</summary>
+  <div class="ans"><p>Nein. Das Kennenlernen ist unverbindlich, und du entscheidest danach in Ruhe,
+  welches Paket zu dir passt.</p></div>
+</details>
+
+<details class="faq">
+  <summary>Was, wenn ich mir den Unterricht finanziell gerade schwer leisten kann?</summary>
+  <div class="ans"><p>Sprich mich einfach an. Wenn du zum Beispiel alleinerziehend bist oder unter
+  finanziellem Druck stehst, finden wir nach Absprache eine Lösung — wir können vom üblichen Tarif
+  abweichen und auf deine Situation eingehen. Bildung soll nicht am Geld scheitern.</p></div>
+</details>
+
+<h2 class="faq-cat">Termine</h2>
+
+<details class="faq">
+  <summary>Wie kann ich einen Termin absagen oder verschieben?</summary>
+  <div class="ans"><p>Termine kannst du bis 24 Stunden vor der gebuchten Einheit kostenlos absagen oder
+  verschieben. Bei kurzfristigeren Absagen verfällt die Einheit, damit der Platz fair an andere
+  vergeben werden kann.</p></div>
+</details>
+
+<div class="faq-contact">
+  <p><strong>Noch eine Frage offen?</strong> Am einfachsten klärt sich alles im unverbindlichen
+  Kennenlernen — oder schreib mir kurz.</p>
+  <a class="btn" href="{% url 'intro' %}">Erste Stunde buchen</a>
+  &nbsp;<a href="mailto:davit@thegreenpencil.at" style="margin-left:6px;">davit@thegreenpencil.at</a>
+</div>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Wie läuft die erste Stunde ab?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Die erste Einheit ist ein unverbindliches Kennenlernen. Wir schauen uns deinen Lernstand und dein Ziel an, klären offene Fragen und entscheiden gemeinsam, wie es weitergeht — ganz ohne Verpflichtung." }
+    },
+    {
+      "@type": "Question",
+      "name": "Wie schnell kann ich starten?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Sofort. Du wählst einfach einen freien Termin im Kalender — alles Weitere klären wir im Kennenlernen." }
+    },
+    {
+      "@type": "Question",
+      "name": "Findet der Unterricht online oder vor Ort statt?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Standardmäßig findet der Unterricht online per Video statt — flexibel und ortsunabhängig. Vor-Ort-Termine sind nach Absprache mit Davit möglich." }
+    },
+    {
+      "@type": "Question",
+      "name": "Wie lang ist eine Einheit?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Eine Einheit dauert 45 Minuten." }
+    },
+    {
+      "@type": "Question",
+      "name": "Für wen ist der Unterricht geeignet?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Für Schüler*innen, Studierende und Erwachsene — alle Altersstufen und alle Niveaus von A1 bis C1, vom ersten Satz bis zur Matura." }
+    },
+    {
+      "@type": "Question",
+      "name": "Wie bereite ich mich auf die Nachprüfung in Englisch im September vor?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Mit einem gezielten Plan: zuerst eine kurze Standortbestimmung, dann fokussiertes Training genau der Themen, die in der Nachprüfung gefragt werden, und abschließend Prüfungssimulationen. Genau so läuft die Vorbereitung bei The Green Pencil ab." }
+    },
+    {
+      "@type": "Question",
+      "name": "Reicht die Zeit bis zur Nachprüfung noch?",
+      "acceptedAnswer": { "@type": "Answer", "text": "In den meisten Fällen ja — entscheidend ist gezieltes, regelmäßiges Üben statt Masse. Im Kennenlernen schätzen wir gemeinsam realistisch ein, was bis September machbar ist." }
+    },
+    {
+      "@type": "Question",
+      "name": "Was kostet der Unterricht?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Es gibt klare Einheiten-Pakete zu fairen Preisen — je größer das Paket, desto günstiger die einzelne Einheit. Die aktuellen Preise findest du im Abschnitt „Preise“ auf der Startseite." }
+    },
+    {
+      "@type": "Question",
+      "name": "Was, wenn ich mir den Unterricht finanziell gerade schwer leisten kann?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Sprich mich einfach an. Wenn du zum Beispiel alleinerziehend bist oder unter finanziellem Druck stehst, finden wir nach Absprache eine Lösung — wir können vom üblichen Tarif abweichen und auf deine Situation eingehen. Bildung soll nicht am Geld scheitern." }
+    },
+    {
+      "@type": "Question",
+      "name": "Wie kann ich einen Termin absagen oder verschieben?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Termine kannst du bis 24 Stunden vor der gebuchten Einheit kostenlos absagen oder verschieben. Bei kurzfristigeren Absagen verfällt die Einheit, damit der Platz fair an andere vergeben werden kann." }
+    }
+  ]
+}
+</script>
+{% endblock %}
