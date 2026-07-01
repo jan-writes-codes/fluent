@@ -541,6 +541,30 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         self.assertEqual(second.json()["error"], "already_set")
         self.assertEqual(CreditTransaction.objects.filter(student=self.maya, txn_type="open").count(), 1)
 
+    def test_opening_balance_can_be_reversed_and_rebooked(self):
+        self.client.force_login(self.admin)
+        before = self.maya.credits
+        self.client.post("/api/students/maya/opening-credit/",
+                         data=json.dumps({"n": 8}), content_type="application/json")
+        txn = CreditTransaction.objects.get(student=self.maya, txn_type="open", amount=8)
+        # Reverse it (fat-finger correction).
+        resp = self.client.post(f"/api/transactions/{txn.pk}/cancel/")
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before, "reversal must undo the credits")
+        txn.refresh_from_db()
+        self.assertTrue(txn.cancelled)
+        self.assertTrue(CreditTransaction.objects.filter(
+            student=self.maya, txn_type="open", amount=-8, reverses=txn).exists())
+        # No receipt/Storno-receipt is ever created for an opening balance.
+        self.assertFalse(Receipt.objects.filter(student=self.maya).exists())
+        # A fresh opening balance can now be booked again.
+        again = self.client.post("/api/students/maya/opening-credit/",
+                                 data=json.dumps({"n": 3}), content_type="application/json")
+        self.assertEqual(again.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.credits, before + 3)
+
     def test_only_admin_sets_opening_balance(self):
         self.client.force_login(self.davit)  # tutor
         resp = self.client.post(
