@@ -751,6 +751,10 @@
   .apack-pop input { accent-color: var(--c1); cursor: pointer; }
   @media (max-width: 760px) { .apack-row { grid-template-columns: 1fr 1fr; }
     .apack-pop { grid-column: 1 / -1; padding-bottom: 0; } }
+  /* Two side-by-side ledgers in the admin Transaktionen panel. */
+  .txn-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 8px; align-items: start; }
+  @media (max-width: 820px) { .txn-cols { grid-template-columns: 1fr; gap: 10px; } }
+  .txn-col-h { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin: 10px 2px 2px; }
   .li .tail .pill2 { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 500;
     background: color-mix(in oklch, var(--c3) 14%, transparent); color: var(--c3); border: 1px solid color-mix(in oklch, var(--c3) 30%, transparent); }
   .li .tail .pill2.done { background: rgba(36,53,40,0.06); color: var(--faint); border-color: var(--line-2); }
@@ -1061,8 +1065,18 @@
           <div class="panel" style="padding: 24px; margin-top: 22px;">
             <div class="section-h"><h2>Transaktionen</h2></div>
             <div class="ed-sub">Gesamter Einheiten-Verlauf aller Schüler</div>
-            <div class="micro" style="text-align:left; margin:2px 2px 12px;">Käufe können hier storniert werden — das erstattet die Einheiten (und die Stripe-Zahlung, falls vorhanden) und stellt einen Storno-Beleg aus.</div>
-            <div class="activity modal-txns" id="adminTxns" style="max-height:420px;"></div>
+            <div class="txn-cols">
+              <div class="txn-col">
+                <div class="txn-col-h">Käufe &amp; Stornos</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;">Käufe können hier storniert werden — das erstattet die Einheiten (und die Stripe-Zahlung, falls vorhanden) und stellt einen Storno-Beleg aus.</div>
+                <div class="activity modal-txns" id="adminTxnsCredit" style="max-height:420px;"></div>
+              </div>
+              <div class="txn-col">
+                <div class="txn-col-h">Stunden</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;">Gebuchte, stornierte und abgeschlossene Einheiten.</div>
+                <div class="activity modal-txns" id="adminTxnsLessons" style="max-height:420px;"></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1992,10 +2006,21 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function renderActivity() { $("#activityList").innerHTML = txnHtml(meLog()); bindReceiptLinks($("#activityList")); }
   // Consolidated credit ledger in the Admin view: every student's movements, with
   // the student name shown and purchases cancellable in place.
+  // A "buy" row is a real credit purchase only when it carries a receipt; booking
+  // refunds reuse the "buy" type but have none, so they belong with the lessons.
+  function isCreditTxn(a){ return a.type === "storno" || (a.type === "buy" && a.receiptNo); }
   function renderAdminTxns(){
-    const el=$("#adminTxns"); if(!el) return;
-    el.innerHTML = txnHtml(state.allTransactions||[], { showStudent:true });
-    bindReceiptLinks(el); bindCancelLinks(el);
+    const credit=$("#adminTxnsCredit"), lessons=$("#adminTxnsLessons");
+    if(!credit && !lessons) return;
+    const all = state.allTransactions || [];
+    if(credit){
+      credit.innerHTML = txnHtml(all.filter(isCreditTxn), { showStudent:true });
+      bindReceiptLinks(credit); bindCancelLinks(credit);
+    }
+    if(lessons){
+      lessons.innerHTML = txnHtml(all.filter(a=>!isCreditTxn(a)), { showStudent:true });
+      bindReceiptLinks(lessons); bindCancelLinks(lessons);
+    }
   }
   // Reverse a completed purchase (admin only). The server deducts the credits,
   // issues a Storno receipt + ledger entry, and refunds Stripe when applicable;
