@@ -763,6 +763,15 @@
   .activity .ai .at .as { font-size: 12px; color: var(--faint); }
   .activity .ai .amt { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
   .amt.plus { color: var(--good); } .amt.minus { color: var(--muted); }
+  /* Admin "cancel this purchase" control in the credit ledger. */
+  .txn-cancel { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; font-family: var(--font-body); font-size: 11px; color: #b8492c;
+    border: 1px solid rgba(184,73,44,0.4); background: rgba(184,73,44,0.06); border-radius: 7px; padding: 3px 8px; cursor: pointer; }
+  .txn-cancel:hover { background: rgba(184,73,44,0.13); }
+  .txn-cancel:disabled { opacity: 0.5; cursor: default; }
+  .txn-cancelled-tag { display: inline-block; margin-top: 7px; font-size: 10.5px; color: var(--faint); font-style: italic; }
+  /* Storno (credit-note) banner on a cancellation receipt. */
+  .r-storno { margin: 12px 0 4px; padding: 9px 12px; background: rgba(184,73,44,0.08); border: 1px solid rgba(184,73,44,0.25);
+    border-radius: 9px; font-size: 11.5px; color: #8f3a22; line-height: 1.45; }
 
   .grid2 { display: grid; gap: 22px; grid-template-columns: 1fr; }
 
@@ -1048,6 +1057,13 @@
             <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Preise speichern</button>
             <div class="micro" style="text-align:left; margin-top:10px;">Pakete sehen die Schüler unter „Einheiten aufladen“.</div>
           </div>
+
+          <div class="panel" style="padding: 24px; margin-top: 22px;">
+            <div class="section-h"><h2>Transaktionen</h2></div>
+            <div class="ed-sub">Gesamter Einheiten-Verlauf aller Schüler</div>
+            <div class="micro" style="text-align:left; margin:2px 2px 12px;">Käufe können hier storniert werden — das erstattet die Einheiten (und die Stripe-Zahlung, falls vorhanden) und stellt einen Storno-Beleg aus.</div>
+            <div class="activity modal-txns" id="adminTxns" style="max-height:420px;"></div>
+          </div>
         </div>
       </section>
     </main>
@@ -1253,8 +1269,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
       unit: r.unit,
       net: r.net,
       total: r.total,
+      isStorno: !!r.isStorno,
+      reversesNo: r.reversesNo || "",
     }));
   }
+
+  // Consolidated credit ledger for the tutor/admin (every student's movements in
+  // one list). Students never receive this key. Rebuilt after each cancellation.
+  state.allTransactions = DJ.allTransactions || [];
 
   // Set initial credits from current user data
   if (DJ.role === "student" && DJ.currentUser) {
@@ -1339,11 +1361,16 @@ window.DJANGO_DATA = {{ django_data|safe }};
   function bindReceiptLinks(root){ if(!root) return; root.querySelectorAll("[data-receipt]").forEach(el=> el.onclick=(e)=>{ e.stopPropagation(); openReceiptNo(el.dataset.receipt); }); }
 
   function receiptDocHtml(r){
+    const headLabel = r.isStorno ? "Storno · Cancellation" : "Beleg · Receipt";
+    const stornoNote = r.isStorno
+      ? `<div class="r-storno">Storno-Beleg (Gutschrift) zu Beleg Nr. ${r.reversesNo||""}. Der ursprüngliche Kauf wurde storniert und der Betrag erstattet.</div>`
+      : "";
     return `<div class="receipt-doc">
       <div class="r-top">
         <div class="r-brand"><div class="mark"></div><div><b>the green pencil</b><span>Englisch-Nachhilfe</span></div></div>
-        <div class="r-meta"><div class="r-h">Beleg · Receipt</div><div>Nr. ${r.no}</div><div>${r.dateStr}</div></div>
+        <div class="r-meta"><div class="r-h">${headLabel}</div><div>Nr. ${r.no}</div><div>${r.dateStr}</div></div>
       </div>
+      ${stornoNote}
       <div class="r-parties">
         <div><div class="r-lbl">Leistungserbringer · From</div>${SUPPLIER.name}<br/>${SUPPLIER.line2}<br/>${SUPPLIER.addr}<br/>${SUPPLIER.city}<br/>${SUPPLIER.email}</div>
         <div><div class="r-lbl">Empfänger · Billed to</div>${r.studentName}${r.billing?'<br/>'+r.billing.line1+'<br/>'+r.billing.postcode+' '+r.billing.city+'<br/>'+r.billing.country:''}</div>
@@ -1358,7 +1385,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
         <div class="r-row r-grand"><span>Gesamt · Total</span><span>€ ${money(r.total)}</span></div>
       </div>
       <div class="r-vat"><b>${VAT_DE}</b><br/>${VAT_EN}</div>
-      <div class="r-foot"><div>Zahlung · Payment: Externe Überweisung — bezahlt</div><div>Automatisch ausgestellter Beleg</div></div>
+      <div class="r-foot"><div>Zahlung · Payment: ${r.isStorno ? "Storniert — Betrag erstattet" : "Externe Überweisung — bezahlt"}</div><div>Automatisch ausgestellter Beleg</div></div>
     </div>`;
   }
   function openReceipt(r){
@@ -1927,21 +1954,79 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
 
   const TXN_ICONS = {
-    book: { bg:"linear-gradient(120deg,var(--c1),var(--c2))", t:"📅" },
-    buy:  { bg:"linear-gradient(120deg,var(--good),var(--c2))", t:"＋" },
-    done: { bg:"rgba(36,53,40,0.12)", t:"✓" },
+    book:   { bg:"linear-gradient(120deg,var(--c1),var(--c2))", t:"📅" },
+    buy:    { bg:"linear-gradient(120deg,var(--good),var(--c2))", t:"＋" },
+    storno: { bg:"linear-gradient(120deg,#c2552f,#8f3a22)", t:"↩" },
+    done:   { bg:"rgba(36,53,40,0.12)", t:"✓" },
   };
-  function txnHtml(log) {
+  // opts.showStudent adds the student name to each row (for the consolidated admin
+  // ledger). Cancel controls only ever render for the admin — the "only from the
+  // admin side" rule — and only on a purchase that still holds its receipt.
+  function txnHtml(log, opts) {
+    opts = opts || {};
     if (!log || !log.length) return `<div class="empty-list">Noch keine Vorgänge.</div>`;
+    const isAdmin = state.role === "admin";
     return log.map(a => {
       const ic = TXN_ICONS[a.type] || TXN_ICONS.done;
       const amtCls = a.amt.startsWith("+")?"plus":(a.amt.startsWith("-")?"minus":"");
+      const who = (opts.showStudent && a.studentName) ? `${escHtml(a.studentName)} · ` : "";
+      const sub = [who + (a.sub||""), a.date].filter(Boolean).join(" · ");
+      const receiptBtn = a.receiptNo?`<button class="rcpt-link" data-receipt="${a.receiptNo}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${a.receiptNo}</button>`:"";
+      let cancelCtl = "";
+      if (isAdmin && a.cancellable && a.id) {
+        cancelCtl = `<button class="txn-cancel" data-cancel-txn="${a.id}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18M6 6l12 12"/></svg> Kauf stornieren</button>`;
+      } else if (isAdmin && a.cancelled) {
+        cancelCtl = `<span class="txn-cancelled-tag">storniert</span>`;
+      }
       return `<div class="ai"><div class="adot" style="background:${ic.bg}">${ic.t}</div>
-        <div class="at"><div>${a.label}</div><div class="as">${a.sub}</div>${a.receiptNo?`<button class="rcpt-link" data-receipt="${a.receiptNo}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${a.receiptNo}</button>`:""}</div>
+        <div class="at"><div>${a.label}</div><div class="as">${sub}</div>${receiptBtn}${cancelCtl}</div>
         ${a.amt?`<div class="amt ${amtCls}">${a.amt}</div>`:""}</div>`;
     }).join("");
   }
+  // Wire the admin "cancel this purchase" buttons under a rendered ledger.
+  function bindCancelLinks(root){
+    if(!root) return;
+    root.querySelectorAll("[data-cancel-txn]").forEach(btn=>
+      btn.onclick=(e)=>{ e.stopPropagation(); cancelPurchaseTxn(+btn.dataset.cancelTxn, btn); });
+  }
   function renderActivity() { $("#activityList").innerHTML = txnHtml(meLog()); bindReceiptLinks($("#activityList")); }
+  // Consolidated credit ledger in the Admin view: every student's movements, with
+  // the student name shown and purchases cancellable in place.
+  function renderAdminTxns(){
+    const el=$("#adminTxns"); if(!el) return;
+    el.innerHTML = txnHtml(state.allTransactions||[], { showStudent:true });
+    bindReceiptLinks(el); bindCancelLinks(el);
+  }
+  // Reverse a completed purchase (admin only). The server deducts the credits,
+  // issues a Storno receipt + ledger entry, and refunds Stripe when applicable;
+  // we then mirror all of that into local state so every view updates at once.
+  function cancelPurchaseTxn(id, btn){
+    if(!window.confirm("Diesen Kauf stornieren? Die Einheiten werden erstattet, ein Storno-Beleg wird erstellt und eine etwaige Stripe-Zahlung zurückerstattet.")) return;
+    if(btn){ btn.disabled=true; btn.textContent="…"; }
+    api('POST', '/api/transactions/'+id+'/cancel/').then(res=>{
+      if(!res || !res.ok){ if(btn){ btn.disabled=false; btn.textContent="Kauf stornieren"; } toast("Stornierung fehlgeschlagen"); return; }
+      applyCancellation(res);
+      toast(res.refundedStripe ? "Kauf storniert · Stripe-Zahlung erstattet" : "Kauf storniert · Einheiten erstattet");
+    });
+  }
+  function applyCancellation(res){
+    const storno = res.stornoTxn || {};
+    const sid = storno.studentId;
+    // Reflect the refunded credit balance on the affected student.
+    if (sid && res.credits != null) setStudentCredits(sid, res.credits);
+    // Mark the original purchase cancelled everywhere it appears.
+    const markCancelled = (list)=>{ (list||[]).forEach(a=>{ if(a.id===res.cancelledTxnId){ a.cancelled=true; a.cancellable=false; } }); };
+    markCancelled(state.allTransactions);
+    const s = studentById(sid);
+    if (s){ markCancelled(s.log); s.log.unshift(storno); }
+    // Prepend the storno to the consolidated ledger too.
+    if (state.allTransactions) state.allTransactions.unshift(storno);
+    // Register the storno receipt so its link opens the credit-note document.
+    if (res.receipt && !state.receipts.some(x=>x.no===res.receipt.no)) state.receipts.unshift(res.receipt);
+    renderAdminTxns(); renderRoster();
+    if (state.teacherStudent && state.teacherStudent.id===sid) renderStudentModal();
+    if (state.currentUser===sid) renderAccount();
+  }
 
   function renderAccount() { updateCredits(); renderUpcoming(); renderActivity(); $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length; }
 
@@ -2294,6 +2379,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
       prevToggle.textContent = show ? "Hide preview" : ("Preview "+s.name.split(' ')[0]+"’s Learning tab");
     };
     bindReceiptLinks($("#studentModal"));
+    bindCancelLinks($("#studentModal"));
     if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
   }
   function notesLogHtml(s){ const l=s.notesLog||[]; if(!l.length) return `<div class="empty-list">Noch keine Notizen — oben die erste hinzufügen.</div>`; return l.map(n=>`<div class="snote"><div class="snote-date">${n.date}</div><div class="snote-text">${escHtml(n.text)}</div></div>`).join(""); }
@@ -2368,7 +2454,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   // ---------- Admin: user management ----------
   function esc(s){ return String(s==null?"":s).replace(/"/g,"&quot;"); }
   function escHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); }
+  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); renderAdminTxns(); }
   // Auto-derived "per session" label = total price ÷ credits. Blank (never a
   // ZeroDivision/NaN) when credits or price are missing.
   function packEach(n, price){
