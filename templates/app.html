@@ -1007,6 +1007,7 @@
               <div class="cal-head">
                 <div class="month" id="tMonthLabel">Juni 2026</div>
                 <div class="weeknav">
+                  <button class="avail-toggle" id="backdateBtn" title="Vergangene Stunde nachtragen"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>Nachtragen</button>
                   <button class="avail-toggle" id="availToggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten</button>
                   <button class="today" id="tTodayBtn">Diese Woche</button>
                   <button id="tPrevWeek" aria-label="Vorherige Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
@@ -1097,6 +1098,7 @@
   <div class="modal-overlay" id="receiptModal" hidden></div>
   <div class="modal-overlay" id="buyModal" hidden></div>
   <div class="modal-overlay" id="settleModal" hidden></div>
+  <div class="modal-overlay" id="backdateModal" hidden></div>
 
 <script>
 window.DJANGO_DATA = {{ django_data|safe }};
@@ -2235,6 +2237,56 @@ window.DJANGO_DATA = {{ django_data|safe }};
     });
   }
 
+  // Log a "forgotten" past session (tutor). Up to 30 days back — the server caps
+  // it too. Consumes a credit (may push the student to the floor) and creates the
+  // correctly-dated ledger entry, exactly like a normal tutor booking.
+  function openBackdate(){
+    const m=$("#backdateModal");
+    const list=state.students.slice().sort((a,b)=>a.name.localeCompare(b.name));
+    if(!list.length){ toast("Noch keine Schüler vorhanden"); return; }
+    const min=new Date(NOW); min.setDate(min.getDate()-30);
+    const times=[]; for(let mn=8*60; mn<=20*60+30; mn+=30){ times.push(String(Math.floor(mn/60)).padStart(2,"0")+":"+String(mn%60).padStart(2,"0")); }
+    m.innerHTML=`<div class="modal-card buy-card" id="bdCard">
+      <button class="modal-x" id="bdX" aria-label="Close">×</button>
+      <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg></div>
+      <h3 class="buy-h">Stunde nachtragen</h3>
+      <p class="buy-p">Trage eine bereits gehaltene Stunde nach — bis zu <b>30 Tage</b> zurück. Es wird <b>1 Einheit</b> abgezogen und die Stunde erscheint im Verlauf.</p>
+      <label class="bf-lab" style="text-align:left;">Schüler<select class="bf-input" id="bdStudent">${list.map(s=>`<option value="${esc(s.id)}">${escHtml(s.name)}</option>`).join("")}</select></label>
+      <div class="bf-grid">
+        <label class="bf-lab" style="text-align:left;">Datum<input class="bf-input" type="date" id="bdDate" min="${ymd(min)}" max="${ymd(NOW)}" value="${ymd(NOW)}"></label>
+        <label class="bf-lab" style="text-align:left;">Uhrzeit<select class="bf-input" id="bdTime">${times.map(t=>`<option${t==="16:00"?" selected":""}>${t}</option>`).join("")}</select></label>
+      </div>
+      <button class="btn" id="bdConfirm" style="margin-top:8px;"><span class="grainbtn"></span>Nachtragen</button>
+      <button class="btn ghost" id="bdCancel">Abbrechen</button>
+    </div>`;
+    m.hidden=false;
+    $("#bdCard").onclick=(e)=>e.stopPropagation();
+    $("#bdX").onclick=closeBackdate; $("#bdCancel").onclick=closeBackdate;
+    $("#bdConfirm").onclick=confirmBackdate;
+  }
+  function closeBackdate(){ const m=$("#backdateModal"); if(m){ m.hidden=true; m.innerHTML=""; } }
+  function confirmBackdate(){
+    const studentId=$("#bdStudent").value, dstr=$("#bdDate").value, time=$("#bdTime").value;
+    const s=studentById(studentId);
+    if(!s||!dstr||!/^\d{4}-\d{2}-\d{2}$/.test(dstr)||!time){ toast("Bitte Schüler, Datum und Uhrzeit wählen"); return; }
+    const d=new Date(dstr+"T00:00:00");
+    const btn=$("#bdConfirm"); if(btn) btn.disabled=true;
+    apiResult('POST', '/api/bookings/', { studentSlug:studentId, tutorSlug:state.myTutor, date:dstr, time, title:'Englischstunde' }).then(res=>{
+      if(btn) btn.disabled=false;
+      if(res.data && res.data.error==="too_far_back"){ toast("Nur bis zu 30 Tage rückwirkend möglich"); return; }
+      if(res.status===409){ toast(res.data && res.data.error==="slot_taken" ? "Zu dieser Zeit besteht bereits eine Buchung" : `${s.name.split(" ")[0]} hat das Limit offener Einheiten erreicht — bitte zuerst begleichen`); return; }
+      if(!res.ok || !res.data){ toast("Nachtragen fehlgeschlagen"); return; }
+      const r=res.data;
+      state.bookings.push({ studentId, tutorId:state.myTutor, date:d, time, title:"Englischstunde", _pk:r.pk });
+      if(typeof r.credits==='number') setStudentCredits(studentId, r.credits);
+      const tut=tutorById(state.myTutor); const tf=tut?tut.name.split(" ")[0]:"";
+      if(s.log) s.log.unshift({ type:"book", label:"Stunde nachgetragen", sub:(tf?"mit "+tf+" · ":"")+fmtAT(d)+" · "+time, amt:"-1" });
+      closeBackdate();
+      renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
+      toast(`${s.name.split(" ")[0]} nachgetragen · ${MONTHS_S[d.getMonth()]} ${d.getDate()}, ${time}`);
+    });
+  }
+
   function teacherRemove(bk){
     const i=state.bookings.indexOf(bk); if(i<0) return;
     const s=studentById(bk.studentId);  // null for a free guest/intro booking
@@ -3158,6 +3210,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
   $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>0){state.tWeekOffset--; renderTeacherWeek();} };
   $("#tNextWeek").onclick = ()=>{ if(state.tWeekOffset<6){state.tWeekOffset++; renderTeacherWeek();} };
   $("#tTodayBtn").onclick = ()=>{ state.tWeekOffset=0; renderTeacherWeek(); };
+  if($("#backdateBtn")) $("#backdateBtn").onclick = openBackdate;
   $("#availToggle").onclick = ()=>{
     if(state.editAvail){ exitEditAvail(); return; }
     state.editAvail = true;

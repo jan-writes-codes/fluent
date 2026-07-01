@@ -338,6 +338,33 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
         self.assertIn("mit Davit", txn.sub)
         self.assertIn("09:30", txn.sub)
 
+    def test_tutor_can_backdate_within_30_days(self):
+        from django.utils import timezone
+        d = (timezone.localdate() - timedelta(days=20)).isoformat()
+        self.client.force_login(self.davit)  # tutor logs a forgotten session
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Booking.objects.filter(student=self.maya, time="15:00").exists())
+
+    def test_tutor_backdate_beyond_30_days_is_rejected(self):
+        from django.utils import timezone
+        d = (timezone.localdate() - timedelta(days=40)).isoformat()
+        self.client.force_login(self.davit)
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["error"], "too_far_back")
+        self.assertFalse(Booking.objects.filter(student=self.maya, time="15:00").exists())
+
     def test_cancellation_refund_entry_names_the_tutor(self):
         # The refund entry (shown under "Stunden") must also name the tutor.
         pk = self._book("maya", "davit", "2026-06-08", "09:30").json()["pk"]

@@ -24,6 +24,9 @@ try:
 except ImportError:  # pragma: no cover - exercised only where stripe isn't installed
     stripe = None
 
+# How many days back a tutor/admin may log a "forgotten" (retroactive) session.
+BACKDATE_LIMIT_DAYS = 30
+
 # Uploaded lesson materials: an allowed type, reasonably sized.
 MAX_LESSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
 AUDIO_EXTS = {"mp3", "m4a", "wav", "ogg"}
@@ -1212,6 +1215,17 @@ def api_bookings(request):
         title = data.get("title", "English session")
     except (KeyError, User.DoesNotExist, ValueError) as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+    # Logging a past ("forgotten") session is a tutor/admin action, bounded to a
+    # 30-day look-back so old history can't be silently rewritten. Students never
+    # book in the past (their UI only offers future slots).
+    from django.utils import timezone
+    today = timezone.localdate()
+    if booking_date < today and getattr(request.user, "role", None) in ("tutor", "admin"):
+        if (today - booking_date).days > BACKDATE_LIMIT_DAYS:
+            return JsonResponse(
+                {"error": "too_far_back", "maxDays": BACKDATE_LIMIT_DAYS}, status=400
+            )
 
     # The slot must be free and open — enforced here, not just in the UI, so the
     # API can't be driven into a clash or onto a closed slot.
