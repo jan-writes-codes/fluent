@@ -104,13 +104,18 @@ class Booking(models.Model):
         student = self.student
         student.credits -= 1
         student.save(update_fields=['credits'])
+        # Note which tutor the lesson is with, so the credit ledger shows it.
+        tutor_first = (self.tutor_name or "").split(" ")[0]
+        sub = f"{self.date.strftime('%d.%m.%Y')} · {self.time}"
+        if tutor_first:
+            sub = f"mit {tutor_first} · {sub}"
         CreditTransaction.objects.create(
             student=student,
             student_slug=student.slug,
             student_name=student.get_full_name() or student.username,
             txn_type='book',
             label='Stunde gebucht',
-            sub=f"{self.date.strftime('%d.%m.%Y')} · {self.time}",
+            sub=sub,
             amount=-1,
         )
 

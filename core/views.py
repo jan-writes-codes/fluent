@@ -922,7 +922,10 @@ def booking_cancel_view(request, token):
                 if not forfeit:
                     locked.credits += 1
                     locked.save(update_fields=["credits"])
-                    _booking_credit_txn(locked, "Buchung storniert — Einheit erstattet", "", 1)
+                    _booking_credit_txn(
+                        locked, "Buchung storniert — Einheit erstattet",
+                        _booking_txn_sub(booking), 1,
+                    )
                     refunded = True
                 snapshot = emails._cancel_snapshot(booking, refunded=refunded)
                 booking.delete()
@@ -1137,6 +1140,15 @@ def api_logout(request):
 # Bookings API
 # ---------------------------------------------------------------------------
 
+def _booking_txn_sub(booking):
+    """Ledger sub-line for a booking movement: which tutor, plus the lesson's
+    date/time — so the credit history says who the lesson was (or would have been)
+    with."""
+    tutor_first = (booking.tutor_name or "").split(" ")[0]
+    when = f"{booking.date.strftime('%d.%m.%Y')} · {booking.time}"
+    return f"mit {tutor_first} · {when}" if tutor_first else when
+
+
 def _booking_credit_txn(student, label, sub, amount):
     """Record a booking-related movement on the credit ledger (book = -1,
     refund = +1) with the identity snapshot, mirroring grant_credits' bookkeeping."""
@@ -1270,7 +1282,8 @@ def api_booking_detail(request, pk):
                     locked.credits += 1
                     locked.save(update_fields=["credits"])
                     _booking_credit_txn(
-                        locked, "Buchung storniert — Einheit erstattet", "", 1
+                        locked, "Buchung storniert — Einheit erstattet",
+                        _booking_txn_sub(b), 1,
                     )
                     refunded = True
                 new_credits = locked.credits
