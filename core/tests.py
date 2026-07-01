@@ -350,6 +350,13 @@ class BookingPersistenceTests(FluentDataMixin, TestCase):
         self.assertEqual(b.date, date(2026, 6, 8))   # no timezone shift server-side
         self.assertEqual(b.time, "09:30")
 
+    def test_booking_ledger_entry_names_the_tutor(self):
+        # The credit ledger should say which tutor a lesson is with.
+        self._book("maya", "davit", "2026-06-08", "09:30")
+        txn = CreditTransaction.objects.filter(student=self.maya, txn_type="book").latest("created_at")
+        self.assertIn("mit Davit", txn.sub)
+        self.assertIn("09:30", txn.sub)
+
     def test_tutor_sees_students_booking(self):
         self._book("maya", "davit", "2026-06-08", "09:30")
         self.client.force_login(self.davit)
