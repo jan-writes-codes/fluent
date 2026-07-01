@@ -1753,7 +1753,9 @@ def api_notes(request, slug):
         text = (data.get("text") or "").strip()
         if not text:
             return JsonResponse({"error": "text required"}, status=400)
-        tutor = acting_tutor(request)
+        # Attribute to the acting tutor — the one the client is working as (which,
+        # under admin "view-as", is the impersonated tutor), not just the first one.
+        tutor = acting_tutor(request, data.get("tutorSlug"))
         note = StudentNote.objects.create(tutor=tutor, student=student, text=text)
         return JsonResponse({"ok": True, "date": note.created_at.strftime("%d.%m.%Y")})
     except User.DoesNotExist as e:
