@@ -170,10 +170,15 @@ def serialize_transaction(t):
         "amt": amt_str,
         "receiptNo": t.receipt_no or None,
         "date": t.created_at.strftime("%d.%m.%Y") if t.created_at else "",
-        # A purchase still holding its receipt may be reversed by an admin; once
-        # cancelled the action is gone. Flags are advisory — the server re-checks.
+        # A purchase (with receipt) or an opening balance may be reversed by an
+        # admin; once cancelled the action is gone. The reversing "open" entry
+        # itself (negative, reverses set) is never cancellable. Flags are advisory —
+        # the server re-checks.
         "cancelled": t.cancelled,
-        "cancellable": (t.txn_type == "buy" and bool(t.receipt_no) and not t.cancelled),
+        "cancellable": (
+            (t.txn_type == "buy" and bool(t.receipt_no)) or
+            (t.txn_type == "open" and t.amount > 0 and t.reverses_id is None)
+        ) and not t.cancelled,
         "isStorno": t.txn_type == "storno",
     }
 
@@ -1424,20 +1429,73 @@ def api_credits(request, slug):
     return JsonResponse({"receiptNo": receipt_no, "receiptHtml": html, "granted": True})
 
 
+def reverse_opening_credit(txn):
+    """Reverse a one-time opening balance (e.g. a fat-finger correction). Deducts the
+    granted credits back off the student and records a reversing, receipt-less
+    ``open`` ledger entry; marks the original cancelled so a fresh opening balance
+    can be booked again. Returns the reversing transaction, or None if already
+    cancelled (a concurrent caller won)."""
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        locked = CreditTransaction.objects.select_for_update().get(pk=txn.pk)
+        if locked.cancelled:
+            return None
+        n = locked.amount
+        student = locked.student
+        student_slug = locked.student_slug
+        student_name = locked.student_name
+        if student is not None:
+            student = User.objects.select_for_update().get(pk=student.pk)
+            student.credits -= n
+            student.save(update_fields=["credits"])
+            student_slug = student.slug
+            student_name = student.get_full_name() or student.username
+        rev = CreditTransaction.objects.create(
+            student=student,
+            student_slug=student_slug,
+            student_name=student_name,
+            txn_type="open",
+            label="Eröffnungsguthaben storniert",
+            sub="Rückgängig gemacht",
+            amount=-n,
+            reverses=locked,
+        )
+        locked.cancelled = True
+        locked.save(update_fields=["cancelled"])
+    return rev
+
+
 @require_http_methods(["POST"])
 @require_roles("admin")
 def api_cancel_transaction(request, txn_id):
-    """Admin-only: cancel a completed credit purchase.
+    """Admin-only: reverse a credit movement.
 
-    Reverses the credits, issues a Storno (credit-note) receipt and a ``storno``
-    ledger entry that both the student and the admin can see, refunds the original
-    Stripe payment when there was one, and notifies the student and the business.
-    Only a ``buy`` that still holds its receipt and hasn't been cancelled qualifies.
+    A purchase (``buy`` with a receipt) is reversed via a Storno credit note + Stripe
+    refund; an opening balance (``open``) is reversed with a plain receipt-less
+    ledger entry. Either way the credits are undone, the original is marked
+    cancelled, and both the student and the admin see the reversal.
     """
     txn = CreditTransaction.objects.filter(pk=txn_id).first()
     if not txn:
         return JsonResponse({"error": "not found"}, status=404)
-    if txn.txn_type != "buy" or not txn.receipt_no or txn.cancelled:
+    if txn.cancelled:
+        return JsonResponse({"error": "not_cancellable"}, status=400)
+
+    # Opening balance → simple receipt-less reversal.
+    if txn.txn_type == "open" and txn.reverses_id is None and txn.amount > 0:
+        rev = reverse_opening_credit(txn)
+        if not rev:
+            return JsonResponse({"error": "not_cancellable"}, status=400)
+        student = rev.student
+        return JsonResponse({
+            "ok": True,
+            "credits": student.credits if student is not None else None,
+            "stornoTxn": serialize_transaction(rev),
+            "cancelledTxnId": txn.pk,
+            "receipt": None,
+        })
+
+    if txn.txn_type != "buy" or not txn.receipt_no:
         return JsonResponse({"error": "not_cancellable"}, status=400)
 
     result = cancel_purchase(txn)
@@ -1804,6 +1862,57 @@ def api_custom_times(request):
 
 
 # ---------------------------------------------------------------------------
+# Opening balance (migration)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("admin")
+def api_opening_credit(request, slug):
+    """Admin-only: set a student's one-time opening balance (Eröffnungsguthaben).
+
+    For students migrating onto the platform with credits they already hold from
+    outside it. It replaces the old free-form credit reset (which changed a balance
+    silently, with no trail — a fraud risk). The opening balance is booked as an
+    audited ledger transaction that the student can see; it carries no receipt,
+    because the credits were paid for elsewhere and issuing one would invent
+    revenue. Allowed once per student.
+    """
+    student = User.objects.filter(slug=slug, role="student").first()
+    if not student:
+        return JsonResponse({"error": "not found"}, status=404)
+    data = parse_body(request)
+    try:
+        n = int(data.get("n"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "invalid amount"}, status=400)
+    if n == 0:
+        return JsonResponse({"error": "invalid amount"}, status=400)
+    note = (data.get("note") or "").strip()[:200]
+
+    from django.db import transaction as db_transaction
+    with db_transaction.atomic():
+        locked = User.objects.select_for_update().get(pk=student.pk)
+        # One active opening balance per student. A reversed one (cancelled) frees
+        # the slot so a corrected balance can be booked after a fat-finger.
+        if CreditTransaction.objects.filter(
+            student=locked, txn_type="open", cancelled=False, amount__gt=0
+        ).exists():
+            return JsonResponse({"error": "already_set"}, status=409)
+        locked.credits += n
+        locked.save(update_fields=["credits"])
+        txn = CreditTransaction.objects.create(
+            student=locked,
+            student_slug=locked.slug,
+            student_name=locked.get_full_name() or locked.username,
+            txn_type="open",
+            label="Eröffnungsguthaben",
+            sub=note or "Übertrag bestehender Einheiten",
+            amount=n,
+        )
+    return JsonResponse({"ok": True, "credits": locked.credits, "txn": serialize_transaction(txn)})
+
+
+# ---------------------------------------------------------------------------
 # Notes API
 # ---------------------------------------------------------------------------
 
@@ -2050,11 +2159,10 @@ def api_user_detail(request, slug):
         # here (rather than only in client state) is what makes an admin-set
         # photo visible when the student later signs in on another device.
         u.photo = data["photo"] or None
-    if "credits" in data:
-        try:
-            u.credits = int(data["credits"])
-        except (ValueError, TypeError):
-            pass
+    # NB: credits are intentionally NOT settable here. A free-form reset left no
+    # audit trail (a fraud risk); balances now only move through booked
+    # transactions — purchases, bookings, and the one-time opening balance
+    # (api_opening_credit).
     if "billing" in data:
         b = data["billing"]
         if isinstance(b, dict):

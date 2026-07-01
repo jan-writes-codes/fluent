@@ -170,7 +170,7 @@ class CreditTransaction(models.Model):
     )
     student_slug = models.CharField(max_length=50, blank=True)
     student_name = models.CharField(max_length=200, blank=True)
-    txn_type = models.CharField(max_length=10)  # book, buy, done, storno
+    txn_type = models.CharField(max_length=10)  # book, buy, done, storno, open
     label = models.CharField(max_length=200)
     sub = models.CharField(max_length=200, blank=True)
     amount = models.IntegerField(default=0)

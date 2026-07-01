@@ -166,7 +166,9 @@ setTimeout(() => {
       // credits field, "remove student") — not the tutor mask.
       const roleEl = document.querySelector(".ed-role");
       const editorRole = roleEl ? roleEl.textContent : null;
-      const hasCreditsField = !!$("#edCredits");
+      // Student-only control: the one-time opening-balance input (replaced the
+      // old free-form credits field). Present for a fresh student, absent for tutors.
+      const hasOpeningField = !!$("#edOpening");
       const hasRemoveStudent = !!$("#edRemove");
       const setVal = (id, v) => { const e = $(id); if (e) { e.value = v; } };
       setVal("#edName", "Jan Heissenberger");
@@ -182,7 +184,7 @@ setTimeout(() => {
             createPosted: !!post,
             editPut: put ? { url: put.url, body: put.body } : null,
             editorRole: editorRole,
-            hasCreditsField: hasCreditsField,
+            hasOpeningField: hasOpeningField,
             hasRemoveStudent: hasRemoveStudent,
           },
         });
