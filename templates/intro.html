@@ -104,8 +104,16 @@
 
   .cal-scroll { overflow-x: auto; }
   .days-row { display: grid; grid-template-columns: repeat(7, minmax(116px, 1fr)); gap: 10px; min-width: 820px; }
-  .day-col { background: rgba(255,255,255,0.4); border: 1px solid var(--line-2); border-radius: 14px; padding: 10px; }
-  .day-name { text-align: center; padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line-2); position: relative; }
+  /* Time-of-day bands (Vormittag / Nachmittag / Abend) stack vertically; each band
+     reuses the 7-column grid so its cells line up under the day headers. */
+  .cal { display: flex; flex-direction: column; min-width: 820px; }
+  .cal-band { margin-top: 4px; }
+  .band-h { display: flex; align-items: baseline; gap: 10px; padding: 14px 2px 10px; margin-top: 4px;
+    border-top: 1px solid var(--line-2); font-family: var(--font-display); font-weight: 700;
+    font-size: 12.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  .band-h span { font-family: var(--font-body); font-size: 11px; letter-spacing: 0.03em;
+    text-transform: none; font-weight: 500; color: var(--faint); }
+  .day-name { text-align: center; padding-bottom: 8px; position: relative; }
   .day-name .dn { font-size: 12px; color: var(--muted); font-weight: 600; }
   .day-name .dd { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
   .day-name.is-today .dd { color: var(--c1); }
@@ -113,9 +121,6 @@
   .slot { font-family: var(--font-body); font-size: 13.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 8px 0; cursor: pointer; transition: 0.13s; }
   .slot:hover { border-color: var(--c1); color: var(--c1); transform: translateY(-1px); }
   .no-slot { text-align: center; color: var(--faint); font-size: 13px; padding: 8px 0; }
-  /* Time-of-day labels grouping a day's slots (Vormittag / Nachmittag / Abend). */
-  .band-lbl { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 10px 2px 4px; }
-  .slots > .band-lbl:first-child { margin-top: 0; }
 
   .modal-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(20,30,22,0.5); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 20px; }
   .modal-overlay[hidden] { display: none; }
@@ -178,7 +183,7 @@
               <button id="nextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
             </div>
           </div>
-          <div class="cal-scroll"><div class="days-row" id="daysRow"></div></div>
+          <div class="cal-scroll"><div class="cal" id="daysRow"></div></div>
         </div>
       </section>
     </main>
@@ -282,9 +287,9 @@ window.INTRO_DATA = {{ intro_data|safe }};
 
   // Vormittag < 12:00 · Nachmittag 12:00–17:00 · Abend ab 17:00 (by start hour).
   const BANDS = [
-    { label: "Vormittag",  test: h => h < 12 },
-    { label: "Nachmittag", test: h => h >= 12 && h < 17 },
-    { label: "Abend",      test: h => h >= 17 },
+    { label: "Vormittag",  hint: "bis 12:00", test: h => h < 12 },
+    { label: "Nachmittag", hint: "12–17 Uhr", test: h => h >= 12 && h < 17 },
+    { label: "Abend",      hint: "ab 17:00",  test: h => h >= 17 },
   ];
   function renderWeek(){
     const weekStart = addDays(startOfWeek(NOW), state.weekOffset*7);
@@ -295,37 +300,53 @@ window.INTRO_DATA = {{ intro_data|safe }};
     $("#prevWeek").disabled = state.weekOffset<=0;
     $("#nextWeek").disabled = state.weekOffset>=8;
 
-    const row=$("#daysRow"); row.innerHTML="";
+    const container=$("#daysRow"); container.innerHTML="";
+    const days=[];
     for(let i=0;i<7;i++){
       const date=addDays(weekStart,i);
       const isToday=sameDay(date,REAL);
-      const isPastDay = date < NOW && !isToday;
-      const col=document.createElement("div"); col.className="day-col";
-      const head=document.createElement("div"); head.className="day-name"+(isToday?" is-today":"");
-      head.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${date.getDate()}</div>`;
-      col.appendChild(head);
-      const slots=document.createElement("div"); slots.className="slots";
-      let any=false;
-      if(!isPastDay){
-        const avail = dayTimes(date,state.tutor).filter(time =>
-          !isPastSlot(date,time) && slotOpen(date,time,state.tutor) && !bookedConflict(date,time,state.tutor));
-        // Group the day's free slots under Vormittag / Nachmittag / Abend.
-        BANDS.forEach(band=>{
-          const items = avail.filter(t => band.test(parseInt(t.split(":")[0],10)));
-          if(!items.length) return;
-          any=true;
-          const lbl=document.createElement("div"); lbl.className="band-lbl"; lbl.textContent=band.label;
-          slots.appendChild(lbl);
+      days.push({ date, isToday, isPastDay: date < NOW && !isToday });
+    }
+
+    // Day-name header row (once, above the bands).
+    const head=document.createElement("div"); head.className="days-row cal-head";
+    days.forEach((d,i)=>{
+      const h=document.createElement("div"); h.className="day-name"+(d.isToday?" is-today":"");
+      h.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${d.date.getDate()}</div>`;
+      head.appendChild(h);
+    });
+    container.appendChild(head);
+
+    // Each day's free slots, computed once, then split into time-of-day bands.
+    const perDay = days.map(d => d.isPastDay ? [] :
+      dayTimes(d.date,state.tutor).filter(time =>
+        !isPastSlot(d.date,time) && slotOpen(d.date,time,state.tutor) && !bookedConflict(d.date,time,state.tutor)));
+
+    BANDS.forEach((band,bi)=>{
+      const section=document.createElement("div"); section.className="cal-band";
+      const lbl=document.createElement("div"); lbl.className="band-h";
+      lbl.innerHTML=`${band.label}<span>${band.hint}</span>`;
+      section.appendChild(lbl);
+      const grid=document.createElement("div"); grid.className="days-row";
+      days.forEach((d,i)=>{
+        const cell=document.createElement("div"); cell.className="slots";
+        const items=perDay[i].filter(t => band.test(parseInt(t.split(":")[0],10)));
+        if(items.length){
           items.forEach(time=>{
             const b=document.createElement("button"); b.className="slot"; b.textContent=time;
-            b.onclick=()=>openBook(date,time);
-            slots.appendChild(b);
+            b.onclick=()=>openBook(d.date,time);
+            cell.appendChild(b);
           });
-        });
-      }
-      if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent=isPastDay?"—":"Voll"; slots.appendChild(n); }
-      col.appendChild(slots); row.appendChild(col);
-    }
+        } else if(perDay[i].length===0 && bi===0){
+          // Whole day has no slots — show the placeholder once, in the first band.
+          const n=document.createElement("div"); n.className="no-slot"; n.textContent=d.isPastDay?"—":"Voll";
+          cell.appendChild(n);
+        }
+        grid.appendChild(cell);
+      });
+      section.appendChild(grid);
+      container.appendChild(section);
+    });
   }
 
   // ---- booking modal ----
