@@ -12,6 +12,11 @@ urlpatterns = [
     path('faq/', TemplateView.as_view(template_name='faq.html'), name='faq'),
     path('intro/', views.intro_view, name='intro'),
     path('cancel/<str:token>/', views.booking_cancel_view, name='booking_cancel'),
+    # Tutor connects their Zoom/Teams account (OAuth redirect dance).
+    path('oauth/video/<str:provider>/connect/', views.video_oauth_start, name='video_oauth_start'),
+    path('oauth/video/<str:provider>/callback/', views.video_oauth_callback, name='video_oauth_callback'),
+    # Public, token-guarded iCal subscription feed of a tutor's bookings.
+    path('calendar/<str:token>.ics', views.calendar_feed, name='calendar_feed'),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('api/intro-bookings/', views.api_intro_booking),
@@ -30,6 +35,8 @@ urlpatterns = [
     path('settle/<str:token>/', views.settle_page, name='settle'),
     path('settle/<str:token>/checkout/', views.api_settle_token_checkout),
     path('api/users/me/billing/', views.api_billing),
+    path('api/video-connection/', views.api_video_connection),
+    path('api/calendar-link/', views.api_calendar_link),
     path('api/availability/', views.api_availability),
     path('api/custom-times/', views.api_custom_times),
     path('api/notes/<str:slug>/', views.api_notes),

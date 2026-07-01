@@ -22,6 +22,10 @@ class User(AbstractUser):
     # can hand to a student. Empty until first generated; a fresh, unguessable
     # value lets the student pay their negative balance without logging in.
     settle_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    # Capability token for a tutor's private iCal subscription feed
+    # (/calendar/<token>.ics). Empty until the tutor first opens the
+    # "Kalender abonnieren" dialog; rotating it revokes every old feed URL.
+    calendar_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
 
     class Meta:
         db_table = 'core_user'
@@ -62,6 +66,12 @@ class Booking(models.Model):
     # link mailed to both the guest and the tutor — lets either side cancel an
     # intro without logging in. Empty for non-intro bookings.
     cancel_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    # When call_link was auto-created through the tutor's connected Zoom/Teams
+    # account, remember which provider and the provider's meeting id so the
+    # meeting can be removed (or moved) again when the booking is cancelled or
+    # rescheduled. Empty for hand-pasted links.
+    video_provider = models.CharField(max_length=10, blank=True, default='')
+    video_meeting_id = models.CharField(max_length=128, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -121,6 +131,35 @@ class Booking(models.Model):
 
     def __str__(self):
         return f'{self.student_slug} + {self.tutor_slug} on {self.date} at {self.time}'
+
+
+class VideoConnection(models.Model):
+    """A tutor's linked video-conferencing account (Zoom or Microsoft Teams).
+
+    Holds the OAuth tokens obtained when the tutor connects their account from
+    the tutor portal. One connection per tutor: connecting a second provider
+    replaces the first (a lesson only ever needs one call link). Tokens are
+    bearer credentials scoped to creating/removing meetings — they are stored
+    server-side only and never serialized into any API payload.
+    """
+    PROVIDERS = [('zoom', 'Zoom'), ('teams', 'Microsoft Teams')]
+
+    tutor = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='video_connection'
+    )
+    provider = models.CharField(max_length=10, choices=PROVIDERS)
+    access_token = models.TextField()
+    refresh_token = models.TextField(blank=True, default='')
+    # When the access token expires; refreshed lazily right before an API call.
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+    # The connected account's e-mail / display name, purely for the settings UI
+    # ("Verbunden als …") so the tutor can tell which account they linked.
+    account_label = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.tutor.slug} ↔ {self.provider}'
 
 
 class CreditTransaction(models.Model):

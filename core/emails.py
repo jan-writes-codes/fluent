@@ -89,6 +89,12 @@ def build_ics(booking):
         f"SUMMARY:{esc('Englisch Schnupperstunde · ' + tutor)}",
         f"DESCRIPTION:{esc('Deine kostenlose Englisch-Schnupperstunde mit ' + tutor + ' bei The Green Pencil.')}",
         f"ORGANIZER;CN={esc('The Green Pencil')}:mailto:{organizer}",
+    ]
+    # The video-call link (auto-created via the tutor's Zoom/Teams account, or
+    # hand-pasted) belongs where calendars actually show it: LOCATION + URL.
+    if booking.call_link:
+        lines += [f"LOCATION:{esc(booking.call_link)}", f"URL:{esc(booking.call_link)}"]
+    lines += [
         "STATUS:CONFIRMED",
         "END:VEVENT",
         "END:VCALENDAR",
@@ -117,6 +123,10 @@ def _ctx(booking):
         "date_long": _date_long(booking.date),
         "time_range": f"{booking.time}–{_end_time(booking.time)}",
         "site_url": settings.SITE_URL,
+        # Join link for the video call — auto-created on the tutor's connected
+        # Zoom/Teams account when the booking came in. Empty when the tutor has
+        # no connection; the templates then fall back to "we'll be in touch".
+        "call_link": booking.call_link,
         # Tokenized public cancel link — works for both the guest and the tutor,
         # no login required. Empty if the booking predates the token.
         "cancel_url": (f"{settings.SITE_URL}/cancel/{booking.cancel_token}/"
@@ -137,6 +147,18 @@ def _message(subject, to, text_body, html_body, reply_to=None):
     )
     msg.attach_alternative(html_body, "text/html")
     return msg
+
+
+def send_intro_notifications(booking_id):
+    """Everything that follows a fresh intro booking, in order: first create
+    the video call on the tutor's connected Zoom/Teams account (lazy import —
+    ``video`` imports this module), so the join link is already on the booking
+    when the confirmation e-mails render; then mail the guest and the studio.
+    Each step is isolated — a video-provider outage still sends the mails."""
+    from . import video
+    _safe(video.attach_call_link, booking_id)
+    _safe(send_intro_confirmation, booking_id)
+    _safe(send_intro_tutor_notification, booking_id)
 
 
 def send_intro_confirmation(booking_id):

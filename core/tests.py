@@ -2286,3 +2286,271 @@ class CancellationEmailTests(FluentDataMixin, TestCase):
             resp = self.client.delete(f"/api/bookings/{b.pk}/")
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(Booking.objects.filter(pk=b.pk).exists())
+
+
+# --------------------------------------------------------------------------- #
+# Video-call connections (Zoom / Teams) + auto-created intro meeting links
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # run the booking follow-up (video + mails) inline
+    ZOOM_CLIENT_ID="zoom-app-id",
+    ZOOM_CLIENT_SECRET="zoom-app-secret",
+)
+class VideoConnectionTests(FluentDataMixin, TestCase):
+    def _connect_davit(self, provider="zoom"):
+        from django.utils import timezone as dj_tz
+        from .models import VideoConnection
+        return VideoConnection.objects.create(
+            tutor=self.davit, provider=provider,
+            access_token="live-access-token", refresh_token="live-refresh-token",
+            token_expires_at=dj_tz.now() + timedelta(hours=1),
+            account_label="davit@zoom.example",
+        )
+
+    def _book_intro(self, email="lena@example.at"):
+        d = date.today() + timedelta(days=5)
+        return self.client.post(
+            "/api/intro-bookings/",
+            data=json.dumps({
+                "tutorSlug": "davit", "date": f"{d.year}-{d.month - 1}-{d.day}",
+                "time": "14:00", "name": "Lena Gast", "email": email,
+                "phone": "+43 660 1234567",
+            }),
+            content_type="application/json",
+        )
+
+    # ---- OAuth start / callback -------------------------------------------
+    def test_oauth_start_requires_a_tutor(self):
+        # Students (and anonymous visitors) bounce straight back to the app.
+        self.client.force_login(self.maya)
+        resp = self.client.get("/oauth/video/zoom/connect/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], "/app/")
+
+    def test_oauth_start_redirects_to_provider_with_state(self):
+        self.client.force_login(self.davit)
+        resp = self.client.get("/oauth/video/zoom/connect/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(resp["Location"].startswith("https://zoom.us/oauth/authorize?"))
+        self.assertIn("client_id=zoom-app-id", resp["Location"])
+        # The anti-forgery state lives in the session and rides in the URL.
+        state = self.client.session["video_oauth"]["state"]
+        self.assertTrue(state)
+        self.assertIn(state, resp["Location"])
+
+    def test_oauth_start_for_unconfigured_provider_flags_unavailable(self):
+        # No TEAMS_* credentials in this test class -> teams is not enabled.
+        self.client.force_login(self.davit)
+        resp = self.client.get("/oauth/video/teams/connect/")
+        self.assertEqual(resp["Location"], "/app/?video=unavailable")
+
+    def test_oauth_callback_stores_the_connection(self):
+        from .models import VideoConnection
+        self.client.force_login(self.davit)
+        self.client.get("/oauth/video/zoom/connect/")
+        state = self.client.session["video_oauth"]["state"]
+        with mock.patch(
+            "core.video.exchange_code",
+            return_value={"access_token": "at-1", "refresh_token": "rt-1", "expires_in": 3600},
+        ) as exchange, mock.patch(
+            "core.video.fetch_account_label", return_value="davit@zoom.example"
+        ):
+            resp = self.client.get(
+                "/oauth/video/zoom/callback/", {"code": "auth-code", "state": state}
+            )
+        self.assertEqual(resp["Location"], "/app/?video=connected")
+        self.assertEqual(exchange.call_args[0][:2], ("zoom", "auth-code"))
+        conn = VideoConnection.objects.get(tutor=self.davit)
+        self.assertEqual(conn.provider, "zoom")
+        self.assertEqual(conn.access_token, "at-1")
+        self.assertEqual(conn.refresh_token, "rt-1")
+        self.assertEqual(conn.account_label, "davit@zoom.example")
+
+    def test_oauth_callback_rejects_a_forged_state(self):
+        from .models import VideoConnection
+        self.client.force_login(self.davit)
+        self.client.get("/oauth/video/zoom/connect/")
+        with mock.patch("core.video.exchange_code") as exchange:
+            resp = self.client.get(
+                "/oauth/video/zoom/callback/", {"code": "auth-code", "state": "forged"}
+            )
+        exchange.assert_not_called()
+        self.assertEqual(resp["Location"], "/app/?video=error")
+        self.assertFalse(VideoConnection.objects.exists())
+
+    # ---- Intro bookings get a call link ------------------------------------
+    def test_intro_booking_creates_meeting_and_mails_the_link(self):
+        from django.core import mail
+        self._connect_davit()
+        with mock.patch(
+            "core.video.create_meeting",
+            return_value=("https://zoom.us/j/987654321", "987654321"),
+        ) as create:
+            resp = self._book_intro()
+        self.assertEqual(resp.status_code, 200)
+        b = Booking.objects.get(is_intro=True, guest_email="lena@example.at")
+        self.assertEqual(b.call_link, "https://zoom.us/j/987654321")
+        self.assertEqual(b.video_provider, "zoom")
+        self.assertEqual(b.video_meeting_id, "987654321")
+        # The topic names the guest so the tutor's Zoom calendar is readable.
+        self.assertIn("Lena Gast", create.call_args.kwargs["topic"])
+        guest = [m for m in mail.outbox if m.to == ["lena@example.at"]]
+        self.assertEqual(len(guest), 1)
+        self.assertIn("https://zoom.us/j/987654321", guest[0].body)
+        ics = [a for a in guest[0].attachments if a[0] == "schnupperstunde.ics"][0]
+        self.assertIn("LOCATION:https://zoom.us/j/987654321", ics[1])
+
+    def test_provider_outage_never_breaks_the_booking(self):
+        from django.core import mail
+        from core.video import VideoError
+        self._connect_davit()
+        with mock.patch("core.video.create_meeting", side_effect=VideoError("zoom down")):
+            resp = self._book_intro()
+        self.assertEqual(resp.status_code, 200)
+        b = Booking.objects.get(is_intro=True, guest_email="lena@example.at")
+        self.assertEqual(b.call_link, "")
+        # The confirmation still goes out — just without a link.
+        self.assertEqual(len([m for m in mail.outbox if m.to == ["lena@example.at"]]), 1)
+
+    def test_no_connection_means_no_meeting_attempt(self):
+        with mock.patch("core.video.create_meeting") as create:
+            resp = self._book_intro()
+        self.assertEqual(resp.status_code, 200)
+        create.assert_not_called()
+
+    def test_cancelling_an_intro_deletes_the_meeting(self):
+        self._connect_davit()
+        token = secrets.token_urlsafe(8)
+        Booking.objects.create(
+            tutor=self.davit, date=date.today() + timedelta(days=5), time="14:00",
+            is_intro=True, guest_name="Lena Gast", guest_email="lena@example.at",
+            student_name="Lena Gast", student_slug="intro", cancel_token=token,
+            call_link="https://zoom.us/j/987654321",
+            video_provider="zoom", video_meeting_id="987654321",
+        )
+        with mock.patch("core.video._http", return_value={}) as http:
+            resp = self.client.post(f"/cancel/{token}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Booking.objects.filter(cancel_token=token).exists())
+        delete_calls = [c for c in http.call_args_list if c.args[0] == "DELETE"]
+        self.assertEqual(len(delete_calls), 1)
+        self.assertIn("/meetings/987654321", delete_calls[0].args[1])
+
+    # ---- Connection management API -----------------------------------------
+    def test_disconnect_removes_the_connection(self):
+        from .models import VideoConnection
+        self._connect_davit()
+        self.client.force_login(self.davit)
+        resp = self.client.delete("/api/video-connection/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(VideoConnection.objects.filter(tutor=self.davit).exists())
+
+    def test_students_cannot_touch_the_connection_api(self):
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.get("/api/video-connection/").status_code, 403)
+        self.assertEqual(self.client.delete("/api/video-connection/").status_code, 403)
+
+    def test_tokens_never_reach_the_client_payload(self):
+        self._connect_davit()
+        self.client.force_login(self.davit)
+        payload = extract_payload(self.client.get("/app/").content.decode())
+        self.assertEqual(
+            payload["video"]["connection"],
+            {"provider": "zoom", "account": "davit@zoom.example"},
+        )
+        self.assertTrue(payload["video"]["enabled"]["zoom"])
+        # The OAuth tokens are bearer credentials — grep the whole payload.
+        blob = json.dumps(payload)
+        self.assertNotIn("live-access-token", blob)
+        self.assertNotIn("live-refresh-token", blob)
+
+
+# --------------------------------------------------------------------------- #
+# Tutor iCal subscription feed
+# --------------------------------------------------------------------------- #
+class CalendarFeedTests(FluentDataMixin, TestCase):
+    def _mint_link(self, as_user=None, body=None):
+        self.client.force_login(as_user or self.davit)
+        resp = self.client.post(
+            "/api/calendar-link/", data=json.dumps(body or {}),
+            content_type="application/json",
+        )
+        return resp
+
+    def test_unknown_token_is_404(self):
+        self.assertEqual(self.client.get("/calendar/not-a-token.ics").status_code, 404)
+
+    def test_link_is_minted_once_and_reused(self):
+        r1 = self._mint_link().json()
+        self.davit.refresh_from_db()
+        self.assertTrue(self.davit.calendar_token)
+        self.assertIn(f"/calendar/{self.davit.calendar_token}.ics", r1["url"])
+        self.assertTrue(r1["webcalUrl"].startswith("webcal://"))
+        # Asking again returns the same URL — the token is stable until rotated.
+        r2 = self._mint_link().json()
+        self.assertEqual(r1["url"], r2["url"])
+
+    def test_regenerate_revokes_the_old_feed_url(self):
+        self._mint_link()
+        self.davit.refresh_from_db()
+        old = self.davit.calendar_token
+        self.assertEqual(self.client.get(f"/calendar/{old}.ics").status_code, 200)
+        self._mint_link(body={"regenerate": True})
+        self.davit.refresh_from_db()
+        self.assertNotEqual(self.davit.calendar_token, old)
+        self.assertEqual(self.client.get(f"/calendar/{old}.ics").status_code, 404)
+        self.assertEqual(
+            self.client.get(f"/calendar/{self.davit.calendar_token}.ics").status_code, 200
+        )
+
+    def test_students_cannot_mint_a_feed_link(self):
+        resp = self._mint_link(as_user=self.maya)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_admin_mints_the_link_for_a_tutor(self):
+        self._mint_link(as_user=self.admin, body={"tutorSlug": "davit"})
+        self.davit.refresh_from_db()
+        self.assertTrue(self.davit.calendar_token)
+
+    def test_feed_contains_only_this_tutors_bookings(self):
+        other_tutor = make_user("sara", "tutor", first_name="Sara", last_name="Novak")
+        Booking.objects.create(
+            student=self.maya, tutor=other_tutor,
+            date=current_week_monday(), time="11:00", title="Sara session",
+        )
+        self._mint_link()
+        self.davit.refresh_from_db()
+        resp = self.client.get(f"/calendar/{self.davit.calendar_token}.ics")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp["Content-Type"].startswith("text/calendar"))
+        body = resp.content.decode()
+        self.assertIn("BEGIN:VCALENDAR", body)
+        self.assertIn("Ines session", body)      # davit's booking (from the mixin)
+        self.assertNotIn("Sara session", body)   # the other tutor's is not leaked
+
+    def test_feed_event_carries_guest_contact_and_call_link(self):
+        Booking.objects.create(
+            tutor=self.davit, date=date.today() + timedelta(days=3), time="14:00",
+            title="Schnupperstunde (Intro)", is_intro=True,
+            guest_name="Lena Gast", guest_email="lena@example.at",
+            guest_phone="+43 660 1234567",
+            student_name="Lena Gast", student_slug="intro",
+            call_link="https://zoom.us/j/555",
+        )
+        self._mint_link()
+        self.davit.refresh_from_db()
+        body = self.client.get(f"/calendar/{self.davit.calendar_token}.ics").content.decode()
+        self.assertIn("Lena Gast", body)
+        self.assertIn("lena@example.at", body)
+        self.assertIn("LOCATION:https://zoom.us/j/555", body)
+        self.assertIn("URL:https://zoom.us/j/555", body)
+
+    def test_feed_is_anonymous_but_capability_guarded(self):
+        # No login of any kind — the token alone opens the feed (calendar apps
+        # can't authenticate), and without it there is nothing to find.
+        self._mint_link()
+        self.davit.refresh_from_db()
+        self.client.logout()
+        resp = self.client.get(f"/calendar/{self.davit.calendar_token}.ics")
+        self.assertEqual(resp.status_code, 200)
