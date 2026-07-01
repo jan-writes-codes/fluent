@@ -2488,7 +2488,7 @@ window.DJANGO_DATA = {{ django_data|safe }};
     if($("#modalCard")) $("#modalCard").scrollTop = prevScroll;
   }
   function notesLogHtml(s){ const l=s.notesLog||[]; if(!l.length) return `<div class="empty-list">Noch keine Notizen — oben die erste hinzufügen.</div>`; return l.map(n=>`<div class="snote"><div class="snote-date">${n.date}</div><div class="snote-text">${escHtml(n.text)}</div></div>`).join(""); }
-  function addStudentNote(s){ const inp=$("#snoteInput"); const t=(inp.value||"").trim(); if(!t) return; s.notesLog=s.notesLog||[]; s.notesLog.unshift({ date:fmtAT(NOW), text:t }); inp.value=""; api('POST', '/api/notes/' + s.id + '/', { text: t }); renderStudentModal(); toast("Notiz zu "+s.name.split(" ")[0]+" hinzugefügt"); }
+  function addStudentNote(s){ const inp=$("#snoteInput"); const t=(inp.value||"").trim(); if(!t) return; s.notesLog=s.notesLog||[]; s.notesLog.unshift({ date:fmtAT(NOW), text:t }); inp.value=""; api('POST', '/api/notes/' + s.id + '/', { text: t, tutorSlug: state.myTutor }); renderStudentModal(); toast("Notiz zu "+s.name.split(" ")[0]+" hinzugefügt"); }
 
   function renderRoster(){
     const el=$("#rosterList"); el.innerHTML="";
@@ -2552,7 +2552,14 @@ window.DJANGO_DATA = {{ django_data|safe }};
     s.billing = { line1:$("#bfLine1").value.trim(), postcode:$("#bfZip").value.trim(), city:$("#bfCity").value.trim(), country:$("#bfCountry").value.trim()||"Österreich" };
     $("#acctHello").textContent="Hallo, "+s.name.split(" ")[0]+".";
     setIdentity(s); renderAccount();
-    api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
+    // "Ansehen als" is client-only — the server session is still the admin — so
+    // /me/ would write to the admin's own record. When impersonating a student,
+    // persist to that student via the admin endpoint instead.
+    if (state.impersonating) {
+      api('PUT', '/api/users/' + s.id + '/', { name: s.name, billing: s.billing });
+    } else {
+      api('PUT', '/api/users/me/billing/', { name: s.name, line1: s.billing.line1, postcode: s.billing.postcode, city: s.billing.city, country: s.billing.country });
+    }
     toast("Rechnungsdaten gespeichert");
   }
 

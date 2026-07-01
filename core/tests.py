@@ -481,6 +481,29 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.initials, "MO")
 
+    def test_admin_saves_student_billing_address(self):
+        # The path used when an admin edits a student's address (incl. while
+        # "viewing as" that student): it must persist to the *student*, so the
+        # student sees it on next login.
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            "/api/users/maya/",
+            data=json.dumps({"name": "Maya Karlsson", "billing": {
+                "line1": "Hauptstraße 5", "postcode": "1020", "city": "Wien",
+                "country": "Österreich",
+            }}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.billing_line1, "Hauptstraße 5")
+        self.assertEqual(self.maya.billing_postcode, "1020")
+        self.assertEqual(self.maya.billing_city, "Wien")
+        # And the student receives it in their own payload on login.
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload["currentUser"]["billing"]["line1"], "Hauptstraße 5")
+
 
 # --------------------------------------------------------------------------- #
 # Multi-tutor: admin can create/manage several tutors; their calendars are
@@ -1428,6 +1451,13 @@ class ReceiptPdfTests(FluentDataMixin, TestCase):
     def test_admin_downloads_any_receipt_pdf(self):
         receipt = self._grant(5)
         self.client.force_login(self.admin)
+        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_tutor_downloads_any_receipt_pdf(self):
+        # Studio staff manage billing, so a tutor may fetch a student's receipt.
+        receipt = self._grant(5)
+        self.client.force_login(self.davit)
         resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
         self.assertEqual(resp.status_code, 200)
 

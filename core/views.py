@@ -1754,7 +1754,9 @@ def api_notes(request, slug):
         text = (data.get("text") or "").strip()
         if not text:
             return JsonResponse({"error": "text required"}, status=400)
-        tutor = acting_tutor(request)
+        # Attribute to the acting tutor — the one the client is working as (which,
+        # under admin "view-as", is the impersonated tutor), not just the first one.
+        tutor = acting_tutor(request, data.get("tutorSlug"))
         note = StudentNote.objects.create(tutor=tutor, student=student, text=text)
         return JsonResponse({"ok": True, "date": note.created_at.strftime("%d.%m.%Y")})
     except User.DoesNotExist as e:
@@ -1857,15 +1859,19 @@ def api_lesson_file_download(request, file_id):
 def api_receipt_pdf(request, number):
     """Serve an issued receipt (or Storno credit note) as a formatted PDF.
 
-    Any authenticated user may fetch a receipt; a student is limited to their own.
-    Rendered on the fly from the frozen receipt snapshot, so it reads the same
+    Access is default-deny: the studio staff (tutor/admin) who manage billing may
+    fetch any receipt; everyone else may only fetch a receipt that belongs to them.
+    A logged-in student therefore can't open another student's receipt by guessing
+    its number. Rendered on the fly from the frozen snapshot, so it reads the same
     forever and needs no stored file."""
     if not request.user.is_authenticated:
         return JsonResponse({"error": "auth"}, status=401)
     receipt = Receipt.objects.filter(number=number).select_related("student", "reverses").first()
     if not receipt:
         raise Http404
-    if request.user.role == "student" and receipt.student_id != request.user.pk:
+    is_staff = getattr(request.user, "role", None) in ("tutor", "admin")
+    owns_it = receipt.student_id is not None and receipt.student_id == request.user.pk
+    if not (is_staff or owns_it):
         return JsonResponse({"error": "forbidden"}, status=403)
     try:
         from .receipts_pdf import render_receipt_pdf
@@ -1873,8 +1879,9 @@ def api_receipt_pdf(request, number):
     except Exception:
         # reportlab missing or a render error — don't 500 the client.
         return JsonResponse({"error": "pdf_unavailable"}, status=503)
+    kind = "Storno" if receipt.reverses_id else "Beleg"
     resp = HttpResponse(pdf, content_type="application/pdf")
-    resp["Content-Disposition"] = f'inline; filename="Beleg-{receipt.number}.pdf"'
+    resp["Content-Disposition"] = f'inline; filename="{kind}-{receipt.number}.pdf"'
     return resp
 
 
