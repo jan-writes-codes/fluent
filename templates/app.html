@@ -1022,7 +1022,7 @@
             </aside>
           </div>
 
-          <div class="section-h" style="margin-top:34px;"><h2>Nächste Stunden</h2><span class="lnk" id="calSyncBtn">↻ Kalender abonnieren / sync</span></div>
+          <div class="section-h" style="margin-top:34px;"><h2>Nächste Stunden</h2><span style="display:flex;gap:18px;"><span class="lnk" id="videoConnectBtn">🎥 Video-Call verbinden</span><span class="lnk" id="calSyncBtn">↻ Kalender abonnieren / sync</span></span></div>
           <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorUpcoming"></div></div>
 
           <div class="section-h" style="margin-top:34px;"><h2>Abgeschlossene Stunden</h2></div>
@@ -1663,25 +1663,70 @@ window.DJANGO_DATA = {{ django_data|safe }};
     a.href=url; a.download="fluent-davit-schedule.ics"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1500); toast("Gesamter Kalender (.ics) heruntergeladen");
   }
-  const CAL_FEED = "webcal://calendar.fluent.app/feeds/davit-7f3a9c.ics";
-  function openCalSync(){
+  // The real, tokenized feed URL is minted server-side on first use (POST so
+  // the unguessable token only exists once the tutor actually asks for it).
+  let calFeed = null;  // {url, webcalUrl} — cached after the first fetch
+  async function openCalSync(){
+    if(!calFeed){
+      calFeed = await api('POST', '/api/calendar-link/', {});
+      if(!calFeed || !calFeed.url){ calFeed=null; toast("Kalender-Link konnte nicht geladen werden"); return; }
+    }
     const m=$("#buyModal");
-    const gcal="https://calendar.google.com/calendar/render?cid="+encodeURIComponent(CAL_FEED);
+    const gcal="https://calendar.google.com/calendar/render?cid="+encodeURIComponent(calFeed.webcalUrl);
     m.innerHTML=`<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8.5 15.5a3 3 0 1 0 3-3"/></svg></div>
       <h3 class="buy-h">Kalender abonnieren</h3>
       <p class="buy-p">Füge diesen Live-Feed einmal hinzu — neue Buchungen, Umbuchungen und Stornierungen synchronisieren sich automatisch, ganz ohne erneuten Download.</p>
-      <div class="cal-url"><input id="calUrl" readonly value="${CAL_FEED}"><button class="mini-btn" id="calCopy">Kopieren</button></div>
-      <a class="btn" href="${CAL_FEED}">Abonnieren · Apple &amp; Outlook</a>
+      <div class="cal-url"><input id="calUrl" readonly value="${calFeed.url}"><button class="mini-btn" id="calCopy">Kopieren</button></div>
+      <a class="btn" href="${calFeed.webcalUrl}">Abonnieren · Apple &amp; Outlook</a>
       <a class="btn ghost" href="${gcal}" target="_blank" rel="noopener">Zu Google Kalender hinzufügen</a>
       <button class="btn-text" id="calDownload">Oder einmalig .ics herunterladen</button>
+      <div class="micro" style="margin-top:10px;">Der Link ist privat — wer ihn hat, sieht deine Stunden.</div>
     </div>`;
     m.hidden=false;
     $("#buyCard").onclick=(e)=>e.stopPropagation();
     $("#buyX").onclick=closeBuy;
     $("#calCopy").onclick=()=>{ const i=$("#calUrl"); i.select(); let done=false; try{ const p=navigator.clipboard&&navigator.clipboard.writeText(i.value); if(p&&p.then){ p.then(()=>{}).catch(()=>{ try{document.execCommand("copy");}catch(e){} }); done=true; } }catch(e){} if(!done){ try{document.execCommand("copy");}catch(e){} } toast("Abo-Link kopiert"); };
     $("#calDownload").onclick=downloadIcsAll;
+  }
+
+  // ---------- Video-call connection (Zoom / Teams) ----------
+  const VIDEO_NAMES = { zoom: "Zoom", teams: "Microsoft Teams" };
+  const videoState = DJ.video || { enabled: {}, connection: null };
+  function openVideoConnect(){
+    const conn = videoState.connection;
+    const enabled = videoState.enabled || {};
+    let body;
+    if (conn) {
+      body = `
+        <p class="buy-p">Verbunden mit <b>${VIDEO_NAMES[conn.provider]||conn.provider}</b>${conn.account?` als <b>${escHtml(conn.account)}</b>`:""}. Jede neue Schnupperstunde bekommt automatisch einen Meeting-Link zur gebuchten Zeit — er steht in der Bestätigungs-Mail und im Kalender.</p>
+        <button class="btn ghost" id="videoDisconnect">Konto trennen</button>`;
+    } else if (DJ.role !== "tutor") {
+      body = `<p class="buy-p">Nur der Tutor selbst kann sein Zoom- oder Teams-Konto verbinden — die Freigabe gehört zu seinem Login.</p>`;
+    } else {
+      body = `
+        <p class="buy-p">Verbinde dein Konto einmal — jede neue Schnupperstunde bekommt dann automatisch einen Meeting-Link zur gebuchten Zeit, direkt in der Bestätigungs-Mail des Gasts.</p>
+        ${enabled.zoom?`<a class="btn" href="/oauth/video/zoom/connect/">Mit Zoom verbinden</a>`:""}
+        ${enabled.teams?`<a class="btn ghost" href="/oauth/video/teams/connect/" style="margin-top:10px;">Mit Microsoft Teams verbinden</a>`:""}
+        ${(enabled.zoom||enabled.teams)?"":`<p class="micro">Noch kein Video-Anbieter eingerichtet — sobald am Server Zoom- oder Teams-Zugangsdaten hinterlegt sind, erscheinen hier die Verbinden-Buttons.</p>`}`;
+    }
+    const m=$("#buyModal");
+    m.innerHTML=`<div class="modal-card buy-card" id="buyCard">
+      <button class="modal-x" id="buyX" aria-label="Close">×</button>
+      <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="1.5" y="5.5" width="14" height="13" rx="2.5"/><path d="M15.5 10l7-4v12l-7-4z"/></svg></div>
+      <h3 class="buy-h">Video-Calls automatisch</h3>
+      ${body}
+    </div>`;
+    m.hidden=false;
+    $("#buyCard").onclick=(e)=>e.stopPropagation();
+    $("#buyX").onclick=closeBuy;
+    const disc=$("#videoDisconnect");
+    if(disc) disc.onclick=async()=>{
+      const r=await api('DELETE','/api/video-connection/');
+      if(!r){ toast("Trennen fehlgeschlagen"); return; }
+      videoState.connection=null; closeBuy(); toast("Video-Konto getrennt");
+    };
   }
 
   // ---------- Render summary ----------
@@ -3242,7 +3287,18 @@ window.DJANGO_DATA = {{ django_data|safe }};
   $("#adminSettingsSave").onclick=saveSettings;
   $("#impExit").onclick=exitImpersonation;
   $("#calSyncBtn").onclick=openCalSync;
+  $("#videoConnectBtn").onclick=openVideoConnect;
   updateImpBanner();
+
+  // Coming back from the Zoom/Teams OAuth dance: toast the outcome once and
+  // scrub the ?video=… flag so a reload doesn't repeat it.
+  const videoReturn = new URLSearchParams(location.search).get("video");
+  if (videoReturn) {
+    history.replaceState(null, "", location.pathname);
+    if (videoReturn === "connected") toast("Video-Konto verbunden — neue Buchungen bekommen automatisch einen Call-Link");
+    else if (videoReturn === "unavailable") toast("Dieser Video-Anbieter ist nicht eingerichtet");
+    else toast("Verbindung fehlgeschlagen — bitte versuche es erneut");
+  }
 
   // ---------- Init ----------
   state.students.forEach(s=>{ if(!s.notesLog) s.notesLog=[]; if(!s.activeLessons) s.activeLessons=[]; });

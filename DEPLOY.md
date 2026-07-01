@@ -44,6 +44,35 @@ dashboard — `.env` files are gitignored):
 | `TUTOR_NOTIFY_EMAIL` | to alert the tutor | `davit@thegreenpencil.at` |
 | `EMAIL_ASYNC` | optional | `true` (send off the request thread; default) |
 | `SITE_URL` | optional | `https://thegreenpencil.at` (links in e-mails) |
+| `ZOOM_CLIENT_ID` | to let tutors connect Zoom | from the Zoom Marketplace app |
+| `ZOOM_CLIENT_SECRET` | with Zoom | from the Zoom Marketplace app |
+| `TEAMS_CLIENT_ID` | to let tutors connect Teams | Entra ID application (client) id |
+| `TEAMS_CLIENT_SECRET` | with Teams | Entra ID client secret |
+| `TEAMS_TENANT` | optional | `common` (default; or your tenant id) |
+
+### Video calls: Zoom / Microsoft Teams (optional)
+
+Tutors can connect their own Zoom or Teams account (Tutor-Portal → „Video-Call
+verbinden"). Every new Schnupperstunde then gets a meeting created on the
+tutor's account for the booked time, and the join link lands in the
+confirmation e-mails, the attached `.ics` and the calendar feed. **If the
+`ZOOM_*`/`TEAMS_*` credentials are unset the app runs unchanged** — the connect
+buttons just explain that no provider is configured.
+
+- **Zoom**: create a *General App* (user-managed) on the
+  [Zoom App Marketplace](https://marketplace.zoom.us), add the scope
+  `meeting:write:meeting`, and register the redirect URL
+  `https://<host>/oauth/video/zoom/callback/`.
+- **Teams**: register an app in Microsoft Entra ID with the delegated Graph
+  permissions `OnlineMeetings.ReadWrite`, `User.Read` and `offline_access`,
+  and the redirect URL `https://<host>/oauth/video/teams/callback/`.
+
+### Tutor calendar feed
+
+Each tutor gets a private, tokenized iCal URL (`/calendar/<token>.ics`) from
+Tutor-Portal → „Kalender abonnieren" — subscribe to it in Apple/Google/Outlook
+and bookings, reschedules and cancellations sync automatically. The token is
+rotatable; no other secrets are involved.
 
 ### Stripe credit top-ups (optional)
 

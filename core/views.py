@@ -1,4 +1,5 @@
 import json
+import logging
 import secrets
 from datetime import date, datetime, time as dtime, timedelta
 from functools import wraps
@@ -13,8 +14,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
-    CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile
+    CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile,
+    VideoConnection,
 )
+from . import video
+
+logger = logging.getLogger(__name__)
 
 # Stripe is an optional dependency: the app must import and run without it (the
 # tutor-mediated purchase flow is always available). When the package is missing
@@ -886,10 +891,12 @@ def api_intro_booking(request):
         # Capability token for the cancel links in both confirmation e-mails.
         cancel_token=secrets.token_urlsafe(24),
     )
-    # Fire-and-forget: a mail hiccup must never fail the booking itself.
+    # Fire-and-forget: create the video call (when the tutor has Zoom/Teams
+    # connected) and send both confirmations — a hiccup in either must never
+    # fail the booking itself. One queued job so the call link exists before
+    # the e-mails render.
     from . import emails
-    emails.queue_email(emails.send_intro_confirmation, booking.pk)
-    emails.queue_email(emails.send_intro_tutor_notification, booking.pk)
+    emails.queue_email(emails.send_intro_notifications, booking.pk)
     return JsonResponse({
         "ok": True,
         "tutorName": tutor.get_full_name() or tutor.username,
@@ -917,6 +924,9 @@ def booking_cancel_view(request, token):
             return render(request, "intro_cancel.html", {"state": "gone"})
         is_intro = booking.is_intro
         when = emails.booking_when(booking) if is_intro else emails.lesson_when(booking)
+        # Remember the auto-created Zoom/Teams meeting (if any) before the row
+        # goes away, so it can be removed from the tutor's account afterwards.
+        video_ref = (booking.tutor_id, booking.video_provider, booking.video_meeting_id)
         refunded = False
         if not is_intro and booking.student_id:
             from django.db import transaction as db_transaction
@@ -938,6 +948,8 @@ def booking_cancel_view(request, token):
             booking.delete()
         # Notify both sides (student/guest and tutor/studio) that it's off.
         emails.queue_email(emails.send_cancellation_notifications, snapshot)
+        if video_ref[2]:
+            emails.queue_email(video.cleanup_meeting, *video_ref)
         return render(request, "intro_cancel.html", {
             "state": "done", "when": when, "is_intro": is_intro,
             "refunded": refunded,
@@ -1106,7 +1118,20 @@ def app_view(request):
             "enabled": stripe_enabled(),
             "publishableKey": dj_settings.STRIPE_PUBLISHABLE_KEY,
         },
+        # Zoom/Teams connect state for the tutor portal. Tokens stay server-
+        # side; the client only learns which providers are configured and what
+        # the tutor's own connection looks like ("Verbunden als …").
+        "video": {
+            "enabled": video.enabled_providers(),
+            "connection": None,
+        },
     }
+    if user.role == "tutor":
+        conn = VideoConnection.objects.filter(tutor=user).first()
+        if conn:
+            django_data["video"]["connection"] = {
+                "provider": conn.provider, "account": conn.account_label,
+            }
 
     return render(request, "app.html", {"django_data": json.dumps(django_data), "role": user.role})
 
@@ -1288,6 +1313,8 @@ def api_booking_detail(request, pk):
         from django.db import transaction as db_transaction
         from . import emails
         student = b.student
+        # Auto-created Zoom/Teams meeting reference, captured before the row dies.
+        video_ref = (b.tutor_id, b.video_provider, b.video_meeting_id)
         refunded = False
         new_credits = None
         if student is not None:
@@ -1312,10 +1339,13 @@ def api_booking_detail(request, pk):
             b.delete()
         # Notify both sides (student/guest and tutor/studio) that it's off.
         emails.queue_email(emails.send_cancellation_notifications, snapshot)
+        if video_ref[2]:
+            emails.queue_email(video.cleanup_meeting, *video_ref)
         return JsonResponse({"ok": True, "refunded": refunded, "credits": new_credits})
 
     # PUT
     data = parse_body(request)
+    old_slot = (b.date, b.time)
     if "title" in data:
         b.title = data["title"]
     if "date" in data:
@@ -1333,9 +1363,24 @@ def api_booking_detail(request, pk):
     if not is_student:
         if "tutorNotes" in data:
             b.tutor_notes = data["tutorNotes"]
-        if "callLink" in data:
+        if "callLink" in data and data["callLink"] != b.call_link:
+            # A hand-edited link supersedes the auto-created meeting: remove
+            # the orphan from the tutor's account and drop the reference so a
+            # later cancel/reschedule never touches the wrong call.
+            if b.video_meeting_id:
+                from . import emails
+                emails.queue_email(
+                    video.cleanup_meeting, b.tutor_id, b.video_provider, b.video_meeting_id
+                )
+            b.video_provider = ""
+            b.video_meeting_id = ""
             b.call_link = data["callLink"]
     b.save()
+    # A rescheduled booking drags its auto-created Zoom/Teams meeting along to
+    # the new slot (best-effort, off-request) so the mailed link stays valid.
+    if b.video_meeting_id and (b.date, b.time) != old_slot:
+        from . import emails
+        emails.queue_email(video.move_meeting, b.pk)
     return JsonResponse({"ok": True})
 
 
@@ -2066,3 +2111,130 @@ def api_settings(request):
             pass
     settings.save()
     return JsonResponse({"ok": True})
+
+# ---------------------------------------------------------------------------
+# Video calls: Zoom / Microsoft Teams account connection (OAuth)
+# ---------------------------------------------------------------------------
+
+# Session key holding the pending OAuth handshake: {"state": ..., "provider": ...}.
+# The state is the CSRF guard for the callback — it must round-trip untouched.
+VIDEO_OAUTH_SESSION_KEY = "video_oauth"
+
+
+def _video_redirect_uri(request, provider):
+    # Derived from the request so dev (localhost) and prod both work; must be
+    # byte-identical between the authorize redirect and the code exchange, and
+    # registered as-is in the provider's OAuth app.
+    return request.build_absolute_uri(f"/oauth/video/{provider}/callback/")
+
+
+@require_http_methods(["GET"])
+def video_oauth_start(request, provider):
+    """Send the logged-in tutor to Zoom/Microsoft to grant access.
+
+    Browser navigation rather than a fetch (OAuth is a redirect dance), so
+    every failure lands back in the app with a ?video=… flag the UI toasts."""
+    if not request.user.is_authenticated or request.user.role != "tutor":
+        return redirect("/app/")
+    if provider not in video.PROVIDERS or not video.provider_enabled(provider):
+        return redirect("/app/?video=unavailable")
+    state = secrets.token_urlsafe(16)
+    request.session[VIDEO_OAUTH_SESSION_KEY] = {"state": state, "provider": provider}
+    return redirect(video.authorize_url(provider, _video_redirect_uri(request, provider), state))
+
+
+@require_http_methods(["GET"])
+def video_oauth_callback(request, provider):
+    """Complete the OAuth handshake and store the connection for the tutor."""
+    if not request.user.is_authenticated or request.user.role != "tutor":
+        return redirect("/app/")
+    pending = request.session.pop(VIDEO_OAUTH_SESSION_KEY, None) or {}
+    code = request.GET.get("code", "")
+    state_ok = (
+        pending.get("state")
+        and pending.get("state") == request.GET.get("state")
+        and pending.get("provider") == provider
+    )
+    if not state_ok or not code or not video.provider_enabled(provider):
+        return redirect("/app/?video=error")
+    try:
+        tokens = video.exchange_code(provider, code, _video_redirect_uri(request, provider))
+    except video.VideoError:
+        logger.exception("%s OAuth code exchange failed", provider)
+        return redirect("/app/?video=error")
+    if not tokens.get("access_token"):
+        return redirect("/app/?video=error")
+    # One connection per tutor: connecting (or re-connecting) replaces whatever
+    # was there — a lesson only ever needs one call link.
+    conn = (VideoConnection.objects.filter(tutor=request.user).first()
+            or VideoConnection(tutor=request.user))
+    conn.provider = provider
+    video.apply_tokens(conn, tokens)
+    conn.account_label = video.fetch_account_label(provider, conn.access_token)
+    conn.save()
+    return redirect("/app/?video=connected")
+
+
+@require_http_methods(["GET", "DELETE"])
+@require_roles("tutor")
+def api_video_connection(request):
+    """The tutor's own Zoom/Teams connection: GET shows status, DELETE unlinks.
+    Tokens never leave the server — only provider + account label go out."""
+    conn = VideoConnection.objects.filter(tutor=request.user).first()
+    if request.method == "DELETE":
+        if conn:
+            conn.delete()
+        return JsonResponse({"ok": True})
+    return JsonResponse({
+        "enabled": video.enabled_providers(),
+        "connection": (
+            {"provider": conn.provider, "account": conn.account_label} if conn else None
+        ),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Tutor calendar subscription feed (iCal)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_calendar_link(request):
+    """The tutor's private iCal feed URL, minting the capability token on first
+    use. ``{"regenerate": true}`` rotates the token, revoking every previously
+    shared feed URL (mirrors the settle-link pattern)."""
+    data = parse_body(request)
+    tutor = acting_tutor(request, data.get("tutorSlug"))
+    if tutor is None:
+        return JsonResponse({"error": "tutor not found"}, status=404)
+    if not tutor.calendar_token or data.get("regenerate"):
+        tutor.calendar_token = secrets.token_urlsafe(24)
+        tutor.save(update_fields=["calendar_token"])
+    url = request.build_absolute_uri(f"/calendar/{tutor.calendar_token}.ics")
+    # webcal:// is what makes Apple Calendar / Outlook subscribe (poll) instead
+    # of importing a one-off snapshot.
+    return JsonResponse({"url": url, "webcalUrl": _re.sub(r"^https?", "webcal", url)})
+
+
+@require_http_methods(["GET"])
+def calendar_feed(request, token):
+    """Public (token-as-capability) iCal feed of a tutor's bookings, for
+    calendar apps to poll. No login: the unguessable, rotatable token on the
+    tutor's account is the authorization, exactly like the settle/cancel links."""
+    from django.utils import timezone
+    tutor = User.objects.filter(role="tutor", calendar_token=token).first() if token else None
+    if tutor is None:
+        raise Http404
+    # Everything upcoming plus a trailing window, so recently finished lessons
+    # don't vanish from the tutor's calendar the morning after.
+    since = timezone.localdate() - timedelta(days=60)
+    bookings = (
+        Booking.objects.filter(tutor=tutor, date__gte=since)
+        .select_related("student", "tutor")
+    )
+    from .ical import build_tutor_feed
+    resp = HttpResponse(build_tutor_feed(tutor, bookings),
+                        content_type="text/calendar; charset=utf-8")
+    resp["Content-Disposition"] = 'inline; filename="thegreenpencil.ics"'
+    resp["Cache-Control"] = "private, max-age=300"
+    return resp

@@ -89,6 +89,23 @@ STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
+# --- Video calls: Zoom / Microsoft Teams OAuth (optional) --------------------
+# Tutors can connect their own Zoom or Teams account so intro bookings get a
+# call link created automatically. Each provider is enabled by configuring its
+# OAuth app credentials; leave them unset and the "connect" buttons simply
+# explain that the integration isn't configured — nothing else changes.
+#   Zoom:  a "General App" (user-managed) with scope  meeting:write:meeting
+#          and redirect URL  {SITE_URL}/oauth/video/zoom/callback/
+#   Teams: an Entra ID app with delegated Graph scopes
+#          OnlineMeetings.ReadWrite + offline_access + User.Read
+#          and redirect URL  {SITE_URL}/oauth/video/teams/callback/
+ZOOM_CLIENT_ID = os.environ.get('ZOOM_CLIENT_ID', '')
+ZOOM_CLIENT_SECRET = os.environ.get('ZOOM_CLIENT_SECRET', '')
+TEAMS_CLIENT_ID = os.environ.get('TEAMS_CLIENT_ID', '')
+TEAMS_CLIENT_SECRET = os.environ.get('TEAMS_CLIENT_SECRET', '')
+# Entra tenant the app lives in; 'common' allows any Microsoft account.
+TEAMS_TENANT = os.environ.get('TEAMS_TENANT', 'common')
+
 # --- Transactional email (Resend via django-anymail) ------------------------
 # Set RESEND_API_KEY to send real mail (booking confirmations, tutor alerts).
 # When unset, mail is printed to the console so the flow stays visible in dev —

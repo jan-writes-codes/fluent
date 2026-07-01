@@ -27,16 +27,22 @@
               <span style="font-size:12px;color:#6e7d6e;">Uhrzeit</span><br>
               <span style="font-size:15.5px;font-weight:600;color:#277a42;">{{ time_range }} <span style="color:#9aa897;font-weight:400;">· 15 Minuten</span></span>
             </td></tr>
-            <tr><td style="padding:16px 18px;">
+            <tr><td style="padding:16px 18px;{% if call_link %}border-bottom:1px solid rgba(36,53,40,0.07);{% endif %}">
               <span style="font-size:12px;color:#6e7d6e;">Tutor</span><br>
               <span style="font-size:15.5px;font-weight:600;">{{ tutor_first }}</span>
             </td></tr>
+            {% if call_link %}
+            <tr><td style="padding:16px 18px;">
+              <span style="font-size:12px;color:#6e7d6e;">Video-Call</span><br>
+              <a href="{{ call_link }}" style="font-size:14px;font-weight:600;color:#309050;text-decoration:underline;word-break:break-all;">{{ call_link }}</a>
+            </td></tr>
+            {% endif %}
           </table>
           <p style="font-size:13px;color:#6e7d6e;margin:10px 2px 0;">📅 Im Anhang findest du eine Kalender-Datei (<b>.ics</b>) — einfach öffnen, um den Termin zu speichern.</p>
         </td></tr>
         <!-- what's next -->
         <tr><td style="padding:18px 32px 4px;">
-          <p style="font-size:15px;line-height:1.6;color:#4a5a4c;margin:0;">Wir melden uns vor dem Termin mit allen Details (Ort bzw. Video-Link). Antworte einfach auf diese E-Mail, wenn du Fragen hast oder den Termin verschieben möchtest.</p>
+          <p style="font-size:15px;line-height:1.6;color:#4a5a4c;margin:0;">{% if call_link %}Die Stunde findet online statt — tritt zur gebuchten Zeit einfach über den Video-Link oben bei.{% else %}Wir melden uns vor dem Termin mit allen Details (Ort bzw. Video-Link).{% endif %} Antworte einfach auf diese E-Mail, wenn du Fragen hast oder den Termin verschieben möchtest.</p>
         </td></tr>
         {% if cancel_url %}
         <!-- cancel -->
