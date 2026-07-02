@@ -9,7 +9,10 @@ from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from .models import (
@@ -17,7 +20,7 @@ from .models import (
     CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile,
     VideoConnection,
 )
-from . import video
+from . import emails, video
 
 logger = logging.getLogger(__name__)
 
@@ -707,10 +710,26 @@ def landing_view(request):
 
 
 def login_view(request):
-    # Standalone sign-in page. Authenticated users have no business here.
+    # Standalone sign-in page. Authenticated users have no business here —
+    # unless they still run on a handed-over password: then this page hosts the
+    # forced "pick your own password" step before the app becomes reachable.
     if request.user.is_authenticated:
+        if getattr(request.user, "must_change_password", False):
+            return render(request, "login.html", {"mode": "force"})
         return redirect("app")
-    return render(request, "login.html")
+    return render(request, "login.html", {"mode": "login"})
+
+
+def password_reset_view(request, uidb64, token):
+    """Landing page of the e-mailed reset link. The token is checked here only
+    to decide which state to render (form vs. 'link expired'); the API endpoint
+    re-checks it on submit, so this check is cosmetic, not the security gate."""
+    user = _reset_link_user(uidb64, token)
+    return render(request, "login.html", {
+        "mode": "reset" if user else "reset_invalid",
+        "uid": uidb64,
+        "token": token,
+    })
 
 
 def impressum_view(request):
@@ -976,6 +995,10 @@ def booking_cancel_view(request, token):
 def app_view(request):
     if not request.user.is_authenticated:
         return redirect("login")
+    # Still on a handed-over (temp/admin-set) password: the app stays locked
+    # until the user has picked their own. The login page renders the form.
+    if getattr(request.user, "must_change_password", False):
+        return redirect("login")
 
     user = request.user
     settings = get_settings()
@@ -1161,12 +1184,115 @@ def api_login(request):
     if user_obj is None:
         return JsonResponse({"error": INVALID}, status=400)
     login(request, user_obj)
-    return JsonResponse({"ok": True, "role": user_obj.role, "slug": user_obj.slug})
+    return JsonResponse({
+        "ok": True,
+        "role": user_obj.role,
+        "slug": user_obj.slug,
+        # True while the account runs on a handed-over (temp/admin-set)
+        # password — the client then shows the "pick your own password" step
+        # instead of entering the app.
+        "mustChangePassword": user_obj.must_change_password,
+    })
 
 
 @require_http_methods(["POST"])
 def api_logout(request):
     logout(request)
+    return JsonResponse({"ok": True})
+
+
+def validate_new_password(password):
+    """German-language sanity rules for a self-chosen password. Returns an
+    error message, or None when the password is acceptable. Deliberately
+    minimal (mirrors Django's MinimumLength/NumericPassword validators) —
+    the rest of the API validates by hand in German the same way."""
+    if not password or len(password) < 8:
+        return "Das Passwort muss mindestens 8 Zeichen lang sein."
+    if password.isdigit():
+        return "Das Passwort darf nicht nur aus Zahlen bestehen."
+    return None
+
+
+def _reset_link_user(uidb64, token):
+    """Resolve a reset link's uid+token to a user, or None. Django's token
+    generator hashes the current password and last_login into the token, so a
+    link stops working the moment the password changes (single-use) or after
+    PASSWORD_RESET_TIMEOUT."""
+    try:
+        uid = urlsafe_base64_decode(uidb64 or "").decode()
+        user = User.objects.get(pk=uid)
+    except (ValueError, OverflowError, User.DoesNotExist):
+        return None
+    if not default_token_generator.check_token(user, token or ""):
+        return None
+    return user
+
+
+def _set_own_password(user, password):
+    """A password the user chose themselves: store it and lift the forced-change
+    gate. Callers send the 'password was changed' notice afterwards."""
+    user.set_password(password)
+    user.must_change_password = False
+    user.save()
+
+
+@require_http_methods(["POST"])
+def api_change_password(request):
+    """Logged-in user sets their own password — the forced step after first
+    login with a handed-over temp password (or after an admin overwrote it)."""
+    err = require_auth(request)
+    if err:
+        return err
+    data = parse_body(request)
+    password = data.get("password") or ""
+    problem = validate_new_password(password)
+    if problem:
+        return JsonResponse({"error": problem}, status=400)
+    user = request.user
+    _set_own_password(user, password)
+    # Keep the current session alive across the hash change (every *other*
+    # session, e.g. one still holding the temp password, is invalidated).
+    update_session_auth_hash(request, user)
+    emails.queue_email(emails.send_password_changed, user.pk)
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def api_password_forgot(request):
+    """Step 1 of "Passwort vergessen": mail a tokenized reset link. Always
+    answers ok — a different reply for unknown addresses would let anyone probe
+    which e-mails have accounts (same stance as api_login)."""
+    data = parse_body(request)
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        return JsonResponse({"error": "Gib deine E-Mail ein"}, status=400)
+    user = User.objects.filter(email__iexact=email).first()
+    if user is not None:
+        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_url = f"{dj_settings.SITE_URL}/password/reset/{uidb64}/{token}/"
+        emails.queue_email(emails.send_password_reset, user.pk, reset_url)
+    return JsonResponse({"ok": True})
+
+
+@require_http_methods(["POST"])
+def api_password_reset(request):
+    """Step 2 of "Passwort vergessen": the reset page submits the link's
+    uid+token plus the new password. The token is re-checked here — the GET
+    page render is not the security gate."""
+    data = parse_body(request)
+    user = _reset_link_user(data.get("uid"), data.get("token"))
+    if user is None:
+        return JsonResponse(
+            {"error": "Der Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an."},
+            status=400,
+        )
+    password = data.get("password") or ""
+    problem = validate_new_password(password)
+    if problem:
+        return JsonResponse({"error": problem}, status=400)
+    _set_own_password(user, password)
+    emails.queue_email(emails.send_password_changed, user.pk)
     return JsonResponse({"ok": True})
 
 
@@ -2117,6 +2243,7 @@ def api_users(request):
             role="tutor", slug=slug,
             initials=compute_initials(name) if name else "NT",
             color1="#309050", color2="#277a42",
+            must_change_password=True,  # temp password: force an own one on first login
         )
         new_user.first_name = first_name or "New"
         new_user.last_name = last_name or "Tutor"
@@ -2126,6 +2253,7 @@ def api_users(request):
             role="student", slug=slug,
             initials=compute_initials(name) if name else "NS",
             color1="#52a86a", color2="#2f8a4d",
+            must_change_password=True,  # temp password: force an own one on first login
         )
         new_user.first_name = first_name or "New"
         new_user.last_name = last_name or "Student"
@@ -2174,6 +2302,14 @@ def api_user_detail(request, slug):
         u.email = new_email
     if "password" in data and data["password"]:
         u.set_password(data["password"])
+        # An admin-set password is a handed-over secret, exactly like the temp
+        # password at account creation — the user must replace it on next
+        # login. Except when the admin edits their *own* account: that IS a
+        # self-chosen password, and their live session must survive the change.
+        if u == request.user:
+            update_session_auth_hash(request, u)
+        else:
+            u.must_change_password = True
     if "photo" in data:
         # Profile photo as a base64 data URL; null/empty removes it. Persisting
         # here (rather than only in client state) is what makes an admin-set

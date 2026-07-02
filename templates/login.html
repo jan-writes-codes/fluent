@@ -131,6 +131,11 @@
   .auth-card .btn { margin-top: 2px; }
   .auth-hint { font-size: 11.5px; color: var(--faint); line-height: 1.5; margin-top: 14px; }
   .auth-hint b { color: var(--muted); font-weight: 600; }
+  .auth-alt { margin-top: 16px; font-size: 12.5px; }
+  .auth-alt a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+  .auth-alt a:hover { color: var(--ink); }
+  .auth-ok { font-size: 14px; color: var(--c3); line-height: 1.6; text-align: left;
+    background: rgba(58,165,92,0.10); border: 1px solid rgba(58,165,92,0.25); border-radius: 12px; padding: 12px 14px; }
 </style>
 </head>
 <body>
@@ -144,7 +149,8 @@
   <div class="vignette"></div>
 
   <div class="auth-screen">
-    <form class="auth-card" id="authForm" novalidate>
+    <!-- Sign-in -->
+    <form class="auth-card" id="authForm" novalidate {% if mode and mode != 'login' %}hidden{% endif %}>
       <div class="brand">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
@@ -157,7 +163,66 @@
       <input class="t-select auth-input" id="authPass" type="password" autocomplete="current-password" placeholder="Dein Passwort" value="" />
       <div class="auth-err" id="authErr"></div>
       <button class="btn" type="submit" id="loginBtn"><span class="grainbtn"></span>Anmelden</button>
+      <div class="auth-alt"><a href="#" id="forgotLink">Passwort vergessen?</a></div>
     </form>
+
+    <!-- Forgot password: request a reset link -->
+    <form class="auth-card" id="forgotForm" novalidate hidden>
+      <div class="brand">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </div>
+      <h2 class="auth-h">Passwort vergessen?</h2>
+      <p class="auth-sub">Gib deine E-Mail-Adresse ein — wir schicken dir einen Link, mit dem du ein neues Passwort festlegen kannst.</p>
+      <div id="forgotFields">
+        <label class="field-label" style="text-align:left;">E-Mail</label>
+        <input class="t-select auth-input" id="forgotEmail" type="email" autocomplete="username" placeholder="you@fluent.at" value="" />
+        <div class="auth-err" id="forgotErr"></div>
+        <button class="btn" type="submit" id="forgotBtn"><span class="grainbtn"></span>Link senden</button>
+      </div>
+      <p class="auth-ok" id="forgotDone" hidden>Wenn ein Konto mit dieser E-Mail existiert, haben wir dir soeben einen Link zum Zurücksetzen geschickt. Schau auch im Spam-Ordner nach.</p>
+      <div class="auth-alt"><a href="#" id="backToLogin">Zurück zur Anmeldung</a></div>
+    </form>
+
+    <!-- Set a new password: forced on first login (temp/admin-set password) or via reset link -->
+    <form class="auth-card" id="setpassForm" novalidate {% if mode != 'force' and mode != 'reset' %}hidden{% endif %}>
+      <div class="brand">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </div>
+      <h2 class="auth-h">Neues Passwort festlegen</h2>
+      <p class="auth-sub" id="setpassSub">{% if mode == 'reset' %}Wähle ein neues Passwort für dein Konto.{% else %}Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes.{% endif %}</p>
+      <label class="field-label" style="text-align:left;">Neues Passwort</label>
+      <input class="t-select auth-input" id="newPass" type="password" autocomplete="new-password" placeholder="Mindestens 8 Zeichen" value="" />
+      <label class="field-label" style="text-align:left;">Passwort wiederholen</label>
+      <input class="t-select auth-input" id="newPass2" type="password" autocomplete="new-password" placeholder="Nochmal eingeben" value="" />
+      <div class="auth-err" id="setpassErr"></div>
+      <button class="btn" type="submit" id="setpassBtn"><span class="grainbtn"></span>Passwort speichern</button>
+      <div class="auth-alt" id="setpassLogout" {% if mode != 'force' %}hidden{% endif %}><a href="#" id="logoutLink">Abmelden</a></div>
+    </form>
+
+    <!-- Reset link invalid or expired -->
+    <div class="auth-card" id="invalidCard" {% if mode != 'reset_invalid' %}hidden{% endif %}>
+      <div class="brand">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </div>
+      <h2 class="auth-h">Link abgelaufen</h2>
+      <p class="auth-sub">Dieser Link ist ungültig oder abgelaufen — er gilt 24 Stunden und kann nur einmal verwendet werden.</p>
+      <button class="btn" type="button" id="requestNewLink"><span class="grainbtn"></span>Neuen Link anfordern</button>
+      <div class="auth-alt"><a href="{% url 'login' %}">Zur Anmeldung</a></div>
+    </div>
+
+    <!-- Password successfully reset -->
+    <div class="auth-card" id="doneCard" hidden>
+      <div class="brand">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </div>
+      <h2 class="auth-h">Passwort geändert</h2>
+      <p class="auth-sub">Dein neues Passwort ist gespeichert. Du kannst dich jetzt damit anmelden.</p>
+      <a class="btn" href="{% url 'login' %}" style="display:block;text-decoration:none;"><span class="grainbtn"></span>Zur Anmeldung</a>
+    </div>
   </div>
 
   <div style="position:fixed; bottom:14px; left:0; right:0; text-align:center; z-index:90; font-size:12px;">
@@ -170,31 +235,111 @@
 (function () {
   "use strict";
   const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  // Which card the server rendered: login | force | reset | reset_invalid.
+  // "force" = signed in but still on a handed-over password; "reset" = opened
+  // via a valid e-mailed reset link (uid/token below feed the submit).
+  const MODE = "{{ mode|default:'login' }}";
+  const RESET_UID = "{{ uid|default:'' }}";
+  const RESET_TOKEN = "{{ token|default:'' }}";
   const $ = (s) => document.querySelector(s);
   const authErr = (m) => { $("#authErr").textContent = m; };
+  const setpassErr = (m) => { $("#setpassErr").textContent = m; };
+
+  // After a successful login with a temp password the set-password card takes
+  // over without a reload — this flag routes its submit to /change/ (session
+  // auth) instead of /reset/ (link token).
+  let forceChange = (MODE === "force");
+
+  async function post(url, body) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify(body),
+      });
+      return await res.json().catch(() => null);
+    } catch (e) { return null; }
+  }
+
+  function showCard(id) {
+    for (const c of document.querySelectorAll('.auth-card')) c.hidden = (c.id !== id);
+  }
 
   async function doLogin() {
     const email = ($("#authEmail").value || "").trim().toLowerCase();
     const password = $("#authPass").value || "";
     if (!email) { authErr("Gib deine E-Mail ein"); return; }
     authErr("");
-    let r;
-    try {
-      const res = await fetch('/api/login/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ email, password }),
-      });
-      r = await res.json().catch(() => null);
-    } catch (e) { r = null; }
+    const r = await post('/api/login/', { email, password });
     if (!r) { authErr("Anmeldung fehlgeschlagen. Prüfe deine Verbindung."); return; }
     if (r.error) { authErr(r.error); return; }
+    if (r.mustChangePassword) {
+      // First login with the handed-over password: pick an own one before the app.
+      forceChange = true;
+      $("#setpassSub").textContent = "Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes.";
+      $("#setpassLogout").hidden = false;
+      showCard("setpassForm");
+      $("#newPass").focus();
+      return;
+    }
     // Success — land on the app.
     window.location.href = "/app/";
   }
 
+  async function doForgot() {
+    const email = ($("#forgotEmail").value || "").trim().toLowerCase();
+    if (!email) { $("#forgotErr").textContent = "Gib deine E-Mail ein"; return; }
+    $("#forgotErr").textContent = "";
+    const r = await post('/api/password/forgot/', { email });
+    if (!r || r.error) {
+      $("#forgotErr").textContent = (r && r.error) || "Senden fehlgeschlagen. Prüfe deine Verbindung.";
+      return;
+    }
+    // Deliberately the same message whether or not the address has an account.
+    $("#forgotFields").hidden = true;
+    $("#forgotDone").hidden = false;
+  }
+
+  async function doSetPassword() {
+    const p1 = $("#newPass").value || "";
+    const p2 = $("#newPass2").value || "";
+    if (p1.length < 8) { setpassErr("Das Passwort muss mindestens 8 Zeichen lang sein."); return; }
+    if (p1 !== p2) { setpassErr("Die Passwörter stimmen nicht überein."); return; }
+    setpassErr("");
+    if (forceChange) {
+      const r = await post('/api/password/change/', { password: p1 });
+      if (!r) { setpassErr("Speichern fehlgeschlagen. Prüfe deine Verbindung."); return; }
+      if (r.error) { setpassErr(r.error); return; }
+      window.location.href = "/app/";
+    } else {
+      const r = await post('/api/password/reset/', { uid: RESET_UID, token: RESET_TOKEN, password: p1 });
+      if (!r) { setpassErr("Speichern fehlgeschlagen. Prüfe deine Verbindung."); return; }
+      if (r.error) { setpassErr(r.error); return; }
+      showCard("doneCard");
+    }
+  }
+
   $("#authForm").addEventListener("submit", (e) => { e.preventDefault(); doLogin(); });
-  $("#authEmail").focus();
+  $("#forgotForm").addEventListener("submit", (e) => { e.preventDefault(); doForgot(); });
+  $("#setpassForm").addEventListener("submit", (e) => { e.preventDefault(); doSetPassword(); });
+  $("#forgotLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    $("#forgotEmail").value = ($("#authEmail").value || "").trim();
+    $("#forgotFields").hidden = false;
+    $("#forgotDone").hidden = true;
+    showCard("forgotForm");
+    $("#forgotEmail").focus();
+  });
+  $("#backToLogin").addEventListener("click", (e) => { e.preventDefault(); showCard("authForm"); $("#authEmail").focus(); });
+  $("#requestNewLink").addEventListener("click", () => { showCard("forgotForm"); $("#forgotEmail").focus(); });
+  $("#logoutLink").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await post('/api/logout/', {});
+    window.location.href = "{% url 'login' %}";
+  });
+
+  if (MODE === "force" || MODE === "reset") $("#newPass").focus();
+  else if (MODE === "login" || !MODE) $("#authEmail").focus();
 })();
 </script>
 </body>
