@@ -2,16 +2,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-{% include "_clarity.html" %}
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=AW-18275409253"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'AW-18275409253');
-</script>
+{% include "_consent.html" %}
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#f5f2ea" />
@@ -98,7 +89,7 @@
   <footer class="foot">
     <div class="wrap foot-in">
       <a href="/">← Zur Startseite</a>
-      <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a></span>
+      <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openCookieSettings();return false;">Cookie-Einstellungen</a></span>
     </div>
   </footer>
 
