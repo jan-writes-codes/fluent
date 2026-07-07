@@ -246,7 +246,10 @@
   .top-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
   .top-nav a.navlink { font-size: 14.5px; color: var(--muted); text-decoration: none; padding: 8px 13px; border-radius: 10px; transition: 0.16s; }
   .top-nav a.navlink:hover { color: var(--ink); background: rgba(36,53,40,0.05); }
-  @media (max-width: 720px) { .top-nav a.navlink { display: none; } }
+  /* Below ~1080px the full link row no longer fits next to the brand and CTA
+     (it used to overflow and get cut off on tablets) — switch to the compact
+     header (brand + login icon + CTA) there. */
+  @media (max-width: 1080px) { .top-nav a.navlink { display: none; } }
 
   /* ---------- Buttons ---------- */
   .btn { font-family: var(--font-body); font-weight: 600; font-size: 15px; border: 0; border-radius: 13px; cursor: pointer;
@@ -262,16 +265,33 @@
   .btn.btn-icon { padding: 11px; }
   .btn.btn-icon svg { width: 19px; height: 19px; }
 
-  /* ---------- Mobile header: keep the bar on one line, restore gutters ---------- */
+  /* ---------- Mobile header: keep the bar on one line, restore gutters ----------
+     The logo mark is deliberately NOT resized here — it must look identical
+     at every width (it used to drop to 34px/radius 10, visibly changing the
+     brand). The room comes out of the gutters, gaps, buttons and a slightly
+     smaller wordmark instead. */
   @media (max-width: 600px) {
-    .top-in { gap: 10px; }
-    .top-nav { gap: 8px; }
-    .mark { width: 34px; height: 34px; border-radius: 10px; }
-    .brand { gap: 9px; }
-    .wordmark { font-size: 18px; }
-    .wordmark .sub { font-size: 9px; letter-spacing: 0.14em; margin-top: 3px; }
-    .top .btn { padding: 10px 15px; font-size: 14px; }
-    .top .btn.btn-icon { padding: 10px; }
+    .top .wrap { padding: 0 12px; }
+    .top-in { gap: 6px; }
+    .top-nav { gap: 6px; }
+    .brand { gap: 8px; }
+    .wordmark { font-size: 17px; }
+    .wordmark .sub { font-size: 8.5px; letter-spacing: 0.13em; margin-top: 3px; }
+    .top .btn { padding: 10px 11px; font-size: 13px; white-space: nowrap; }
+    .top .btn.btn-icon { padding: 9px; }
+    .btn.btn-icon svg { width: 18px; height: 18px; }
+  }
+  /* Very narrow phones: the login icon no longer fits next to the full brand
+     and CTA — drop it there (login stays reachable via the CTA flow and
+     /login/ directly). The logo mark still never changes. */
+  @media (max-width: 374px) {
+    .top .wrap { padding: 0 10px; }
+    .top .btn.btn-icon { display: none; }
+    .top .btn { padding: 9px 10px; }
+  }
+  @media (max-width: 330px) {
+    .top .btn { padding: 9px 8px; font-size: 12.5px; }
+    .top-in { gap: 5px; }
   }
 
   /* ---------- Announcement bar (campaign) ---------- */
