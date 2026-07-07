@@ -35,6 +35,10 @@
     color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
   button:disabled { opacity: 0.6; cursor: default; }
   .note { font-size: 12px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+  .consent { display: flex; gap: 10px; align-items: flex-start; text-align: left;
+    font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+  .consent input { margin-top: 2px; width: 17px; height: 17px; accent-color: var(--c1); flex: none; }
+  .consent a { color: var(--c1); }
   .ok { color: var(--good); } .err { color: var(--bad); }
   .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px;
     background: rgba(48,144,80,0.12); color: var(--c1); margin-bottom: 16px; }
@@ -65,7 +69,14 @@
     <p class="amount">€ {{ amount }} <small>für {{ outstanding }} Einheit{{ outstanding|pluralize:"en" }}</small></p>
     <p class="break">{{ outstanding }} × € {{ unit }} pro Einheit</p>
     {% if stripe_enabled %}
-      <button id="payBtn" type="button">Jetzt sicher bezahlen</button>
+      <label class="consent">
+        <input type="checkbox" id="consent">
+        <span>Ich stimme den <a href="/agb/" target="_blank" rel="noopener">AGB</a> zu und habe die
+        <a href="/widerruf/" target="_blank" rel="noopener">Widerrufsbelehrung</a> zur Kenntnis genommen.
+        Da diese Einheiten bereits gebuchten Unterricht betreffen, wünsche ich die Leistungserbringung
+        ausdrücklich und nehme zur Kenntnis, dass mein Widerrufsrecht bei vollständiger Erbringung erlischt.</span>
+      </label>
+      <button id="payBtn" type="button" disabled>Jetzt sicher bezahlen</button>
       <p class="note" id="msg">Zahlung über Stripe · du wirst kurz weitergeleitet.</p>
     {% else %}
       <button disabled>Online-Zahlung nicht verfügbar</button>
@@ -79,7 +90,11 @@
     (function () {
       var btn = document.getElementById("payBtn");
       var msg = document.getElementById("msg");
+      var consent = document.getElementById("consent");
+      // FAGG: the pay button stays disabled until the buyer accepts the terms.
+      consent.addEventListener("change", function () { btn.disabled = !consent.checked; });
       btn.addEventListener("click", function () {
+        if (!consent.checked) return;
         btn.disabled = true;
         msg.textContent = "Einen Moment …";
         fetch("/settle/{{ token }}/checkout/", { method: "POST" })

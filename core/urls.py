@@ -8,6 +8,8 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('impressum/', views.impressum_view, name='impressum'),
     path('datenschutz/', views.datenschutz_view, name='datenschutz'),
+    path('agb/', views.agb_view, name='agb'),
+    path('widerruf/', views.widerruf_view, name='widerruf'),
     # Static FAQ page — pure content, so a TemplateView is enough (no view fn).
     path('faq/', TemplateView.as_view(template_name='faq.html'), name='faq'),
     path('intro/', views.intro_view, name='intro'),
@@ -17,6 +19,7 @@ urlpatterns = [
     path('oauth/video/<str:provider>/callback/', views.video_oauth_callback, name='video_oauth_callback'),
     # Public, token-guarded iCal subscription feed of a tutor's bookings.
     path('calendar/<str:token>.ics', views.calendar_feed, name='calendar_feed'),
+    path('favicon.ico', views.favicon_ico, name='favicon_ico'),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('api/intro-bookings/', views.api_intro_booking),

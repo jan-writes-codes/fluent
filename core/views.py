@@ -742,9 +742,30 @@ def datenschutz_view(request):
     return render(request, "datenschutz.html")
 
 
+def agb_view(request):
+    # Public terms of service (Allgemeine Geschäftsbedingungen).
+    return render(request, "agb.html")
+
+
+def widerruf_view(request):
+    # Consumer right-of-withdrawal instructions for distance contracts (FAGG).
+    return render(request, "widerruf.html")
+
+
 # Public, crawler-facing pages worth listing in the sitemap. The booking app and
 # API endpoints are intentionally excluded — they're gated or non-content.
-SITEMAP_PATHS = ["/", "/intro/", "/impressum/", "/datenschutz/"]
+SITEMAP_PATHS = ["/", "/intro/", "/impressum/", "/datenschutz/", "/agb/", "/widerruf/"]
+
+
+def favicon_ico(request):
+    # Google Search (and older browsers) fetch /favicon.ico from the site root,
+    # not the <link> in the page head. Serve the raster icon there directly so
+    # the search-result icon resolves instead of falling back to a placeholder.
+    from django.contrib.staticfiles import finders
+    path = finders.find("favicon.ico")
+    if not path:
+        raise Http404("favicon.ico not found")
+    return FileResponse(open(path, "rb"), content_type="image/x-icon")
 
 
 def robots_txt(request):

@@ -11,8 +11,10 @@
      permanent off-tone strip along the screen edges. -->
 {% block robots %}<meta name="robots" content="noindex" />{% endblock %}
 <title>{% block title %}{% endblock %} · The Green Pencil</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
+<link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon-96.png' %}">
+<link rel="apple-touch-icon" href="{% static 'favicon-192.png' %}">
 <style>
   /* Self-hosted display font — no external CDN, no data sent to third parties. */
   @font-face {
@@ -92,7 +94,7 @@
   <footer class="foot">
     <div class="wrap foot-in">
       <a href="/">← Zur Startseite</a>
-      <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openCookieSettings();return false;">Cookie-Einstellungen</a></span>
+      <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'agb' %}">AGB</a> &nbsp;·&nbsp; <a href="{% url 'widerruf' %}">Widerruf</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a> &nbsp;·&nbsp; <a href="#" onclick="openCookieSettings();return false;">Cookie-Einstellungen</a></span>
     </div>
   </footer>
 

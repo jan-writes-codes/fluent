@@ -13,6 +13,9 @@ venv/
 # Node (frontend test deps)
 node_modules/
 
+# Local SQLite database — may hold real personal data in production; never commit
+db.sqlite3
+
 # Uploaded media
 media/
 
