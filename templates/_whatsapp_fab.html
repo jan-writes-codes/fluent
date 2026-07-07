@@ -19,6 +19,14 @@
   @media (max-width: 560px) {
     .wa-fab { right: 16px; bottom: 16px; padding: 12px; }
     .wa-fab .wa-label { display: none; }
+    /* Keep the glow's downward reach (offset + blur + spread) under the 16px
+       gap to the viewport edge: iOS Safari doesn't paint page shadows into
+       its toolbar area, so a longer shadow gets sliced off at that boundary
+       with a visible straight edge. */
+    .wa-fab, .wa-fab:hover {
+      box-shadow: 0 5px 12px -4px rgba(37,211,102,0.5), 0 2px 6px rgba(0,0,0,0.12);
+      transform: none;
+    }
   }
   @media print { .wa-fab { display: none; } }
 </style>
