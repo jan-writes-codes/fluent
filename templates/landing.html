@@ -16,9 +16,12 @@
 <meta name="geo.region" content="AT-9">
 <meta name="geo.placename" content="Wien">
 <link rel="canonical" href="https://thegreenpencil.at/">
-<!-- Favicon: the green pencil mark -->
+<!-- Favicon: the green pencil mark. Root /favicon.ico (raster) is what Google
+     Search uses for the result icon; the SVG is preferred by modern browsers. -->
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
+<link rel="icon" type="image/png" sizes="96x96" href="{% static 'favicon-96.png' %}">
+<link rel="apple-touch-icon" href="{% static 'favicon-192.png' %}">
 <!-- Open Graph / social -->
 <meta property="og:type" content="website">
 <meta property="og:locale" content="de_AT">

@@ -757,6 +757,17 @@ def widerruf_view(request):
 SITEMAP_PATHS = ["/", "/intro/", "/impressum/", "/datenschutz/", "/agb/", "/widerruf/"]
 
 
+def favicon_ico(request):
+    # Google Search (and older browsers) fetch /favicon.ico from the site root,
+    # not the <link> in the page head. Serve the raster icon there directly so
+    # the search-result icon resolves instead of falling back to a placeholder.
+    from django.contrib.staticfiles import finders
+    path = finders.find("favicon.ico")
+    if not path:
+        raise Http404("favicon.ico not found")
+    return FileResponse(open(path, "rb"), content_type="image/x-icon")
+
+
 def robots_txt(request):
     # Tells search engines they may crawl the site and points them at the
     # sitemap so new/updated pages get discovered faster.
