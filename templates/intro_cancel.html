@@ -5,7 +5,10 @@
 {% include "_consent.html" %}
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#f5f2ea" />
+<!-- No theme-color: iOS Safari then samples the real page pixels to tint its
+     top/bottom bar backdrops, so they always match the rendered page. A
+     declared #f5f2ea sat warm against the grain-tinted page and painted a
+     permanent off-tone strip along the screen edges. -->
 <title>Termin absagen · The Green Pencil</title>
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
