@@ -108,7 +108,7 @@
     background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22));
     position: relative; z-index: 30;
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; cursor: pointer; }
   .mark { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
     display: grid; place-items: center;
     background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%);
@@ -831,10 +831,10 @@
       <button id="impExit">Zurück zum Admin</button>
     </div>
     <header class="top">
-      <div class="brand">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <button class="nav-toggle" id="navToggle" aria-haspopup="true" aria-expanded="false">
         <span id="navToggleLabel">Buchen</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
