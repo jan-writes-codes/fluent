@@ -185,6 +185,15 @@
   @keyframes jitter { 0%{transform:translate(0,0)} 50%{transform:translate(-3%, 2%)} 100%{transform:translate(2%,-3%)} }
   .vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: radial-gradient(125% 95% at 50% 0%, transparent 60%, rgba(31,60,34,0.15) 100%); }
+  /* The field is fixed, so its dark bottom (vignette edge + the two green
+     bottom blobs) parks on the same screen region at every scroll position.
+     On a tall, narrow phone that murks the lower half of every screenful —
+     soften it there; desktop keeps the full depth cue. */
+  @media (max-width: 720px) {
+    .vignette { background: radial-gradient(125% 95% at 50% 0%, transparent 72%, rgba(31,60,34,0.06) 100%); }
+    .blob.b3 { opacity: 0.26; }
+    .blob.b4 { opacity: 0.22; }
+  }
 
   /* All content (incl. the sticky header) lives in .page, so sideways
      overflow (nav row on tablets, buttons on very small phones) is clipped
