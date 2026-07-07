@@ -666,7 +666,12 @@
   .buy-contact { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; margin-bottom: 18px;
     background: rgba(36,53,40,0.05); border: 1px solid var(--line-2); font-size: 13px; }
   .buy-contact svg { color: var(--muted); }
+  .buy-consent { display: flex; gap: 10px; align-items: flex-start; text-align: left;
+    font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 16px; }
+  .buy-consent input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--c1); flex: none; }
+  .buy-consent a { color: var(--c1); }
   a.btn { display: block; text-align: center; text-decoration: none; }
+  .btn:disabled { opacity: 0.55; cursor: default; }
   .buy-card .btn.ghost { margin-top: 10px; }
   .cal-url { display: flex; gap: 8px; margin-bottom: 16px; }
   .cal-url input { flex: 1; min-width: 0; font-family: var(--font-body); font-size: 12.5px; color: var(--ink);
@@ -2005,7 +2010,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
       <button class="btn ghost" id="buyClose">Schließen</button>`
       : `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
       <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${p.price}</b>) sicher per Karte. Deine <b>${p.n} Einheiten</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
-      <button class="btn" id="buyStripe"><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
+      <label class="buy-consent"><input type="checkbox" id="buyConsent"><span>Ich stimme den <a href="/agb/" target="_blank" rel="noopener">AGB</a> zu und habe die <a href="/widerruf/" target="_blank" rel="noopener">Widerrufsbelehrung</a> zur Kenntnis genommen. Löse ich eine Einheit vor Ablauf der Widerrufsfrist ein, wünsche ich die vorzeitige Leistungserbringung ausdrücklich und nehme zur Kenntnis, dass mein Widerrufsrecht bei vollständiger Erbringung erlischt.</span></label>
+      <button class="btn" id="buyStripe" disabled><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
       <a class="btn ghost" id="buyMail" href="${mailHref(t0)}">Lieber Tutor schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
       <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
@@ -2021,6 +2027,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
     $("#buyX").onclick=closeBuy; $("#buyClose").onclick=closeBuy;
     if ($("#buyBilling")) $("#buyBilling").onclick=goToBilling;
     if (stripeOn && $("#buyStripe")) $("#buyStripe").onclick=()=>startStripeCheckout(p);
+    // FAGG: the pay button unlocks only once the buyer accepts the terms.
+    if ($("#buyConsent")) $("#buyConsent").onchange=(e)=>{ const b=$("#buyStripe"); if(b) b.disabled=!e.target.checked; };
     const selEl=$("#buyTutorSel");
     if(selEl){ selEl.onchange=()=>{
       const t=list[parseInt(selEl.value,10)]||t0;
@@ -2031,6 +2039,8 @@ window.DJANGO_DATA = {{ django_data|safe }};
   }
 
   function startStripeCheckout(p){
+    const consent=$("#buyConsent");
+    if(consent && !consent.checked){ return; }
     const btn=$("#buyStripe");
     if(btn){ btn.disabled=true; btn.style.opacity="0.6"; }
     apiResult('POST', '/api/checkout/', { n: p.n }).then(res => {
