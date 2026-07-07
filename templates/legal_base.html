@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+{% include "_clarity.html" %}
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18275409253"></script>
 <script>
@@ -100,5 +101,7 @@
       <span><a href="{% url 'faq' %}">FAQ</a> &nbsp;·&nbsp; <a href="{% url 'impressum' %}">Impressum</a> &nbsp;·&nbsp; <a href="{% url 'datenschutz' %}">Datenschutz</a></span>
     </div>
   </footer>
+
+  {% include "_whatsapp_fab.html" %}
 </body>
 </html>

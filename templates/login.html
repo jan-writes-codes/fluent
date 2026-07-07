@@ -2,6 +2,7 @@
 {% load static %}
 <html lang="de">
 <head>
+{% include "_clarity.html" %}
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18275409253"></script>
 <script>
@@ -90,7 +91,7 @@
     background: radial-gradient(125% 95% at 50% 0%, transparent 58%, rgba(31,60,34,0.15) 100%); }
 
   /* ---------- Brand mark ---------- */
-  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; cursor: pointer; }
   .mark { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
     display: grid; place-items: center;
     background: linear-gradient(120deg, #4cb56b 0%, var(--c1) 72%);
@@ -151,10 +152,10 @@
   <div class="auth-screen">
     <!-- Sign-in -->
     <form class="auth-card" id="authForm" novalidate {% if mode and mode != 'login' %}hidden{% endif %}>
-      <div class="brand">
+      <div class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <h2 class="auth-h">Anmelden</h2>
       <p class="auth-sub">Melde dich an, um deine Stunden und deine Einheiten zu verwalten.</p>
       <label class="field-label" style="text-align:left;">E-Mail</label>

@@ -1,6 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="de"><head>
+{% include "_clarity.html" %}
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18275409253"></script>
 <script>
@@ -447,5 +448,7 @@ window.INTRO_DATA = {{ intro_data|safe }};
   renderWeek();
 })();
 </script>
+
+{% include "_whatsapp_fab.html" %}
 </body>
 </html>
