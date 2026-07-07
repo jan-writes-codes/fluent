@@ -136,18 +136,24 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  /* Root background so Safari fills the safe-area / overscroll strips in the
-     page colour rather than white.
+  /* Root background so Safari fills the safe-area / overscroll strips and its
+     own toolbar backdrops in the page colour rather than white. It must be
+     the tone the page actually RENDERS in — --bg multiplied by the grain
+     overlay — not the raw --bg: Safari fills its expanded bottom bar with the
+     page's declared background colour, and the raw warm cream sat visibly
+     lighter/warmer than the grain-tinted page (a hard-edged slab above the
+     toolbar). #ece9e1 is the measured grained tone. The visible page is
+     unaffected — the fixed .field paints over the root everywhere.
      No overflow property on html/body — anything non-visible here (hidden OR
      clip) breaks iOS Safari's edge-to-edge rendering: `hidden` demotes the
      root scroller so the page stops extending under the status bar / home
      indicator, and `clip` on the root garbles the sticky header's compositing
      (an opaque band where scrolled content should show through the glass).
      Sideways clipping lives on .page instead. */
-  html { scroll-behavior: smooth; background: var(--bg); }
+  html { scroll-behavior: smooth; background: #ece9e1; }
   body {
     font-family: var(--font-body);
-    background: var(--bg);
+    background: #ece9e1;
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     line-height: 1.6;
@@ -219,7 +225,11 @@
     border-bottom: 1px solid var(--line-2);
     /* With the page running under the iPhone status bar, drop the nav row
        below it — the glass gradient fills the notch area instead. */
-    padding-top: env(safe-area-inset-top); }
+    padding-top: env(safe-area-inset-top);
+    /* The header sits outside .page (see body markup), so it clips its own
+       sideways overflow (nav row on tight widths). Its own clip doesn't
+       affect stickiness — only an ANCESTOR clip does. */
+    overflow-x: clip; }
   .top-in { display: flex; align-items: center; gap: 20px; padding-top: 14px; padding-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
   .mark { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
@@ -435,34 +445,38 @@
     <div class="vignette"></div>
   </div>
 
-  <div class="page">
-    <a class="announce" href="#nachpruefung" id="announce">
-      <span class="ann-dot"></span>
-      <span class="ann-text"><b>Nachprüfung im September?</b> Sichere dir jetzt deinen Vorbereitungsplatz für Englisch.</span>
-      <span class="ann-cta">Mehr erfahren →</span>
-    </a>
-    <header class="top">
-      <div class="wrap top-in">
-        <a class="brand" href="#top">
-          <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
-          <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+  <!-- Announce + sticky header live OUTSIDE .page: an ancestor with any
+       overflow clipping makes iOS Safari jitter position:sticky during scroll
+       and intermittently drop the header's backdrop-filter (sharp text showing
+       through the glass). As direct body children they composite cleanly. -->
+  <a class="announce" href="#nachpruefung" id="announce">
+    <span class="ann-dot"></span>
+    <span class="ann-text"><b>Nachprüfung im September?</b> Sichere dir jetzt deinen Vorbereitungsplatz für Englisch.</span>
+    <span class="ann-cta">Mehr erfahren →</span>
+  </a>
+  <header class="top">
+    <div class="wrap top-in">
+      <a class="brand" href="#top">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </a>
+      <nav class="top-nav">
+        <a class="navlink hl" href="#nachpruefung">Nachprüfung</a>
+        <a class="navlink" href="#angebot">Angebot</a>
+        <a class="navlink" href="#ueber-mich">Über mich</a>
+        <a class="navlink" href="#ansatz">Ansatz</a>
+        <a class="navlink" href="#preise">Preise</a>
+        <a class="navlink" href="#stimmen">Stimmen</a>
+        <a class="navlink" href="/faq/">FAQ</a>
+        <a class="btn ghost btn-icon" href="{% url 'login' %}" aria-label="Anmelden" title="Anmelden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z"></path><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"></path></svg>
         </a>
-        <nav class="top-nav">
-          <a class="navlink hl" href="#nachpruefung">Nachprüfung</a>
-          <a class="navlink" href="#angebot">Angebot</a>
-          <a class="navlink" href="#ueber-mich">Über mich</a>
-          <a class="navlink" href="#ansatz">Ansatz</a>
-          <a class="navlink" href="#preise">Preise</a>
-          <a class="navlink" href="#stimmen">Stimmen</a>
-          <a class="navlink" href="/faq/">FAQ</a>
-          <a class="btn ghost btn-icon" href="{% url 'login' %}" aria-label="Anmelden" title="Anmelden">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V7a4 4 0 0 1 4-4z"></path><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"></path></svg>
-          </a>
-          <a class="btn" href="{% url 'intro' %}">Stunde buchen</a>
-        </nav>
-      </div>
-    </header>
+        <a class="btn" href="{% url 'intro' %}">Stunde buchen</a>
+      </nav>
+    </div>
+  </header>
 
+  <div class="page">
     <main id="top">
       <!-- HERO -->
       <section class="hero">

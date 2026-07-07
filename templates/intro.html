@@ -30,14 +30,18 @@
     --font-body: "Hanken Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  /* Root background so Safari fills the safe-area / overscroll strips in the
-     page colour rather than white. */
-  html { background: var(--bg); }
-  /* No overflow on html/body — any non-visible value here (hidden or clip)
+  /* Root background so Safari fills the safe-area / overscroll strips and its
+     own toolbar backdrops in the page colour rather than white. Must be the
+     tone the page actually renders in (#ece9e1 — the base tinted the way the
+     landing page's grain does), not raw --bg: Safari fills its expanded
+     bottom bar with the declared background colour, and the raw warm cream
+     showed as a hard-edged slab against the page.
+     No overflow on html/body — any non-visible value here (hidden or clip)
      breaks iOS Safari's edge-to-edge rendering under the status bar / home
      indicator or the sticky header's compositing. Sideways clipping sits on
      .page instead (see below). */
-  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; }
+  html { background: #ece9e1; }
+  body { font-family: var(--font-body); background: #ece9e1; color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; }
   .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.42; mix-blend-mode: multiply; }
   .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); }
@@ -57,7 +61,11 @@
     background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22)); border-bottom: 1px solid var(--line-2);
     /* With the page running under the iPhone status bar, drop the nav row
        below it — the glass gradient fills the notch area instead. */
-    padding-top: env(safe-area-inset-top); }
+    padding-top: env(safe-area-inset-top);
+    /* The header sits outside .page (see body markup), so it clips its own
+       sideways overflow. Its own clip doesn't affect stickiness — only an
+       ANCESTOR clip does. */
+    overflow-x: clip; }
   /* Set only the vertical padding so the .wrap horizontal gutter (0 28px) is
      preserved — using the `padding` shorthand here would zero it and let the
      header bleed to the screen edge (the rest of the page keeps its 28px margin). */
@@ -153,19 +161,22 @@
 </head>
 <body>
   <div class="field"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
-  <div class="page">
-    <header class="top">
-      <div class="wrap top-in">
-        <a class="brand" href="/">
-          <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
-          <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-        </a>
-        <div class="top-actions">
-          <a class="btn ghost" href="{% url 'login' %}">Anmelden</a>
-        </div>
+  <!-- Sticky header lives OUTSIDE .page: an ancestor with any overflow
+       clipping makes iOS Safari jitter position:sticky during scroll and
+       intermittently drop the backdrop-filter. -->
+  <header class="top">
+    <div class="wrap top-in">
+      <a class="brand" href="/">
+        <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
+        <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
+      </a>
+      <div class="top-actions">
+        <a class="btn ghost" href="{% url 'login' %}">Anmelden</a>
       </div>
-    </header>
+    </div>
+  </header>
 
+  <div class="page">
     <main>
       <section class="hero">
         <div class="wrap">
