@@ -30,7 +30,12 @@
   /* Root background so Safari fills the safe-area / overscroll strips in the
      page colour rather than white. */
   html { background: var(--bg); }
-  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; overflow-x: hidden; }
+  /* `clip`, not `hidden`: a non-visible overflow-x on the body propagates to
+     the viewport and turns the root into a scroll container — iOS Safari then
+     stops running the page under the status bar / home indicator and paints
+     those strips flat (a visible seam). `clip` cuts sideways overflow without
+     that; the `hidden` line is the pre-16-Safari fallback. */
+  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; overflow-x: hidden; overflow-x: clip; }
   .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.42; mix-blend-mode: multiply; }
   .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); }
@@ -40,7 +45,10 @@
   .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 28px; }
 
   header.top { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(14px);
-    background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22)); border-bottom: 1px solid var(--line-2); }
+    background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22)); border-bottom: 1px solid var(--line-2);
+    /* With the page running under the iPhone status bar, drop the nav row
+       below it — the glass gradient fills the notch area instead. */
+    padding-top: env(safe-area-inset-top); }
   /* Set only the vertical padding so the .wrap horizontal gutter (0 28px) is
      preserved — using the `padding` shorthand here would zero it and let the
      header bleed to the screen edge (the rest of the page keeps its 28px margin). */

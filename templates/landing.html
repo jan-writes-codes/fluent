@@ -134,8 +134,16 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   /* Root background so Safari fills the safe-area / overscroll strips in the
-     page colour rather than white. */
-  html { scroll-behavior: smooth; overflow-x: hidden; background: var(--bg); }
+     page colour rather than white.
+     Horizontal clipping must use `clip`, not `hidden`: `overflow-x: hidden`
+     on the root forces overflow-y into `auto`, which turns <html> into a
+     scroll container — iOS Safari then stops extending the page under the
+     status bar / home indicator (despite viewport-fit=cover) and paints those
+     strips in the flat root colour, visibly seamed against the tinted page.
+     `clip` cuts sideways overflow without creating a scroll container, so the
+     document stays the root scroller and content runs edge-to-edge. The
+     `hidden` line before it is the fallback for pre-16 Safari. */
+  html { scroll-behavior: smooth; overflow-x: hidden; overflow-x: clip; background: var(--bg); }
   body {
     font-family: var(--font-body);
     background: var(--bg);
@@ -143,6 +151,7 @@
     -webkit-font-smoothing: antialiased;
     line-height: 1.6;
     overflow-x: hidden;
+    overflow-x: clip;
   }
 
   /* ---------- Ambient grainy gradient field ---------- */
@@ -188,7 +197,10 @@
   header.top { position: sticky; top: 0; z-index: 40;
     backdrop-filter: blur(14px);
     background: linear-gradient(180deg, rgba(251,248,241,0.72), rgba(251,248,241,0.22));
-    border-bottom: 1px solid var(--line-2); }
+    border-bottom: 1px solid var(--line-2);
+    /* With the page running under the iPhone status bar, drop the nav row
+       below it — the glass gradient fills the notch area instead. */
+    padding-top: env(safe-area-inset-top); }
   .top-in { display: flex; align-items: center; gap: 20px; padding-top: 14px; padding-bottom: 14px; }
   .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
   .mark { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
@@ -386,7 +398,7 @@
   .cta-band .hero-cta { justify-content: center; flex-direction: column; align-items: center; }
 
   /* ---------- Footer ---------- */
-  footer.foot { padding: 50px 0 60px; border-top: 1px solid var(--line-2); margin-top: 64px; }
+  footer.foot { padding: 50px 0 calc(60px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-2); margin-top: 64px; }
   .foot-in { display: flex; flex-wrap: wrap; gap: 28px; justify-content: space-between; align-items: flex-start; }
   .foot-contact { display: flex; flex-direction: column; gap: 10px; }
   .foot-contact a { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-size: 15px; transition: 0.15s; }
