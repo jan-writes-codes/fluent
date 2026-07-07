@@ -30,18 +30,24 @@
   /* Root background so Safari fills the safe-area / overscroll strips in the
      page colour rather than white. */
   html { background: var(--bg); }
-  /* `clip`, not `hidden`: a non-visible overflow-x on the body propagates to
-     the viewport and turns the root into a scroll container — iOS Safari then
-     stops running the page under the status bar / home indicator and paints
-     those strips flat (a visible seam). `clip` cuts sideways overflow without
-     that; the `hidden` line is the pre-16-Safari fallback. */
-  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; overflow-x: hidden; overflow-x: clip; }
+  /* No overflow on html/body — any non-visible value here (hidden or clip)
+     breaks iOS Safari's edge-to-edge rendering under the status bar / home
+     indicator or the sticky header's compositing. Sideways clipping sits on
+     .page instead (see below). */
+  body { font-family: var(--font-body); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.6; }
   .field { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
   .blob { position: absolute; border-radius: 50%; filter: blur(96px); opacity: 0.42; mix-blend-mode: multiply; }
   .blob.b1 { width: 60vw; height: 60vw; left: -16vw; top: -24vw; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 62%); }
   .blob.b2 { width: 52vw; height: 52vw; right: -14vw; top: -12vw; background: radial-gradient(circle at 60% 40%, var(--c2), transparent 60%); }
   .blob.b3 { width: 58vw; height: 58vw; right: 4vw; bottom: -30vw; background: radial-gradient(circle at 50% 50%, var(--c3), transparent 60%); }
-  .page { position: relative; z-index: 2; }
+  /* Clip sideways overflow on the content wrapper, not the root: `clip`
+     creates no scroll container, so the sticky header keeps sticking and the
+     root scroller stays intact for edge-to-edge iOS rendering. Engines
+     without `clip` (pre-16 Safari) fall back to root-level `hidden`. */
+  .page { position: relative; z-index: 2; overflow-x: clip; }
+  @supports not (overflow-x: clip) {
+    html, body { overflow-x: hidden; }
+  }
   .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 28px; }
 
   header.top { position: sticky; top: 0; z-index: 40; backdrop-filter: blur(14px);
