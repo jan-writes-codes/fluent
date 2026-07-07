@@ -1,0 +1,180 @@
+{% comment %}
+  Cookie-Consent-Banner (DSGVO Art. 6 Abs. 1 lit. a + § 165 Abs. 3 TKG 2021).
+
+  Non-essential trackers (Microsoft Clarity = Statistik, Google Ads gtag =
+  Marketing) are NOT loaded until the visitor has actively opted in. Only
+  strictly necessary session/CSRF cookies run without consent.
+
+  The choice is stored in a first-party cookie ("tgp_consent"), which is itself
+  strictly necessary for the consent function and therefore consent-free.
+  window.openCookieSettings() re-opens the banner so consent can be changed or
+  withdrawn at any time (e.g. from the footer link).
+
+  Self-contained: this single include replaces the old _clarity.html include and
+  the inline gtag.js block. Include it once in <head> on every public page.
+{% endcomment %}
+<script>
+(function () {
+  "use strict";
+
+  // --- Configuration -------------------------------------------------------
+  var COOKIE = "tgp_consent";
+  var VERSION = 1;                 // bump to re-ask everyone after policy changes
+  var MAX_AGE = 60 * 60 * 24 * 180; // remember the choice for 180 days
+  var CLARITY_ID = "xgtda52i1k";
+  var ADS_ID = "AW-18275409253";
+
+  var loaded = { statistics: false, marketing: false };
+
+  // --- Consent cookie ------------------------------------------------------
+  function readConsent() {
+    var m = document.cookie.match(/(?:^|;\s*)tgp_consent=([^;]+)/);
+    if (!m) return null;
+    try {
+      var c = JSON.parse(decodeURIComponent(m[1]));
+      if (!c || c.v !== VERSION) return null; // outdated → ask again
+      return c;
+    } catch (e) { return null; }
+  }
+
+  function writeConsent(statistics, marketing) {
+    var val = JSON.stringify({ v: VERSION, statistics: !!statistics, marketing: !!marketing });
+    var secure = location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = COOKIE + "=" + encodeURIComponent(val) +
+      "; Max-Age=" + MAX_AGE + "; Path=/; SameSite=Lax" + secure;
+  }
+
+  // --- Tracker loaders (only fire once, after consent) ---------------------
+  function loadClarity() {
+    if (loaded.statistics) return;
+    loaded.statistics = true;
+    (function (c, l, a, r, i, t, y) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+      t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
+      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+    })(window, document, "clarity", "script", CLARITY_ID);
+  }
+
+  function loadAds() {
+    if (loaded.marketing) return;
+    loaded.marketing = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + ADS_ID;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag("js", new Date());
+    window.gtag("config", ADS_ID);
+  }
+
+  function apply(consent) {
+    if (consent && consent.statistics) loadClarity();
+    if (consent && consent.marketing) loadAds();
+  }
+
+  // --- Banner UI -----------------------------------------------------------
+  var root = null;
+
+  function css() {
+    return "" +
+    "#tgp-consent{position:fixed;inset:auto 0 0 0;z-index:2147483000;display:flex;justify-content:center;padding:16px;font-family:var(--font-body,ui-sans-serif,system-ui,sans-serif)}" +
+    "#tgp-consent .tgp-card{background:#fbf8f1;color:#243528;border:1px solid rgba(36,53,40,0.16);border-radius:16px;box-shadow:0 24px 60px -20px rgba(36,53,40,0.45),0 6px 18px rgba(0,0,0,0.10);max-width:640px;width:100%;padding:22px 24px}" +
+    "#tgp-consent h2{font-family:var(--font-display,inherit);font-size:19px;font-weight:800;letter-spacing:-0.01em;margin:0 0 8px}" +
+    "#tgp-consent p{font-size:14px;line-height:1.6;color:#3a4a3d;margin:0 0 14px}" +
+    "#tgp-consent a{color:#309050;text-decoration:underline}" +
+    "#tgp-consent .tgp-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}" +
+    "#tgp-consent button{font:inherit;font-weight:600;font-size:14px;cursor:pointer;border-radius:999px;padding:11px 20px;border:1px solid transparent;transition:transform .12s ease,box-shadow .12s ease,background .12s ease}" +
+    "#tgp-consent button:hover{transform:translateY(-1px)}" +
+    "#tgp-consent .tgp-primary{background:linear-gradient(120deg,#4cb56b 0%,#309050 72%);color:#fff;box-shadow:0 12px 26px -10px rgba(48,144,80,0.6)}" +
+    "#tgp-consent .tgp-secondary{background:#fff;color:#243528;border-color:rgba(36,53,40,0.22)}" +
+    "#tgp-consent .tgp-secondary:hover{border-color:#309050;color:#309050}" +
+    "#tgp-consent .tgp-link{background:none;border:none;color:#6e7d6e;text-decoration:underline;padding:11px 8px;box-shadow:none}" +
+    "#tgp-consent .tgp-link:hover{color:#309050;transform:none}" +
+    "#tgp-consent .tgp-prefs{margin:4px 0 16px;border-top:1px solid rgba(36,53,40,0.12);padding-top:12px}" +
+    "#tgp-consent .tgp-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0}" +
+    "#tgp-consent .tgp-row label{font-size:14px;font-weight:600;color:#243528}" +
+    "#tgp-consent .tgp-row .tgp-desc{display:block;font-weight:400;font-size:13px;color:#6e7d6e;margin-top:2px}" +
+    "#tgp-consent input[type=checkbox]{margin-top:3px;width:18px;height:18px;accent-color:#309050;flex:none}" +
+    "#tgp-consent input[disabled]{opacity:.6}" +
+    "@media(max-width:520px){#tgp-consent .tgp-actions{flex-direction:column;align-items:stretch}#tgp-consent .tgp-actions button{width:100%}}";
+  }
+
+  function remove() { if (root) { root.remove(); root = null; } }
+
+  function build(existing) {
+    remove();
+    var stat = existing ? existing.statistics : false;
+    var mkt = existing ? existing.marketing : false;
+
+    root = document.createElement("div");
+    root.id = "tgp-consent";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-live", "polite");
+    root.setAttribute("aria-label", "Cookie-Einstellungen");
+
+    var style = document.createElement("style");
+    style.textContent = css();
+    root.appendChild(style);
+
+    root.innerHTML += "" +
+    "<div class='tgp-card'>" +
+      "<h2>Wir respektieren deine Privatsphäre</h2>" +
+      "<p>Für den Betrieb dieser Website verwenden wir nur technisch notwendige Cookies. " +
+      "Mit deiner Einwilligung nutzen wir zusätzlich Statistik- und Marketing-Dienste, um unser Angebot zu verbessern. " +
+      "Du kannst frei entscheiden und deine Wahl jederzeit widerrufen. Mehr dazu in der " +
+      "<a href='/datenschutz/'>Datenschutzerklärung</a>.</p>" +
+      "<div class='tgp-prefs' id='tgp-prefs' hidden>" +
+        "<div class='tgp-row'>" +
+          "<input type='checkbox' id='tgp-nec' checked disabled>" +
+          "<label for='tgp-nec'>Notwendig<span class='tgp-desc'>Anmeldung, Sicherheit (CSRF) und Sitzung. Immer aktiv.</span></label>" +
+        "</div>" +
+        "<div class='tgp-row'>" +
+          "<input type='checkbox' id='tgp-stat'" + (stat ? " checked" : "") + ">" +
+          "<label for='tgp-stat'>Statistik<span class='tgp-desc'>Microsoft Clarity — anonyme Nutzungsanalyse, um die Website zu verbessern.</span></label>" +
+        "</div>" +
+        "<div class='tgp-row'>" +
+          "<input type='checkbox' id='tgp-mkt'" + (mkt ? " checked" : "") + ">" +
+          "<label for='tgp-mkt'>Marketing<span class='tgp-desc'>Google Ads — Messung des Erfolgs unserer Anzeigen (Conversion-Tracking).</span></label>" +
+        "</div>" +
+      "</div>" +
+      "<div class='tgp-actions'>" +
+        "<button type='button' class='tgp-primary' id='tgp-accept'>Alle akzeptieren</button>" +
+        "<button type='button' class='tgp-secondary' id='tgp-reject'>Nur notwendige</button>" +
+        "<button type='button' class='tgp-link' id='tgp-toggle'>Einstellungen</button>" +
+        "<button type='button' class='tgp-secondary' id='tgp-save' hidden>Auswahl speichern</button>" +
+      "</div>" +
+    "</div>";
+
+    document.body.appendChild(root);
+
+    function finish(s, m) { writeConsent(s, m); apply({ statistics: s, marketing: m }); remove(); }
+
+    root.querySelector("#tgp-accept").onclick = function () { finish(true, true); };
+    root.querySelector("#tgp-reject").onclick = function () { finish(false, false); };
+    root.querySelector("#tgp-save").onclick = function () {
+      finish(root.querySelector("#tgp-stat").checked, root.querySelector("#tgp-mkt").checked);
+    };
+    root.querySelector("#tgp-toggle").onclick = function () {
+      var prefs = root.querySelector("#tgp-prefs");
+      var save = root.querySelector("#tgp-save");
+      var show = prefs.hasAttribute("hidden");
+      if (show) { prefs.removeAttribute("hidden"); save.removeAttribute("hidden"); this.textContent = "Weniger anzeigen"; }
+      else { prefs.setAttribute("hidden", ""); save.setAttribute("hidden", ""); this.textContent = "Einstellungen"; }
+    };
+  }
+
+  // Public: re-open the banner to change/withdraw consent (footer link etc.)
+  window.openCookieSettings = function () { build(readConsent()); };
+
+  // --- Boot ----------------------------------------------------------------
+  function boot() {
+    var consent = readConsent();
+    if (consent) { apply(consent); }   // already decided → load only what's allowed
+    else { build(null); }              // first visit → ask, load nothing yet
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
