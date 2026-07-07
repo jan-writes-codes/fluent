@@ -1,0 +1,81 @@
+{% extends "legal_base.html" %}
+{% block title %}Widerrufsbelehrung{% endblock %}
+{% block content %}
+<h1>Widerrufsbelehrung</h1>
+<p class="updated muted">Für Verbraucher:innen bei Fernabsatzverträgen · gemäß Fern- und Auswärtsgeschäfte-Gesetz (FAGG)</p>
+
+<div class="todo">
+  <strong>Rechtlicher Hinweis für den Betreiber:</strong> Diese Widerrufsbelehrung ist eine an den
+  tatsächlichen Ablauf angepasste Vorlage. Bitte vor dem Live-Betrieb rechtlich prüfen lassen und die
+  <span class="placeholder">markierten Angaben</span> (Widerrufsfrist-Beginn, Rückzahlungsweg,
+  Regelung zur vorzeitigen Leistungserbringung) verbindlich bestätigen.
+</div>
+
+<h2>Widerrufsrecht</h2>
+<p>
+  Du hast als Verbraucher:in das Recht, binnen <strong>vierzehn Tagen</strong> ohne Angabe von Gründen
+  diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des
+  Vertragsabschlusses (beim Kauf von Unterrichtseinheiten: ab dem Tag, an dem du die Einheiten
+  erworben hast).
+</p>
+<p>
+  Um dein Widerrufsrecht auszuüben, musst du uns
+</p>
+<p>
+  Davit Hovakimyan, Kraygasse 94/2/6, 1220 Wien, Österreich<br>
+  E-Mail: <a href="mailto:davit18h@gmail.com">davit18h@gmail.com</a> · Telefon: +43&nbsp;676&nbsp;397&nbsp;5535
+</p>
+<p>
+  mittels einer eindeutigen Erklärung (z.&nbsp;B. ein mit der Post versandter Brief oder eine E-Mail)
+  über deinen Entschluss, diesen Vertrag zu widerrufen, informieren. Du kannst dafür das unten stehende
+  Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist.
+</p>
+<p>
+  Zur Wahrung der Widerrufsfrist reicht es aus, dass du die Mitteilung über die Ausübung des
+  Widerrufsrechts vor Ablauf der Widerrufsfrist absendest.
+</p>
+
+<h2>Folgen des Widerrufs</h2>
+<p>
+  Wenn du diesen Vertrag widerrufst, haben wir dir alle Zahlungen, die wir von dir erhalten haben,
+  unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung
+  über deinen Widerruf dieses Vertrags bei uns eingegangen ist. Für diese Rückzahlung verwenden wir
+  dasselbe Zahlungsmittel, das du bei der ursprünglichen Transaktion eingesetzt hast, es sei denn, mit
+  dir wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden dir wegen dieser Rückzahlung
+  Entgelte berechnet.
+</p>
+
+<h2>Vorzeitige Erbringung der Dienstleistung</h2>
+<p>
+  Wünschst du, dass der Unterricht bzw. die Nutzung erworbener Einheiten schon <em>vor</em> Ablauf der
+  Widerrufsfrist beginnt, so bestätigst du dies vor Buchungsbeginn ausdrücklich. Hast du eine bereits
+  begonnene oder vollständig erbrachte Unterrichtseinheit ausdrücklich verlangt, so hast du bei einem
+  Widerruf einen den bereits erbrachten Leistungen entsprechenden anteiligen Betrag zu zahlen. Für
+  bereits vollständig erbrachte Unterrichtsleistungen, deren Ausführung mit deiner ausdrücklichen
+  Zustimmung vor Ablauf der Widerrufsfrist begonnen wurde, erlischt das Widerrufsrecht (§&nbsp;10,
+  §&nbsp;16 FAGG).
+</p>
+
+<h2>Muster-Widerrufsformular</h2>
+<p class="muted">(Wenn du den Vertrag widerrufen möchtest, kannst du dieses Formular ausfüllen und zurücksenden.)</p>
+<div style="border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:rgba(251,248,241,0.5);">
+  <p>An: Davit Hovakimyan, Kraygasse 94/2/6, 1220 Wien, davit18h@gmail.com</p>
+  <p>
+    Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der
+    folgenden Unterrichtseinheiten/Dienstleistung (*):
+  </p>
+  <p>_______________________________________________</p>
+  <p>Bestellt am (*) / erhalten am (*): _______________</p>
+  <p>Name der/des Verbraucher(s): _______________</p>
+  <p>Anschrift der/des Verbraucher(s): _______________</p>
+  <p>Datum: _______________</p>
+  <p>Unterschrift (nur bei Mitteilung auf Papier): _______________</p>
+  <p class="muted" style="font-size:13px;">(*) Unzutreffendes streichen.</p>
+</div>
+
+<p class="muted" style="margin-top:28px;font-size:14px;">
+  Siehe auch unsere <a href="{% url 'agb' %}">AGB</a>, das
+  <a href="{% url 'impressum' %}">Impressum</a> und die
+  <a href="{% url 'datenschutz' %}">Datenschutzerklärung</a>.
+</p>
+{% endblock %}

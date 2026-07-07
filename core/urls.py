@@ -8,6 +8,8 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('impressum/', views.impressum_view, name='impressum'),
     path('datenschutz/', views.datenschutz_view, name='datenschutz'),
+    path('agb/', views.agb_view, name='agb'),
+    path('widerruf/', views.widerruf_view, name='widerruf'),
     # Static FAQ page — pure content, so a TemplateView is enough (no view fn).
     path('faq/', TemplateView.as_view(template_name='faq.html'), name='faq'),
     path('intro/', views.intro_view, name='intro'),
