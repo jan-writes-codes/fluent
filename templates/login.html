@@ -143,7 +143,7 @@
   <div class="auth-screen">
     <!-- Sign-in -->
     <form class="auth-card" id="authForm" novalidate {% if mode and mode != 'login' %}hidden{% endif %}>
-      <div class="brand" href="/">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
       </a>
@@ -160,10 +160,10 @@
 
     <!-- Forgot password: request a reset link -->
     <form class="auth-card" id="forgotForm" novalidate hidden>
-      <div class="brand">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <h2 class="auth-h">Passwort vergessen?</h2>
       <p class="auth-sub">Gib deine E-Mail-Adresse ein — wir schicken dir einen Link, mit dem du ein neues Passwort festlegen kannst.</p>
       <div id="forgotFields">
@@ -178,10 +178,10 @@
 
     <!-- Set a new password: forced on first login (temp/admin-set password) or via reset link -->
     <form class="auth-card" id="setpassForm" novalidate {% if mode != 'force' and mode != 'reset' %}hidden{% endif %}>
-      <div class="brand">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <h2 class="auth-h">Neues Passwort festlegen</h2>
       <p class="auth-sub" id="setpassSub">{% if mode == 'reset' %}Wähle ein neues Passwort für dein Konto.{% else %}Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes.{% endif %}</p>
       <label class="field-label" style="text-align:left;">Neues Passwort</label>
@@ -195,10 +195,10 @@
 
     <!-- Reset link invalid or expired -->
     <div class="auth-card" id="invalidCard" {% if mode != 'reset_invalid' %}hidden{% endif %}>
-      <div class="brand">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <h2 class="auth-h">Link abgelaufen</h2>
       <p class="auth-sub">Dieser Link ist ungültig oder abgelaufen — er gilt 24 Stunden und kann nur einmal verwendet werden.</p>
       <button class="btn" type="button" id="requestNewLink"><span class="grainbtn"></span>Neuen Link anfordern</button>
@@ -207,10 +207,10 @@
 
     <!-- Password successfully reset -->
     <div class="auth-card" id="doneCard" hidden>
-      <div class="brand">
+      <a class="brand" href="/">
         <div class="mark"><img src="{% static 'pencil-mark.png' %}" alt="" /></div>
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
-      </div>
+      </a>
       <h2 class="auth-h">Passwort geändert</h2>
       <p class="auth-sub">Dein neues Passwort ist gespeichert. Du kannst dich jetzt damit anmelden.</p>
       <a class="btn" href="{% url 'login' %}" style="display:block;text-decoration:none;"><span class="grainbtn"></span>Zur Anmeldung</a>
