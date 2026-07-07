@@ -26,6 +26,11 @@ class User(AbstractUser):
     # (/calendar/<token>.ics). Empty until the tutor first opens the
     # "Kalender abonnieren" dialog; rotating it revokes every old feed URL.
     calendar_token = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    # True while the account still runs on a password somebody *else* knows —
+    # the temp password from account creation, or one an admin typed in later.
+    # The login flow forces the user to pick their own password before they can
+    # reach the app; self-set passwords (forced change, e-mail reset) clear it.
+    must_change_password = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'core_user'

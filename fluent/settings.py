@@ -77,6 +77,10 @@ DATABASES = {
 
 AUTH_USER_MODEL = 'core.User'
 LOGIN_URL = '/login/'
+# "Passwort vergessen" reset links expire after 24 hours (the e-mail copy
+# promises exactly that). Django's default of 3 days is longer than a link
+# that lands in a mailbox needs to live.
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 # --- Stripe payments (optional) ---------------------------------------------
 # Self-service credit top-ups go through Stripe Checkout when a secret key is

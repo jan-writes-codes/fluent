@@ -504,6 +504,16 @@ class AdminUserManagementTests(FluentDataMixin, TestCase):
         )
         self.assertEqual(login.status_code, 200)
         self.assertEqual(login.json()["role"], "student")
+        # The admin-set password is a handed-over secret: the first login must
+        # replace it with an own one before the app opens.
+        self.assertTrue(login.json()["mustChangePassword"])
+        self.assertEqual(fresh.get(reverse("app")).headers["Location"], reverse("login"))
+        resp = fresh.post(
+            "/api/password/change/",
+            data=json.dumps({"password": "mein-eigenes-1"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
         self.assertEqual(fresh.get(reverse("app")).status_code, 200)
 
     def test_billing_name_change_updates_initials(self):
@@ -2733,3 +2743,200 @@ class RetroactiveCancelTests(FluentDataMixin, TestCase):
         self.assertFalse(resp.json()["refunded"])
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.credits, before)
+
+
+# --------------------------------------------------------------------------- #
+# Password lifecycle: forced first-login change + "Passwort vergessen" reset
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,  # send inline so mail.outbox is populated deterministically
+)
+class PasswordLifecycleTests(FluentDataMixin, TestCase):
+    RESET_LINK_RE = re.compile(r"/password/reset/([^/\s]+)/([^/\s]+)/")
+
+    def _json_post(self, url, payload):
+        return self.client.post(url, data=json.dumps(payload), content_type="application/json")
+
+    def _login(self, email, password):
+        return self._json_post("/api/login/", {"email": email, "password": password})
+
+    # ---- forced change on first login ------------------------------------- #
+
+    def test_admin_created_account_must_change_password(self):
+        self.client.force_login(self.admin)
+        resp = self._json_post("/api/users/", {"role": "student", "name": "Nino Neu"})
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        new_user = User.objects.get(slug=payload["slug"])
+        self.assertTrue(new_user.must_change_password)
+
+        # First login with the temp password announces the forced step ...
+        fresh = Client()
+        resp = fresh.post(
+            "/api/login/",
+            data=json.dumps({"email": new_user.email, "password": payload["tempPassword"]}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["mustChangePassword"])
+        # ... and the app stays locked behind it (bounced to the login page,
+        # which renders the set-password card for the signed-in user).
+        self.assertEqual(fresh.get(reverse("app")).headers["Location"], reverse("login"))
+        page = fresh.get(reverse("login"))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Neues Passwort festlegen")
+
+    def test_admin_password_overwrite_forces_change(self):
+        # Same process as a fresh account: an admin-typed password is a
+        # handed-over secret and must be replaced on next login.
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            f"/api/users/{self.maya.slug}/",
+            data=json.dumps({"password": "handed-over-secret"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertTrue(self.maya.must_change_password)
+
+    def test_admin_changing_own_password_is_not_flagged(self):
+        self.client.force_login(self.admin)
+        resp = self.client.put(
+            f"/api/users/{self.admin.slug}/",
+            data=json.dumps({"password": "my-own-choice-1"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.must_change_password)
+        # The admin picked it themselves — their session survives the change.
+        self.assertEqual(self.client.get(reverse("app")).status_code, 200)
+
+    def test_forced_change_unlocks_app_and_clears_flag(self):
+        self.maya.must_change_password = True
+        self.maya.save()
+        resp = self._login("maya@fluent.at", "password")
+        self.assertTrue(resp.json()["mustChangePassword"])
+        resp = self._json_post("/api/password/change/", {"password": "brand-new-pass"})
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertFalse(self.maya.must_change_password)
+        self.assertTrue(self.maya.check_password("brand-new-pass"))
+        # Same session keeps working (update_session_auth_hash) — no re-login.
+        self.assertEqual(self.client.get(reverse("app")).status_code, 200)
+
+    def test_change_password_validation(self):
+        self.client.force_login(self.maya)
+        for bad in ("short7!", "123456789"):
+            resp = self._json_post("/api/password/change/", {"password": bad})
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("Passwort", resp.json()["error"])
+
+    def test_change_password_requires_auth(self):
+        resp = self._json_post("/api/password/change/", {"password": "brand-new-pass"})
+        self.assertEqual(resp.status_code, 401)
+
+    def test_forced_change_sends_changed_notice_to_real_email(self):
+        from django.core import mail
+        self.maya.email = "maya@example.com"
+        self.maya.must_change_password = True
+        self.maya.save()
+        self._login("maya@example.com", "password")
+        self._json_post("/api/password/change/", {"password": "brand-new-pass"})
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, ["maya@example.com"])
+        self.assertIn("geändert", msg.subject)
+        self.assertIn("davit@thegreenpencil.at", msg.body)
+
+    # ---- "Passwort vergessen" --------------------------------------------- #
+
+    def test_login_page_offers_forgot_password(self):
+        resp = self.client.get(reverse("login"))
+        self.assertContains(resp, "Passwort vergessen?")
+
+    def test_forgot_mails_a_reset_link(self):
+        from django.core import mail
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        resp = self._json_post("/api/password/forgot/", {"email": "MAYA@example.com"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertEqual(msg.to, ["maya@example.com"])
+        m = self.RESET_LINK_RE.search(msg.body)
+        self.assertIsNotNone(m, "reset link missing from mail body")
+        # The e-mailed link renders the set-password form.
+        page = self.client.get(f"/password/reset/{m.group(1)}/{m.group(2)}/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Neues Passwort festlegen")
+
+    def test_forgot_is_silent_for_unknown_email(self):
+        # Same 200 as for a known address — no account enumeration.
+        from django.core import mail
+        resp = self._json_post("/api/password/forgot/", {"email": "ghost@example.com"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json(), {"ok": True})
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_forgot_never_mails_the_placeholder_address(self):
+        # Fresh accounts carry the auto-generated <slug>@fluent.at address until
+        # the admin sets the real one; nobody reads that mailbox.
+        from django.core import mail
+        resp = self._json_post("/api/password/forgot/", {"email": "maya@fluent.at"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_reset_flow_end_to_end(self):
+        from django.core import mail
+        self.maya.email = "maya@example.com"
+        self.maya.must_change_password = True  # e.g. forgot the admin-set password
+        self.maya.save()
+        self._json_post("/api/password/forgot/", {"email": "maya@example.com"})
+        uid, token = self.RESET_LINK_RE.search(mail.outbox[0].body).groups()
+        mail.outbox = []
+
+        resp = self._json_post(
+            "/api/password/reset/",
+            {"uid": uid, "token": token, "password": "fresh-own-pass"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertTrue(self.maya.check_password("fresh-own-pass"))
+        # A self-set password also lifts a pending forced change.
+        self.assertFalse(self.maya.must_change_password)
+        # Confirmation notice with the "that wasn't me" escalation contact.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("davit@thegreenpencil.at", mail.outbox[0].body)
+        # The link is single-use: the password change invalidated the token.
+        resp = self._json_post(
+            "/api/password/reset/",
+            {"uid": uid, "token": token, "password": "another-pass-x"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        page = self.client.get(f"/password/reset/{uid}/{token}/")
+        self.assertContains(page, "Link abgelaufen")
+        # And the new password signs in normally.
+        resp = self._login("maya@example.com", "fresh-own-pass")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["mustChangePassword"])
+
+    def test_reset_api_rejects_bad_token(self):
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+        uid = urlsafe_base64_encode(force_bytes(self.maya.pk))
+        resp = self._json_post(
+            "/api/password/reset/",
+            {"uid": uid, "token": "not-a-token", "password": "fresh-own-pass"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.maya.refresh_from_db()
+        self.assertTrue(self.maya.check_password("password"))
+
+    def test_reset_page_with_garbage_link_shows_expired(self):
+        page = self.client.get("/password/reset/xxxx/yyyy/")
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Link abgelaufen")

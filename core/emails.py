@@ -18,7 +18,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .models import Booking
+from .models import Booking, User
 
 logger = logging.getLogger(__name__)
 
@@ -470,6 +470,69 @@ def send_storno_notifications(receipt_id):
              f"Der Storno-Beleg <strong>{receipt.number}</strong> vom {receipt.date_str} ist als PDF angehängt."],
             pdf, pdf_name,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Password reset / change
+# --------------------------------------------------------------------------- #
+# Where a user turns when a "your password was changed" notice wasn't them.
+SECURITY_CONTACT = "davit@thegreenpencil.at"
+
+
+def _account_ctx(user):
+    name = user.get_full_name() or user.username
+    return {
+        "user_first": (name or "").split(" ")[0] or "du",
+        "user_email": user.email,
+        "site_url": settings.SITE_URL,
+        "security_contact": SECURITY_CONTACT,
+    }
+
+
+def _account_email(user):
+    """The address account mail may go to — or '' when none is on file yet.
+    Fresh accounts carry the auto-generated `<slug>@fluent.at` placeholder until
+    the admin enters the real address; mailing that would only bounce."""
+    email = (user.email or "").strip()
+    if not email or email.lower() == f"{user.slug}@fluent.at".lower():
+        return ""
+    return email
+
+
+def send_password_reset(user_id, reset_url):
+    """The 'Passwort vergessen' mail with the tokenized reset link."""
+    user = User.objects.filter(pk=user_id).first()
+    if not user:
+        return
+    to = _account_email(user)
+    if not to:
+        return
+    ctx = _account_ctx(user)
+    ctx["reset_url"] = reset_url
+    msg = _message(
+        "Passwort zurücksetzen · The Green Pencil", to,
+        render_to_string("email/password_reset.txt", ctx),
+        render_to_string("email/password_reset.html", ctx),
+    )
+    msg.send()
+
+
+def send_password_changed(user_id):
+    """Confirmation that the password was changed — with a 'that wasn't me'
+    escalation path, so a hijacked account gets noticed."""
+    user = User.objects.filter(pk=user_id).first()
+    if not user:
+        return
+    to = _account_email(user)
+    if not to:
+        return
+    ctx = _account_ctx(user)
+    msg = _message(
+        "Dein Passwort wurde geändert · The Green Pencil", to,
+        render_to_string("email/password_changed.txt", ctx),
+        render_to_string("email/password_changed.html", ctx),
+    )
+    msg.send()
 
 
 # --------------------------------------------------------------------------- #

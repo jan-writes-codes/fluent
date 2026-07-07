@@ -22,6 +22,12 @@ urlpatterns = [
     path('api/intro-bookings/', views.api_intro_booking),
     path('api/login/', views.api_login),
     path('api/logout/', views.api_logout),
+    # Password lifecycle: forced first-login change, and the e-mailed
+    # "Passwort vergessen" reset link (page + submit endpoint).
+    path('api/password/change/', views.api_change_password),
+    path('api/password/forgot/', views.api_password_forgot),
+    path('api/password/reset/', views.api_password_reset),
+    path('password/reset/<str:uidb64>/<str:token>/', views.password_reset_view, name='password_reset'),
     path('api/bookings/', views.api_bookings),
     path('api/bookings/<int:pk>/', views.api_booking_detail),
     path('api/credits/<str:slug>/', views.api_credits),
