@@ -187,12 +187,13 @@
     background: radial-gradient(125% 95% at 50% 0%, transparent 60%, rgba(31,60,34,0.15) 100%); }
   /* The field is fixed, so its dark bottom (vignette edge + the two green
      bottom blobs) parks on the same screen region at every scroll position.
-     On a tall, narrow phone that murks the lower half of every screenful —
-     soften it there; desktop keeps the full depth cue. */
+     On a phone that permanently darkens the lower half of every screenful —
+     and iOS Safari's frosted bottom toolbar only blends away over a LIGHT
+     page, so any dark zone down there makes the system bar read as a pale
+     box sitting on the content. Kill the dark bottom entirely on phones
+     (the top blobs keep the brand tint); desktop keeps the full depth cue. */
   @media (max-width: 720px) {
-    .vignette { background: radial-gradient(125% 95% at 50% 0%, transparent 72%, rgba(31,60,34,0.06) 100%); }
-    .blob.b3 { opacity: 0.26; }
-    .blob.b4 { opacity: 0.22; }
+    .vignette, .blob.b3, .blob.b4 { display: none; }
   }
 
   /* All content (incl. the sticky header) lives in .page, so sideways
