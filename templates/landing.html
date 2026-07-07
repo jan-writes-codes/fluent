@@ -135,23 +135,19 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   /* Root background so Safari fills the safe-area / overscroll strips in the
      page colour rather than white.
-     Horizontal clipping must use `clip`, not `hidden`: `overflow-x: hidden`
-     on the root forces overflow-y into `auto`, which turns <html> into a
-     scroll container — iOS Safari then stops extending the page under the
-     status bar / home indicator (despite viewport-fit=cover) and paints those
-     strips in the flat root colour, visibly seamed against the tinted page.
-     `clip` cuts sideways overflow without creating a scroll container, so the
-     document stays the root scroller and content runs edge-to-edge. The
-     `hidden` line before it is the fallback for pre-16 Safari. */
-  html { scroll-behavior: smooth; overflow-x: hidden; overflow-x: clip; background: var(--bg); }
+     No overflow property on html/body — anything non-visible here (hidden OR
+     clip) breaks iOS Safari's edge-to-edge rendering: `hidden` demotes the
+     root scroller so the page stops extending under the status bar / home
+     indicator, and `clip` on the root garbles the sticky header's compositing
+     (an opaque band where scrolled content should show through the glass).
+     Sideways clipping lives on .page instead. */
+  html { scroll-behavior: smooth; background: var(--bg); }
   body {
     font-family: var(--font-body);
     background: var(--bg);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     line-height: 1.6;
-    overflow-x: hidden;
-    overflow-x: clip;
   }
 
   /* ---------- Ambient grainy gradient field ---------- */
@@ -190,7 +186,17 @@
   .vignette { position: absolute; inset: 0; z-index: 1; pointer-events: none;
     background: radial-gradient(125% 95% at 50% 0%, transparent 60%, rgba(31,60,34,0.15) 100%); }
 
-  .page { position: relative; z-index: 2; }
+  /* All content (incl. the sticky header) lives in .page, so sideways
+     overflow (nav row on tablets, buttons on very small phones) is clipped
+     here — NOT on html/body, where any non-visible overflow breaks iOS
+     Safari's edge-to-edge rendering (see the html/body comment above).
+     `clip` doesn't create a scroll container, so the sticky header keeps
+     sticking to the viewport. Engines without `clip` (pre-16 Safari) fall
+     back to the old root-level `hidden` and its known seams. */
+  .page { position: relative; z-index: 2; overflow-x: clip; }
+  @supports not (overflow-x: clip) {
+    html, body { overflow-x: hidden; }
+  }
   .wrap { width: 100%; max-width: 1060px; margin: 0 auto; padding: 0 28px; }
 
   /* ---------- Header ---------- */
