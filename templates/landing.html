@@ -271,7 +271,9 @@
      brand). The room comes out of the gutters, gaps, buttons and a slightly
      smaller wordmark instead. */
   @media (max-width: 600px) {
-    .top .wrap { padding: 0 12px; }
+    /* Side padding only — the `padding` shorthand would zero the .top-in
+       vertical padding and collapse the bar's height. */
+    .top .wrap { padding-left: 12px; padding-right: 12px; }
     .top-in { gap: 6px; }
     .top-nav { gap: 6px; }
     .brand { gap: 8px; }
@@ -285,7 +287,7 @@
      and CTA — drop it there (login stays reachable via the CTA flow and
      /login/ directly). The logo mark still never changes. */
   @media (max-width: 374px) {
-    .top .wrap { padding: 0 10px; }
+    .top .wrap { padding-left: 10px; padding-right: 10px; }
     .top .btn.btn-icon { display: none; }
     .top .btn { padding: 9px 10px; }
   }
