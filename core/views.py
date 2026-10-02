@@ -704,9 +704,12 @@ def landing_view(request):
             "price": p.get("price", ""),
             "per_unit": per_unit,
             "feat": is_popular,
-            "tag": "Beliebt" if is_popular else "",
+            "tag": "Beliebteste Wahl" if is_popular else "",
         })
-    return render(request, "landing.html", {"packs": packs})
+    # The popular pack's per-unit price is the headline figure in the pricing
+    # copy — it's what nearly every student actually pays.
+    featured = next((p for p in packs if p["feat"] and p["per_unit"]), None)
+    return render(request, "landing.html", {"packs": packs, "featured": featured})
 
 
 def login_view(request):
