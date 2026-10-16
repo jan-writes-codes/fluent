@@ -291,6 +291,11 @@ setTimeout(() => {
       const rows = [...root().querySelectorAll(".st-row")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
       const timeline = [...document.querySelectorAll("#studentModal .lesson-hist .li")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
       const stats = [...document.querySelectorAll(isStudent ? "#myProgress .pf-stat" : "#studentModal .pf-stat")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
+      const charts = [...document.querySelectorAll(isStudent ? "#myProgress .pf-chart" : "#studentModal .pf-chart")].map((c) => ({
+        title: c.querySelector("h4").textContent, svg: !!c.querySelector("svg"),
+        tips: [...c.querySelectorAll("title")].map((t) => t.textContent) }));
+      const week = { total: $("#rosterWeek") ? $("#rosterWeek").textContent : "",
+        perStudent: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-week .rc-num") && r.querySelector(".rc-week .rc-num").textContent]) };
       root().querySelector("#testAdd").click();
       setTimeout(() => {
         const r = root();
@@ -301,7 +306,7 @@ setTimeout(() => {
         setTimeout(() => {
           const post = apiCalls.find((c) => c.url.endsWith("/api/school-tests/") && c.method === "POST");
           const after = [...root().querySelectorAll(".st-row")].map((x) => x.textContent.replace(/\s+/g, " ").trim());
-          finish({ schoolTests: { rows, timeline, stats, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
+          finish({ schoolTests: { rows, timeline, stats, charts, week, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
         }, 80);
       }, 40);
     }, 80);

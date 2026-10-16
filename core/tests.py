@@ -4302,3 +4302,25 @@ class EnglishSiteTests(FluentDataMixin, TestCase):
         self.assertIn("<loc>http://testserver/en/faq/</loc>", body)
         self.assertIn("<loc>http://testserver/faq/</loc>", body)
         self.assertIn('hreflang="en"', body)
+
+
+class ProgressChartDomTests(_DomProbeBase):
+    def test_progress_charts_and_lessons_per_week(self):
+        today = timezone.localdate()
+        for days in (6, 13, 20, 27):  # one lesson a week for four weeks
+            Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=days), time="09:00")
+        b = Booking.objects.filter(student=self.maya).first()
+        ErrorCard.objects.create(student=self.maya, booking=b, front="He go.", back="He goes.")
+        SchoolTest.objects.create(student=self.maya, date=today - timedelta(days=2), grade=3, topic="Unit 2")
+        r = self.run_probe(self.davit, school_tests=True)
+        self.assertEqual(r["initErrors"], [])
+        st = r["schoolTests"]
+        self.assertEqual([c["title"] for c in st["charts"]], ["Stunden pro Monat", "Fehler über die Zeit", "Noten"])
+        self.assertTrue(all(c["svg"] for c in st["charts"]))
+        self.assertTrue(any("Note 3" in t for t in st["charts"][2]["tips"]))
+        per = dict(st["week"]["perStudent"])
+        self.assertEqual(per["Maya Karlsson"], "1")
+        self.assertIn("Stunden pro Woche", st["week"]["total"])
+        # The student sees the same charts on their own page.
+        mine = self.run_probe(self.maya, school_tests=True)["schoolTests"]["charts"]
+        self.assertEqual(len(mine), 3)
