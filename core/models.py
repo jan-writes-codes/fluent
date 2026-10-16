@@ -504,6 +504,14 @@ class SessionExercise(models.Model):
     description = models.TextField(blank=True)
     link = models.URLField(max_length=500, blank=True)
     done = models.BooleanField(default=False)
+    # The result the tutor gives: ``score_right`` of ``score_total`` correct, on
+    # a CEFR sublevel (A1.1 … C1.2) and in one skill area. Feeds the student's
+    # level-adjusted progress charts. Empty until scored.
+    SUBLEVELS = ['A1.1', 'A1.2', 'A2.1', 'A2.2', 'B1.1', 'B1.2', 'B2.1', 'B2.2', 'C1.1', 'C1.2']
+    score_right = models.PositiveSmallIntegerField(null=True, blank=True)
+    score_total = models.PositiveSmallIntegerField(null=True, blank=True)
+    level = models.CharField(max_length=4, blank=True)
+    skill = models.CharField(max_length=10, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

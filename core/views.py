@@ -161,7 +161,35 @@ SESSION_PREFETCH = (
 
 
 def serialize_exercise(e):
-    return {"id": e.pk, "title": e.title, "description": e.description, "link": e.link, "done": e.done}
+    return {"id": e.pk, "title": e.title, "description": e.description, "link": e.link, "done": e.done,
+            "right": e.score_right, "total": e.score_total, "level": e.level, "skill": e.skill}
+
+
+EXERCISE_SKILLS = {k for k, _ in CurriculumTopic.SKILL_CHOICES}
+
+
+def _apply_exercise_score(e, data):
+    """Copy the result fields present in ``data`` onto ``e``; ValueError on bad
+    input. ``right``/``total`` go together; null clears the score."""
+    if "right" in data or "total" in data:
+        right, total = data.get("right", e.score_right), data.get("total", e.score_total)
+        if right is None and total is None:
+            e.score_right = e.score_total = None
+        else:
+            ok = all(isinstance(v, int) and not isinstance(v, bool) for v in (right, total))
+            if not ok or not (1 <= total <= 999 and 0 <= right <= total):
+                raise ValueError("Ergebnis: richtig muss zwischen 0 und der Gesamtzahl liegen.")
+            e.score_right, e.score_total = right, total
+    if "level" in data:
+        level = data["level"] or ""
+        if level and level not in SessionExercise.SUBLEVELS:
+            raise ValueError("unknown level")
+        e.level = level
+    if "skill" in data:
+        skill = data["skill"] or ""
+        if skill and skill not in EXERCISE_SKILLS:
+            raise ValueError("unknown skill")
+        e.skill = skill
 
 
 def serialize_session_file(f):
@@ -1813,9 +1841,14 @@ def api_session_exercises(request, pk):
     link = str(data.get("link") or "").strip()[:500]
     if link and not re.match(r"^https?://", link):
         return JsonResponse({"error": "Link muss mit http(s):// beginnen."}, status=400)
-    e = SessionExercise.objects.create(
+    e = SessionExercise(
         booking=b, title=title, description=str(data.get("description") or "")[:3000], link=link,
     )
+    try:
+        _apply_exercise_score(e, data)
+    except ValueError as err:
+        return JsonResponse({"error": str(err)}, status=400)
+    e.save()
     return JsonResponse({"exercise": serialize_exercise(e)})
 
 
@@ -1848,6 +1881,10 @@ def api_session_exercise_detail(request, ex_id):
             if link and not re.match(r"^https?://", link):
                 return JsonResponse({"error": "Link muss mit http(s):// beginnen."}, status=400)
             e.link = link
+        try:
+            _apply_exercise_score(e, data)
+        except ValueError as err:
+            return JsonResponse({"error": str(err)}, status=400)
     e.save()
     return JsonResponse({"exercise": serialize_exercise(e)})
 

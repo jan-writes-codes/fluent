@@ -4352,7 +4352,10 @@ class ProgressChartDomTests(_DomProbeBase):
         r = self.run_probe(self.davit, school_tests=True)
         self.assertEqual(r["initErrors"], [])
         st = r["schoolTests"]
-        self.assertEqual([c["title"] for c in st["charts"]], ["Stunden pro Monat", "Fehler über die Zeit", "Noten"])
+        self.assertEqual([c["title"] for c in st["charts"]],
+                         ["Niveau über die Zeit", "Niveau je Bereich", "Stunden pro Monat", "Fehler über die Zeit", "Noten"])
+        self.assertFalse(st["charts"][0]["svg"])  # no scored exercises yet
+        st["charts"] = st["charts"][2:]
         self.assertTrue(all(c["svg"] for c in st["charts"]))
         self.assertTrue(any("Note 3" in t for t in st["charts"][2]["tips"]))
         per = dict(st["week"]["perStudent"])
@@ -4362,6 +4365,62 @@ class ProgressChartDomTests(_DomProbeBase):
         # The student sees the same charts on their own page.
         mine = self.run_probe(self.maya, school_tests=True)["schoolTests"]["charts"]
         self.assertEqual(len(mine), 3)
+
+
+class LevelProgressDomTests(_DomProbeBase):
+    def test_level_charts_detail_and_student_view(self):
+        today = timezone.localdate()
+        scores = [(60, "B1.1", 7, 10, "grammar"), (40, "B1.1", 8, 10, "reading"),
+                  (20, "B1.2", 5, 10, "grammar"), (5, "B1.2", 8, 10, "reading")]
+        for days, lv, right, total, skill in scores:
+            b = Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=days), time="09:00")
+            SessionExercise.objects.create(booking=b, title=f"Ex {lv} {skill}", score_right=right, score_total=total,
+                                           level=lv, skill=skill)
+        r = self.run_probe(self.davit, school_tests=True)
+        self.assertEqual(r["initErrors"], [])
+        st = r["schoolTests"]
+        a, c = st["charts"][0], st["charts"][1]
+        self.assertTrue(a["svg"] and c["svg"])
+        self.assertTrue(any("5/10 auf B1.2" in t for t in a["tips"]))
+        d = st["detail"]
+        self.assertFalse(d["hidden"])
+        self.assertEqual(d["title"], "Niveau über die Zeit")
+        self.assertEqual(len(d["table"]), 4)
+        self.assertIn("8/10", d["table"][0])  # newest first
+        self.assertEqual(d["grammarRows"], 2)
+        self.assertEqual((d["skillTitle"], d["skillBars"]), ("Niveau je Bereich", 2))
+        way = self.run_probe(self.maya, school_tests=True)["schoolTests"]["way"]
+        self.assertIn("Dein Weg durch B1.2", way[0])
+        self.assertIn("65 %", way[0])  # average of the two B1.2 results
+        self.assertIn("5 von 10 Stufen geschafft", way[0])
+        self.assertIn("BewerteteÜbungeninsgesamt4", way[1].replace(" ", ""))
+
+
+class ExerciseScoreApiTests(FluentDataMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.b = Booking.objects.create(student=self.maya, tutor=self.davit, date=timezone.localdate(), time="09:00")
+        self.ex = SessionExercise.objects.create(booking=self.b, title="Unit 1")
+
+    def _put(self, body, actor=None):
+        self.client.force_login(actor or self.davit)
+        return self.client.put(f"/api/exercises/{self.ex.id}/", data=json.dumps(body), content_type="application/json")
+
+    def test_tutor_scores_exercise(self):
+        r = self._put({"right": 7, "total": 10, "level": "B1.2", "skill": "grammar"})
+        self.assertEqual(r.status_code, 200)
+        e = r.json()["exercise"]
+        self.assertEqual((e["right"], e["total"], e["level"], e["skill"]), (7, 10, "B1.2", "grammar"))
+        r = self._put({"right": None, "total": None})
+        self.assertEqual((r.json()["exercise"]["right"], r.json()["exercise"]["level"]), (None, "B1.2"))
+
+    def test_validation_and_student(self):
+        for bad in ({"right": 11, "total": 10}, {"right": -1, "total": 10}, {"right": 1, "total": 0},
+                    {"right": 1}, {"right": "3", "total": 5}, {"level": "B3"}, {"skill": "dance"}):
+            self.assertEqual(self._put(bad).status_code, 400, bad)
+        self._put({"right": 3, "total": 5}, actor=self.maya)
+        self.ex.refresh_from_db()
+        self.assertIsNone(self.ex.score_right)
 
 
 class WeeklyLessonsTests(FluentDataMixin, TestCase):

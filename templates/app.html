@@ -391,6 +391,58 @@
   .rc-week-in { width: 68px; padding: 6px 8px; text-align: right; flex-shrink: 0; }
   .roster-week { font-size: 13px; color: var(--muted); margin: 0 2px 10px; }
   .roster-week b { color: var(--ink); }
+  .sx-score { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 7px; font-size: 12px; color: var(--muted); }
+  .sx-score .bf-input { padding: 4px 6px; font-size: 12.5px; width: 46px; text-align: center; }
+  .sx-score select.bf-input { width: auto; text-align: left; }
+  .sx-score .pct { font-family: var(--font-display); font-weight: 800; font-size: 14px; color: var(--ink); min-width: 38px; }
+  .sx-score-ro { margin-top: 5px; font-size: 12px; color: var(--muted); }
+  .sx-score-ro b { color: var(--ink); }
+  .pf-chart.open { cursor: pointer; transition: border-color .15s; }
+  .pf-chart.open:hover { border-color: color-mix(in oklch, var(--c1) 50%, transparent); }
+  .pf-chart .more { font-size: 12px; color: var(--c1); font-weight: 600; margin-top: 4px; }
+  .modal-card.pf-detail { width: min(980px, 100%); max-height: calc(100vh - 32px); }
+  @media (max-width: 600px){ .modal-card.pf-detail { padding: 20px 16px; } .pd-kpi .n { font-size: 18px; } }
+  .pf-detail .pd-head { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; margin-right: 40px; }
+  .pf-detail h2 { font-family: var(--font-display); font-size: 22px; margin: 2px 0 0; }
+  .pd-kpis { display: flex; gap: 22px; flex-wrap: wrap; }
+  .pd-kpi .n { font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .pd-kpi .l { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .pd-filters { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
+  .pd-seg { display: inline-flex; background: var(--bg); border-radius: 10px; padding: 3px; border: 1px solid var(--line-2); }
+  .pd-seg button, .pd-chips button { font: inherit; font-size: 12.5px; cursor: pointer; }
+  .pd-seg button { border: 0; background: transparent; color: var(--muted); padding: 5px 12px; border-radius: 8px; }
+  .pd-seg button[aria-pressed="true"] { background: var(--bg-2); color: var(--ink); font-weight: 600; }
+  .pd-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pd-chips button { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+  .pd-chips button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .pd-box { position: relative; }
+  .pd-box svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .pd-box svg text { font-family: var(--font-body); fill: var(--muted); font-size: 11px; }
+  .pd-box svg text.v { fill: var(--ink); font-weight: 700; }
+  .pd-tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 7px 10px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 2; }
+  .pd-tbl { overflow-x: auto; margin-top: 14px; }
+  .pd-tbl table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pd-tbl th { text-align: left; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .pd-tbl td { padding: 7px 8px; border-bottom: 1px solid var(--line-2); }
+  .pd-tbl .r { text-align: right; }
+  .pd-lvl { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; color: #fff; }
+  .pd-bar { height: 6px; border-radius: 3px; background: var(--bg); min-width: 60px; overflow: hidden; }
+  .pd-bar i { display: block; height: 100%; background: var(--c1); border-radius: 3px; }
+  .stu-way { padding: 16px 18px; }
+  .stu-way .track { position: relative; height: 14px; border-radius: 7px; background: var(--bg); margin: 28px 0 6px; }
+  .stu-way .track i { position: absolute; inset: 0 auto 0 0; border-radius: 7px; background: var(--c1); }
+  .stu-way .track b { position: absolute; top: -24px; transform: translateX(-50%); font-family: var(--font-display); font-size: 15px; white-space: nowrap; }
+  .stu-way .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .stu-way .gain { font-size: 13px; color: var(--c3); font-weight: 600; margin-top: 8px; }
+  .journey { display: flex; gap: 4px; margin-top: 14px; }
+  .journey span { flex: 1; height: 8px; border-radius: 4px; background: var(--bg); }
+  .journey span.done { background: #519f6b; }
+  .journey span.now { background: var(--c1); outline: 2px solid var(--c1); outline-offset: 2px; }
+  .journey-l { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-top: 6px; gap: 8px; }
+  .stu-wins { padding: 14px 18px; display: grid; gap: 8px; }
+  .stu-wins .win { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; border-bottom: 1px solid var(--line-2); padding-bottom: 6px; }
+  .stu-wins .win:last-child { border-bottom: 0; padding-bottom: 0; }
+  .stu-wins .win b { font-family: var(--font-display); font-size: 16px; font-variant-numeric: tabular-nums; }
   .pf-sum { font-size: 13px; color: var(--muted); margin-top: 3px; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .tl-test { background: color-mix(in oklch, var(--c2, #d0925a) 9%, transparent); border-radius: 10px; }
   .lh-pill.done { color: var(--good); border-color: color-mix(in oklch, var(--good) 35%, transparent); background: color-mix(in oklch, var(--good) 9%, transparent); }
@@ -3244,6 +3296,7 @@
         <div class="st-cols"><div class="st-col-main">
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Fortschritt</h2></div>
         ${progressStatsHtml(s.id)}
+        ${levelChartsHtml(s.id)}
         ${progressChartsHtml(s.id)}
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Schularbeiten &amp; Tests</h2></div>
         <div id="modalTests">${schoolTestsHtml(s.id)}</div>
@@ -3275,6 +3328,7 @@
     $("#studentModal").querySelectorAll("[data-session]").forEach(btn=> btn.onclick=()=>openSession(+btn.dataset.session));
     $("#maddCustom").onclick=()=>openCustomTopUp(s, true);
     bindSchoolTests($("#modalTests"), s.id, renderStudentModal);
+    bindLevelCharts($("#studentModal"), s.id);
     const tlAll=$("#tlAll"); if(tlAll) tlAll.onclick=()=>{ state.timelineAll=true; renderStudentModal(); };
     const settleLinkBtn = $("#settleLinkBtn");
     if (settleLinkBtn) settleLinkBtn.onclick = () => {
@@ -4171,7 +4225,7 @@
 
   // ----- Stunden list (student) -----
   function renderLessonHistory(){
-    const pg=$("#myProgress"); if(pg) pg.innerHTML=progressStatsHtml(state.currentUser) + progressChartsHtml(state.currentUser);
+    const pg=$("#myProgress"); if(pg) pg.innerHTML=progressStatsHtml(state.currentUser) + studentWayHtml(state.currentUser) + progressChartsHtml(state.currentUser);
     const tl=$("#myTests"); if(tl){ tl.innerHTML=schoolTestsHtml(state.currentUser); bindSchoolTests(tl, state.currentUser, renderLessonHistory); }
     const el=$("#lessonHistory"); if(!el) return;
     const mine = state.bookings
@@ -4663,7 +4717,7 @@
     } else if(sx.tab==="ex"){
       body=`<div class="sx-list">${ex.length ? ex.map(e=>`<div class="sx-ex ${e.done?"done":""}">
           <input type="checkbox" data-exdone="${e.id}" ${e.done?"checked":""} aria-label="Erledigt">
-          <div class="sx-it"><div class="t">${esc(e.title)}</div>${e.description ? `<div class="n">${esc(e.description)}</div>` : ""}${e.link ? `<a class="lnk" href="${esc(e.link)}" target="_blank" rel="noopener">Link öffnen ↗</a>` : ""}</div>
+          <div class="sx-it"><div class="t">${esc(e.title)}</div>${e.description ? `<div class="n">${esc(e.description)}</div>` : ""}${e.link ? `<a class="lnk" href="${esc(e.link)}" target="_blank" rel="noopener">Link öffnen ↗</a>` : ""}${exScoreHtml(e, tutor, b)}</div>
           ${tutor ? `<button class="sx-x" data-delex="${e.id}" title="Löschen" aria-label="Löschen">×</button>` : ""}
         </div>`).join("") : `<div class="sx-empty">${tutor ? "Noch keine Übungen. Was habt ihr gemacht, was ist noch offen?" : "Keine Übungen zu dieser Stunde."}</div>`}</div>
         ${tutor ? `<form class="sx-add one" id="sxExAdd"><input class="bf-input" id="exTitle" placeholder="z. B. Unit 7, Ex 2 (S. 1)" aria-label="Übung"><button class="sx-add-btn" type="submit" aria-label="Hinzufügen">+</button></form>
@@ -4718,6 +4772,7 @@
       };
     }
     // Exercises
+    side.querySelectorAll("[data-exscore]").forEach(row=> bindExScore(row, ex.find(x=>x.id===+row.dataset.exscore), ()=>renderSidePanel(b, sx)));
     side.querySelectorAll("[data-exdone]").forEach(cb=> cb.onchange=async ()=>{
       const id=+cb.dataset.exdone, r=await apiResult('PUT', `/api/exercises/${id}/`, { done: cb.checked });
       if(!r.ok){ toast("Speichern fehlgeschlagen"); cb.checked=!cb.checked; return; }
@@ -5054,6 +5109,180 @@
       ${chartCard("Fehler über die Zeit", "insgesamt gefunden und gemeistert", cardLinesSvg(sid), legend)}
       ${chartCard("Noten", "Schularbeiten und Tests · 1 = Sehr gut", gradesSvg(sid))}
     </div>`;
+  }
+
+  // ---------- Level-adjusted progress from exercise results ----------
+  // Each scored exercise sits on a CEFR sublevel (A1.1 … C1.2, two steps per
+  // level). Its value on that scale is step index + share correct, so 80 % on
+  // B1.2 lies 80 % of the way from B1.2 to B2.1.
+  const SUBLEVELS = ["A1.1","A1.2","A2.1","A2.2","B1.1","B1.2","B2.1","B2.2","C1.1","C1.2"], MAIN_LV = ["A1","A2","B1","B2","C1"];
+  const LV_COLORS = ["#a9d2b4", "#7dbb8e", "#4f9e68", "#2c7a48", "#17502c"];  // ordered: one hue, light to dark
+  const lvColor = i => LV_COLORS[Math.floor(i/2)];
+  const skillName = id => (SKILLS.find(k=>k.id===id) || {}).t || "";
+  const lvTxt = v => { const i=Math.max(0, Math.min(9, Math.floor(v))); return `${SUBLEVELS[i]} · ${Math.round((v-i)*100)} %`; };
+  function scoredResults(sid){
+    const out=[];
+    state.bookings.filter(b=>b.studentId===sid && !b.isIntro && b._pk && b.status!=="requested").forEach(b=>{
+      (b.exercises||[]).forEach(e=>{
+        const lv=SUBLEVELS.indexOf(e.level);
+        if(e.total && e.right!=null && lv>=0) out.push({ d:b.date, at:bookingStart(b).getTime()+e.id, t:e.title, sk:e.skill, lv, r:e.right, n:e.total, p:e.right/e.total, v:lv+e.right/e.total, pk:b._pk });
+      });
+    });
+    return out.sort((a,b)=>a.at-b.at);
+  }
+  const avgOf = (a, key) => a.reduce((x, r)=>x+r[key], 0)/a.length;
+  // The level a student's exercises are usually scored at: the latest one.
+  function lastLevel(sid){ const rs=scoredResults(sid); return rs.length ? SUBLEVELS[rs[rs.length-1].lv] : ""; }
+
+  // Score inputs on the lesson page (tutor) or the read-only result (student).
+  function exScoreHtml(e, tutor, b){
+    const pct = e.total && e.right!=null ? Math.round(e.right/e.total*100) + " %" : "";
+    if(!tutor) return e.total && e.right!=null ? `<div class="sx-score-ro"><b>${e.right}/${e.total}</b> richtig · ${pct}${e.level ? ` · ${e.level}` : ""}${e.skill ? ` · ${esc(skillName(e.skill))}` : ""}</div>` : "";
+    const lvDefault = e.level || (b && b.studentId ? lastLevel(b.studentId) : "");
+    return `<div class="sx-score" data-exscore="${e.id}">
+      <input class="bf-input" data-f="right" inputmode="numeric" value="${e.right ?? ""}" placeholder="?" aria-label="Richtig">
+      <span>von</span><input class="bf-input" data-f="total" inputmode="numeric" value="${e.total ?? ""}" placeholder="?" aria-label="Aufgaben gesamt">
+      <select class="bf-input" data-f="level" aria-label="Niveau"><option value="">Niveau</option>${SUBLEVELS.map(l=>`<option ${l===lvDefault?"selected":""}>${l}</option>`).join("")}</select>
+      <select class="bf-input" data-f="skill" aria-label="Bereich"><option value="">Bereich</option>${SKILLS.map(k=>`<option value="${k.id}" ${k.id===e.skill?"selected":""}>${k.t}</option>`).join("")}</select>
+      <span class="pct">${pct}</span></div>`;
+  }
+  function bindExScore(row, e, rerender){
+    if(!row || !e) return;
+    const val=f=>row.querySelector(`[data-f="${f}"]`).value.trim();
+    row.querySelectorAll("input,select").forEach(el=> el.onchange=async ()=>{
+      const r=val("right"), n=val("total");
+      const body={ level: val("level"), skill: val("skill") };
+      if(r==="" && n==="") { body.right=null; body.total=null; }
+      else if(r!=="" && n!=="") { body.right=parseInt(r, 10); body.total=parseInt(n, 10); }
+      else { if(el.dataset.f==="level"||el.dataset.f==="skill") delete body.right; else return; }   // wait for the other number
+      const res=await apiResult('PUT', `/api/exercises/${e.id}/`, body);
+      if(!res.ok){ toast((res.data && res.data.error) || "Speichern fehlgeschlagen"); return; }
+      Object.assign(e, res.data.exercise); rerender(); toast("Ergebnis gespeichert");
+    });
+  }
+
+  // Chart A: the level line through the sublevels (3-result moving average,
+  // single results as rings). Chart C: current level per skill area.
+  function levelLineSvg(rows, f, big){
+    const t0=Math.min(...rows.map(r=>+r.d)), t1=Math.max(NOW.getTime(), t0+86400000);
+    const x=t=>f.l+(t-t0)/(t1-t0)*f.iw;
+    const lo=Math.max(0, Math.floor(Math.min(...rows.map(r=>r.v)))), hi=Math.min(10, Math.max(lo+1, Math.ceil(Math.max(...rows.map(r=>r.v)))));
+    const y=v=>f.t+f.ih-(v-lo)/(hi-lo)*f.ih;
+    let s="";
+    for(let i=lo; i<hi; i++) s+=`<rect x="${f.l}" y="${y(i+1)}" width="${f.iw}" height="${y(i)-y(i+1)}" fill="${lvColor(i)}" opacity="${i%2 ? 0.28 : 0.15}"/><text x="${f.l-6}" y="${(y(i)+y(i+1))/2+3.5}" text-anchor="end">${SUBLEVELS[i]}</text>`;
+    const avg=rows.map((r, i)=>{ const w=rows.slice(Math.max(0, i-2), i+1); return [x(+r.d), y(avgOf(w, "v"))]; });
+    if(avg.length>1) s+=`<path d="${avg.map((p, i)=>(i?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="${CH_GREEN}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    s+=rows.map((r, i)=>`<circle cx="${x(+r.d)}" cy="${y(r.v)}" r="${big?4.5:3}" fill="var(--bg-2)" stroke="${CH_GREEN}" stroke-width="2" data-i="${i}"><title>${fmtAT(r.d)} · ${esc(r.t)}: ${r.r}/${r.n} auf ${SUBLEVELS[r.lv]}</title></circle>`).join("");
+    const e=avg[avg.length-1];
+    s+=`<circle cx="${e[0]}" cy="${e[1]}" r="5" fill="${CH_GREEN}" stroke="var(--bg-2)" stroke-width="2"/>`;
+    if(big) s+=`<text class="v" x="${e[0]+9}" y="${e[1]+4}">${lvTxt(avgOf(rows.slice(-3), "v"))}</text>`;
+    s+=`<text x="${f.l}" y="${f.H-5}">${fmtAT(new Date(t0)).slice(0,6)}</text><text x="${f.l+f.iw}" y="${f.H-5}" text-anchor="end">heute</text>`;
+    return s;
+  }
+  function skillNow(rows){
+    return SKILLS.map(k=>{ const rs=rows.filter(r=>r.sk===k.id).slice(-3); return { id:k.id, t:k.t, v: rs.length ? avgOf(rs, "v") : null, n: rs.length }; }).filter(x=>x.v!=null);
+  }
+  function skillBarsSvg(rows, f, big){
+    const now=skillNow(rows), x=v=>f.l+v/10*f.iw, rowH=f.ih/Math.max(1, now.length), bh=Math.min(big?18:12, rowH*0.6);
+    let s=[...Array(11)].map((_, i)=>`<line x1="${x(i)}" x2="${x(i)}" y1="${f.t}" y2="${f.t+f.ih}" stroke="${i%2 ? "var(--line-2)" : "var(--line)"}" stroke-width="1"/>` + (i<10 && i%2===0 ? `<text x="${x(i+1)}" y="${f.H-4}" text-anchor="middle">${MAIN_LV[i/2]}</text>` : "")).join("");
+    s+=now.map((k, i)=>{ const cy=f.t+rowH*i+rowH/2, w=Math.max(2, x(k.v)-f.l), rad=Math.min(4, w);
+      return `<text x="${f.l-8}" y="${cy+3.5}" text-anchor="end">${big ? k.t : k.t.replace("Language in Use", "LiU")}</text>
+        <path fill="${lvColor(Math.min(9, Math.floor(k.v)))}" d="M${f.l},${cy-bh/2} H${f.l+w-rad} Q${f.l+w},${cy-bh/2} ${f.l+w},${cy-bh/2+rad} V${cy+bh/2-rad} Q${f.l+w},${cy+bh/2} ${f.l+w-rad},${cy+bh/2} H${f.l} Z" data-k="${i}"><title>${k.t}: ${lvTxt(k.v)} (letzte ${k.n} Ergebnisse)</title></path>
+        ${big ? `<text class="v" x="${f.l+w+6}" y="${cy+3.5}">${lvTxt(k.v)}</text>` : ""}`; }).join("");
+    return s;
+  }
+  function levelChartsHtml(sid){
+    const rows=scoredResults(sid);
+    const empty=`<div class="empty">Noch keine bewerteten Übungen. Trag auf der Seite einer Stunde bei einer Übung ein, wie viel richtig war.</div>`;
+    const f={ ...CH, l:36, r:12 }; f.iw=f.w-f.l-f.r; f.ih=f.h-f.t-f.b; f.W=f.w; f.H=f.h;
+    const fc={ ...CH, l:46, r:12, t:6, b:16 }; fc.iw=fc.w-fc.l-fc.r; fc.ih=fc.h-fc.t-fc.b; fc.W=fc.w; fc.H=fc.h;
+    const a = rows.length ? `<svg viewBox="0 0 ${f.W} ${f.H}" role="img" aria-label="Niveau über die Zeit">${levelLineSvg(rows, f, false)}</svg>` : empty;
+    const c = rows.length ? `<svg viewBox="0 0 ${fc.W} ${fc.H}" role="img" aria-label="Niveau je Bereich">${skillBarsSvg(rows, fc, false)}</svg>` : empty;
+    const now = rows.length ? lvTxt(avgOf(rows.slice(-3), "v")) : "";
+    const card=(k, title, sub, body)=>`<div class="panel pf-chart${rows.length ? " open" : ""}" ${rows.length ? `data-pfopen="${k}" role="button" tabindex="0"` : ""}><h4>${title}</h4><div class="sub2">${sub}</div>${body}${rows.length ? `<div class="more">Groß ansehen →</div>` : ""}</div>`;
+    return `<div class="pf-charts">${card("a", "Niveau über die Zeit", now ? `jetzt ${now}` : "aus den Übungs-Ergebnissen", a)}${card("c", "Niveau je Bereich", "Schnitt der letzten 3 Ergebnisse", c)}</div>`;
+  }
+  function bindLevelCharts(root, sid){
+    if(!root) return;
+    root.querySelectorAll("[data-pfopen]").forEach(el=>{
+      const go=()=>openProgressDetail(sid, el.dataset.pfopen);
+      el.onclick=go; el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+    });
+  }
+
+  // The opened chart: bigger, with a time range, a skill filter (A) and every result as a table.
+  function openProgressDetail(sid, kind){
+    const st={ kind, range:6, skill:"" }, m=$("#lessonModal"), s=studentById(sid);
+    const draw=()=>{
+      let rows=scoredResults(sid).filter(r=> st.range>=99 || +r.d >= NOW.getTime()-st.range*30.5*86400000);
+      if(st.kind==="a" && st.skill) rows=rows.filter(r=>r.sk===st.skill);
+      const box=$("#pdBox"), W=Math.max(320, Math.min(920, (box && box.clientWidth) || 900));
+      const f = st.kind==="a" ? { W, H:300, l:40, r:80, t:12, b:22 } : { W, H:260, l:120, r:80, t:8, b:20 };
+      f.iw=f.W-f.l-f.r; f.ih=f.H-f.t-f.b;
+      const svg = rows.length ? `<svg viewBox="0 0 ${f.W} ${f.H}" role="img" aria-label="${st.kind==="a" ? "Niveau über die Zeit" : "Niveau je Bereich"}">${st.kind==="a" ? levelLineSvg(rows, f, true) : skillBarsSvg(rows, f, true)}</svg>` : `<div class="empty-list" style="padding:40px 0;">Keine Ergebnisse in diesem Zeitraum.</div>`;
+      const kpis = rows.length ? (()=>{ const last=avgOf(rows.slice(-3), "v"), first=avgOf(rows.slice(0, 3), "v"), d=Math.round((last-first)*100)/100;
+        return `<div class="pd-kpi"><div class="n">${lvTxt(last)}</div><div class="l">Stand jetzt</div></div>
+          <div class="pd-kpi"><div class="n">${d>=0?"+":""}${fmtNum(d)}</div><div class="l">Stufen im Zeitraum</div></div>
+          <div class="pd-kpi"><div class="n">${Math.round(avgOf(rows, "p")*100)} %</div><div class="l">richtig im Schnitt · ${rows.length} Übungen</div></div>`; })() : "";
+      m.innerHTML=`<div class="modal-card pf-detail" id="pdCard"><button class="modal-x" id="pdX" aria-label="Schließen">×</button>
+        <div class="pd-head"><div><div class="micro" style="margin:0;text-align:left;">${esc(s ? s.name : "")} · Fortschritt</div><h2>${st.kind==="a" ? "Niveau über die Zeit" : "Niveau je Bereich"}</h2></div><div class="pd-kpis">${kpis}</div></div>
+        <div class="pd-filters">
+          <div class="pd-seg" role="group" aria-label="Zeitraum">${[[3,"3 Monate"],[6,"6 Monate"],[12,"1 Jahr"],[99,"Alles"]].map(([v, l])=>`<button data-r="${v}" aria-pressed="${st.range===v}">${l}</button>`).join("")}</div>
+          <div class="pd-seg" role="group" aria-label="Ansicht"><button data-k="a" aria-pressed="${st.kind==="a"}">Über die Zeit</button><button data-k="c" aria-pressed="${st.kind==="c"}">Je Bereich</button></div>
+        </div>
+        ${st.kind==="a" ? `<div class="pd-chips" role="group" aria-label="Bereich">${[["", "Alle"], ...SKILLS.map(k=>[k.id, k.t])].map(([id, t])=>`<button data-s="${id}" aria-pressed="${st.skill===id}">${t}</button>`).join("")}</div>` : ""}
+        <div class="pd-box" id="pdBox" style="margin-top:12px;">${svg}<div class="pd-tip" id="pdTip" hidden></div></div>
+        <div class="pf-legend">${st.kind==="a" ? `<span><i style="background:${CH_GREEN}"></i>Schnitt der letzten 3 Ergebnisse</span><span>○ einzelnes Ergebnis</span>` : `<span>Balken = Schnitt der letzten 3 Ergebnisse im Bereich, Farbe = Niveau</span>`}</div>
+        <div class="pd-tbl"><table><thead><tr><th>Datum</th><th>Übung</th><th>Bereich</th><th>Niveau</th><th class="r">Richtig</th><th>Anteil</th></tr></thead><tbody>
+          ${rows.slice().reverse().map(r=>`<tr data-pd-session="${r.pk}" style="cursor:pointer;"><td>${fmtAT(r.d)}</td><td>${esc(r.t)}</td><td>${esc(skillName(r.sk))}</td><td><span class="pd-lvl" style="background:${lvColor(r.lv)};${r.lv<4?"color:var(--ink);":""}">${SUBLEVELS[r.lv]}</span></td><td class="r">${r.r}/${r.n}</td><td><div class="pd-bar"><i style="width:${Math.round(r.p*100)}%"></i></div></td></tr>`).join("")}
+        </tbody></table></div></div>`;
+      m.hidden=false;
+      $("#pdCard").onclick=e=>e.stopPropagation();
+      $("#pdX").onclick=closeLessonModal;
+      m.querySelectorAll("[data-r]").forEach(b=> b.onclick=()=>{ st.range=+b.dataset.r; draw(); });
+      m.querySelectorAll("[data-k]").forEach(b=> b.onclick=()=>{ st.kind=b.dataset.k; draw(); });
+      m.querySelectorAll("[data-s]").forEach(b=> b.onclick=()=>{ st.skill=b.dataset.s; draw(); });
+      m.querySelectorAll("[data-pd-session]").forEach(tr=> tr.onclick=()=>{ closeLessonModal(); openSession(+tr.dataset.pdSession); });
+      const tip=$("#pdTip"), bx=$("#pdBox");
+      bx.querySelectorAll("circle[data-i] , path[data-k]").forEach(el=>{
+        const t=el.querySelector("title"); if(!t) return; const text=t.textContent; t.remove();
+        el.addEventListener("mouseenter", ()=>{ const bb=el.getBoundingClientRect(), ob=bx.getBoundingClientRect(); tip.textContent=text; tip.hidden=false; const hw=tip.offsetWidth/2;
+          tip.style.left=Math.max(hw, Math.min(ob.width-hw, bb.left-ob.left+bb.width/2))+"px"; tip.style.top=(bb.top-ob.top)+"px"; });
+        el.addEventListener("mouseleave", ()=>{ tip.hidden=true; });
+      });
+      // Draw at the box's real width so labels stay readable on a phone.
+      if(Math.abs(bx.clientWidth-W)>40 && !st.sized){ st.sized=true; draw(); } else st.sized=false;
+    };
+    draw();
+  }
+
+  // For the student: progress inside the step they're on (a step takes about
+  // half a year, so a level line would look flat) and what keeps growing.
+  function studentWayHtml(sid){
+    const rows=scoredResults(sid);
+    const cards=state.errorCards.filter(c=>c.studentId===sid), monthAgo=NOW.getTime()-30*86400000;
+    const day=s=>s ? new Date(s+"T00:00:00").getTime() : 0;
+    const ex30=state.bookings.filter(b=>b.studentId===sid && b._pk && bookingStart(b).getTime()>=monthAgo && lessonEnded(b)).reduce((n, b)=>n+(b.exercises||[]).length, 0);
+    const mastered30=cards.filter(c=>cardKind(c)==="error" && day(c.mastered)>=monthAgo).length;
+    const words30=cards.filter(c=>cardKind(c)==="vocab" && day(c.created)>=monthAgo).length;
+    let way="", best="";
+    if(rows.length){
+      const cur=rows[rows.length-1].lv, at=rows.filter(r=>r.lv===cur), nowP=avgOf(at.slice(-3), "p"), pct=Math.round(nowP*100);
+      const before=at.filter(r=>+r.d<monthAgo), gain=before.length ? Math.round((nowP-avgOf(before.slice(-3), "p"))*100) : null;
+      way=`<div class="panel stu-way"><h4 style="margin:0;font-size:14px;">Dein Weg durch ${SUBLEVELS[cur]}</h4>
+        <div class="track" role="img" aria-label="${pct} Prozent von ${SUBLEVELS[cur]}"><i style="width:${pct}%"></i><b style="left:${Math.min(94, Math.max(6, pct))}%">${pct} %</b></div>
+        <div class="ends"><span>${SUBLEVELS[cur]}</span><span>${SUBLEVELS[cur+1] || "Ziel"}</span></div>
+        ${gain!=null && gain>0 ? `<div class="gain">+${gain} % seit letztem Monat</div>` : `<div class="gain">Ab 70 % sitzt ${SUBLEVELS[cur]}.</div>`}
+        <div class="journey" aria-label="Alle Stufen">${SUBLEVELS.map((l, i)=>`<span class="${i<cur?"done":i===cur?"now":""}" title="${l}"></span>`).join("")}</div>
+        <div class="journey-l"><span>A1.1</span><span>${cur} von 10 Stufen geschafft</span><span>C1.2</span></div></div>`;
+      const top=SKILLS.filter(k=>{ const rs=rows.filter(r=>r.sk===k.id && r.lv===cur); if(rs.length<2) return false; const b=rs.reduce((a, r)=>r.p>a.p?r:a); return +b.d>=NOW.getTime()-45*86400000; }).map(k=>k.t);
+      best=top.join(", ");
+    }
+    const win=(l, n)=>`<div class="win"><span>${l}</span><b>${n}</b></div>`;
+    const wins=`<div class="panel stu-wins"><h4 style="margin:0 0 2px;font-size:14px;">Das hast du geschafft</h4>
+      ${win("Übungen in den letzten 30 Tagen", ex30)}${win("Fehler gemeistert in 30 Tagen", mastered30)}${win("Neue Wörter in 30 Tagen", words30)}
+      ${best ? win("Neuer Bestwert", `<span style="font-size:13px;">${esc(best)}</span>`) : ""}${win("Bewertete Übungen insgesamt", rows.length)}</div>`;
+    return `<div class="pf-charts">${way}${wins}</div>`;
   }
 
   // Lessons per week: set by hand per student (not computed from bookings),

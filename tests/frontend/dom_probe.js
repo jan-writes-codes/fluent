@@ -296,6 +296,22 @@ setTimeout(() => {
         tips: [...c.querySelectorAll("title")].map((t) => t.textContent) }));
       const week = { total: $("#rosterWeek") ? $("#rosterWeek").textContent : "",
         perStudent: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-week .rc-num") && r.querySelector(".rc-week .rc-num").textContent]) };
+      const way = isStudent ? [...document.querySelectorAll("#myProgress .stu-way, #myProgress .stu-wins")].map((x) => x.textContent.replace(/\s+/g, " ").trim()) : [];
+      let detail = null;
+      const opener = !isStudent && document.querySelector('#studentModal [data-pfopen="a"]');
+      if (opener) {
+        opener.click();
+        const m = $("#lessonModal");
+        detail = { hidden: m.hidden, title: m.querySelector("h2") && m.querySelector("h2").textContent,
+          kpis: [...m.querySelectorAll(".pd-kpi")].map((k) => k.textContent.replace(/\s+/g, " ").trim()),
+          table: [...m.querySelectorAll(".pd-tbl tbody tr")].map((t) => t.textContent.replace(/\s+/g, " ").trim()) };
+        const chip = m.querySelector('[data-s="grammar"]'); if (chip) chip.click();
+        detail.grammarRows = m.querySelectorAll(".pd-tbl tbody tr").length;
+        const kc = m.querySelector('[data-k="c"]'); if (kc) kc.click();
+        detail.skillTitle = m.querySelector("h2").textContent;
+        detail.skillBars = [...m.querySelectorAll("#pdBox path[data-k]")].length;
+        document.querySelector("#pdX").click();
+      }
       root().querySelector("#testAdd").click();
       setTimeout(() => {
         const r = root();
@@ -306,7 +322,7 @@ setTimeout(() => {
         setTimeout(() => {
           const post = apiCalls.find((c) => c.url.endsWith("/api/school-tests/") && c.method === "POST");
           const after = [...root().querySelectorAll(".st-row")].map((x) => x.textContent.replace(/\s+/g, " ").trim());
-          finish({ schoolTests: { rows, timeline, stats, charts, week, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
+          finish({ schoolTests: { rows, timeline, stats, charts, week, way, detail, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
         }, 80);
       }, 40);
     }, 80);
