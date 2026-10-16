@@ -3087,6 +3087,25 @@ class CalendarFeedTests(FluentDataMixin, TestCase):
         resp = self.client.get(f"/calendar/{self.davit.calendar_token}.ics")
         self.assertEqual(resp.status_code, 200)
 
+    def test_feed_lines_are_folded_to_75_octets(self):
+        # RFC 5545 caps content lines at 75 octets; stricter clients (Outlook,
+        # Google) reject or truncate a feed whose long notes run past that.
+        Booking.objects.create(
+            tutor=self.davit, student=self.maya, date=date.today() + timedelta(days=2),
+            time="10:00", title="Englisch",
+            notes="Übung: " + "Präpositionen, Zeitformen; " * 8 + "\r\nZweite Zeile",
+            call_link="https://zoom.us/j/123456789?pwd=" + "x" * 60,
+        )
+        self._mint_link()
+        self.davit.refresh_from_db()
+        body = self.client.get(f"/calendar/{self.davit.calendar_token}.ics").content
+        self.assertTrue(body.endswith(b"\r\n"))
+        lines = body.split(b"\r\n")
+        self.assertTrue(all(len(l) <= 75 for l in lines))
+        unfolded = body.replace(b"\r\n ", b"").decode()
+        self.assertIn("\\nZweite Zeile", unfolded)  # CRLF in notes stays one escaped break
+        self.assertIn("URL:https://zoom.us/j/123456789?pwd=" + "x" * 60, unfolded)
+
 
 # --------------------------------------------------------------------------- #
 # Retroactive cancellation of completed ("Abgeschlossene") lessons

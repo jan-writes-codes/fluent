@@ -2113,10 +2113,14 @@
   // The real, tokenized feed URL is minted server-side on first use (POST so
   // the unguessable token only exists once the tutor actually asks for it).
   let calFeed = null;  // {url, webcalUrl} — cached after the first fetch
+  let calFeedLoading = false;  // repeated clicks while the server wakes up mint nothing twice
   async function openCalSync(){
     if(!calFeed){
-      calFeed = await api('POST', '/api/calendar-link/', {});
-      if(!calFeed || !calFeed.url){ calFeed=null; toast("Kalender-Link konnte nicht geladen werden"); return; }
+      if(calFeedLoading) return;
+      calFeedLoading = true;
+      toast("Kalender-Link wird geladen …");
+      try { calFeed = await api('POST', '/api/calendar-link/', {}); } finally { calFeedLoading = false; }
+      if(!calFeed || !calFeed.url){ calFeed=null; toast("Kalender-Link konnte nicht geladen werden. Bitte versuch es gleich noch einmal."); return; }
     }
     const m=$("#buyModal");
     const gcal="https://calendar.google.com/calendar/render?cid="+encodeURIComponent(calFeed.webcalUrl);

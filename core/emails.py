@@ -19,7 +19,7 @@ from django.utils import timezone
 from django.utils.translation import get_language
 
 from . import video
-from .ical import ics_escape
+from .ical import ics_escape, ics_join
 from .models import Booking, Receipt, User
 
 logger = logging.getLogger(__name__)
@@ -106,14 +106,13 @@ def build_ics(booking, lang="de"):
     # The video-call link (auto-created via the tutor's Zoom/Teams account, or
     # hand-pasted) belongs where calendars actually show it: LOCATION + URL.
     if booking.call_link:
-        lines += [f"LOCATION:{ics_escape(booking.call_link)}", f"URL:{ics_escape(booking.call_link)}"]
+        lines += [f"LOCATION:{ics_escape(booking.call_link)}", f"URL:{booking.call_link}"]
     lines += [
         "STATUS:CONFIRMED",
         "END:VEVENT",
         "END:VCALENDAR",
     ]
-    # iCalendar lines are CRLF-terminated.
-    return "\r\n".join(lines) + "\r\n"
+    return ics_join(lines)
 
 
 # --------------------------------------------------------------------------- #
