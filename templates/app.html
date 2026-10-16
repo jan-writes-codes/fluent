@@ -589,6 +589,7 @@
   .deck-tabs button.on { background: #fbf8f1; color: var(--ink); box-shadow: 0 1px 4px rgba(31,60,34,0.12); }
   .deck-tabs .c { font-size: 11.5px; background: rgba(36,53,40,0.08); border-radius: 6px; padding: 1px 6px; margin-left: 6px; }
   .deck-bar .btn { width: auto; margin: 0; padding: 9px 18px; }
+  .deck-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 
   /* ---------- Learning files ---------- */
   .lvl-sec { margin-top: 26px; }
@@ -4683,14 +4684,16 @@
     const hero = !mine.length ? "" : open.length
       ? `<div class="panel train-hero"><div><div class="n">${open.length} ${open.length===1?"Karte":"Karten"} offen</div><div class="l">${[oe ? `${oe} Fehler` : "", ov ? `${ov} ${ov===1?"Wort":"Wörter"}` : ""].filter(Boolean).join(" · ")} · gemischt üben</div></div><button class="btn" data-practice="all"><span class="grainbtn"></span>Jetzt üben →</button></div>`
       : `<div class="panel train-hero"><div><div class="n">Alles gemeistert</div><div class="l">Neue Karten kommen aus deinen nächsten Stunden.</div></div></div>`;
-    const kOpen=openOf(kind).length;
+    const kOpen=openOf(kind).length, kAll=deck(kind).length;
     const nt=testsFor(state.currentUser).filter(t=>daysUntil(t.date)>=0).sort((a,b)=>a.date-b.date)[0], nd=nt ? daysUntil(nt.date) : 99;
     const soon = nd<=14 ? `<div class="micro" style="text-align:left;margin:12px 2px 0;">📝 ${esc(TEST_KINDS[nt.kind]||"Test")} ${nd===0?"heute":nd===1?"morgen":`in ${nd} Tagen`}${nt.topic ? ` · ${esc(nt.topic)}` : ""}${open.length ? ". Ein guter Moment, deine offenen Karten zu üben." : ""}</div>` : "";
     el.innerHTML = hero + soon + `<div class="deck-bar"><div class="deck-tabs" role="tablist">${["error","vocab"].map(k=>`<button role="tab" aria-selected="${k===kind}" class="${k===kind?"on":""}" data-deck="${k}">${DECKS[k].title}${openOf(k).length ? `<span class="c">${openOf(k).length}</span>` : ""}</button>`).join("")}</div>
-        ${kOpen ? `<button class="btn ghost" data-practice="${kind}">Nur ${kind==="vocab" ? "Wörter" : "Fehler"} üben · ${kOpen}</button>` : ""}</div>`
+        <div class="deck-acts">${kOpen ? `<button class="btn ghost" data-practice="${kind}">Nur ${kind==="vocab" ? "Wörter" : "Fehler"} üben · ${kOpen}</button>` : ""}${kAll>kOpen ? `<button class="btn ghost" data-practice="${kind}-all">Alle wiederholen · ${kAll}</button>` : ""}</div></div>`
       + deckHtml(kind, deck(kind));
     el.querySelectorAll("[data-deck]").forEach(t=> t.onclick=()=>{ state.trainTab=t.dataset.deck; renderErrors(); });
-    el.querySelectorAll("[data-practice]").forEach(btn=> btn.onclick=()=>openFlashcards(btn.dataset.practice==="all" ? open : openOf(btn.dataset.practice), "practice"));
+    el.querySelectorAll("[data-practice]").forEach(btn=> btn.onclick=()=>{ const v=btn.dataset.practice;
+      // "<deck>-all" also brings back mastered cards; practice never saves, so nothing reopens.
+      openFlashcards(v==="all" ? open : v.endsWith("-all") ? deck(v.slice(0,-4)) : openOf(v), "practice"); });
     el.querySelectorAll("[data-gosession]").forEach(a=> a.onclick=(e)=>{ e.preventDefault(); openSession(+a.dataset.gosession); });
   }
 
