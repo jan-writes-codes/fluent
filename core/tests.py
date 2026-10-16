@@ -469,6 +469,35 @@ class BookingPersistenceTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Booking.objects.filter(student=self.maya, time="15:00").exists())
 
+    def test_backdated_lesson_sends_no_emails(self):
+        # A "nachgetragene" lesson already happened: no booking confirmation with
+        # a cancel link for the student and no notice for the tutor.
+        from django.core import mail
+        from django.utils import timezone
+        self.maya.email = "maya@example.com"; self.maya.save()
+        self.davit.email = "davit@example.com"; self.davit.save()
+        self.client.force_login(self.davit)
+        mail.outbox.clear()
+        d = (timezone.localdate() - timedelta(days=2)).isoformat()
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        # A future booking by the tutor still confirms to both.
+        d = (timezone.localdate() + timedelta(days=2)).isoformat()
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+
     def test_tutor_backdate_beyond_30_days_is_rejected(self):
         from django.utils import timezone
         d = (timezone.localdate() - timedelta(days=40)).isoformat()

@@ -889,6 +889,25 @@
   .slot .ts-time { font-size: 12.5px; font-weight: 600; }
   .slot .ts-add { font-size: 10.5px; color: var(--faint); letter-spacing: 0.01em; }
   .slot.t-open:hover .ts-add { color: var(--c1); }
+  .slot.t-open.t-past { border-style: dashed; background: transparent; opacity: 0.75; }
+  .slot.t-open.t-past:hover { opacity: 1; }
+  /* Stunden nachtragen: one row per lesson */
+  .bd-card { width: min(560px, 100%); }
+  .bd-head, .bd-row { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1.25fr) minmax(0,0.75fr) 28px; gap: 8px; text-align: left; }
+  .bd-head { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+  .bd-head span:last-child { grid-column: span 2; }
+  #bdRows { display: flex; flex-direction: column; gap: 8px; }
+  .bd-row .bf-input { padding: 9px 10px; font-size: 13.5px; min-width: 0; }
+  .bd-row.bad .bf-input { border-color: color-mix(in oklch, #c0532f 55%, transparent); }
+  .bd-x { border: 0; background: transparent; color: var(--faint); font-size: 18px; cursor: pointer; border-radius: 8px; }
+  .bd-x:hover { color: #a23a22; background: rgba(192,83,47,0.08); }
+  .bd-err { grid-column: 1 / -1; font-size: 12px; color: #a23a22; margin-top: -2px; }
+  .bd-more { display: block; margin: 10px 0 6px; border: 0; background: transparent; color: var(--c1); font-family: var(--font-body); font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 4px 0; }
+  @media (max-width: 520px) {
+    .bd-head { display: none; }
+    .bd-row { grid-template-columns: minmax(0,1.3fr) minmax(0,0.8fr) 28px; padding-bottom: 8px; border-bottom: 1px solid var(--line-2); }
+    .bd-row .bd-student { grid-column: 1 / -1; }
+  }
   .slot.t-booked { background: color-mix(in oklch, var(--good) 13%, transparent); border-color: color-mix(in oklch, var(--good) 30%, transparent); cursor: pointer; }
   .slot.t-booked:hover { filter: brightness(1.04); }
   /* Booking request awaiting the tutor's confirmation */
@@ -2735,6 +2754,9 @@
         const bk=state.bookings.find(b=>b.tutorId===state.myTutor&&sameDay(b.date,date)&&b.time===time);
         const conflict = bookingConflict(date,time,null,state.myTutor);
         const open = !isPast && slotOpen(date,time,state.myTutor) && !conflict;
+        // A free slot on a past day (within the 30-day look-back) can be tapped
+        // to log a lesson that happened there.
+        const loggable = isPast && !bk && !conflict && slotOpen(date,time,state.myTutor) && (NOW-date)/864e5 <= 30;
         if(state.editAvail){
           if(isPast) return;
           any=true;
@@ -2757,10 +2779,14 @@
           slots.appendChild(el);
           return;
         }
-        if(!open && !bk) return;
+        if(!open && !bk && !loggable) return;
         any=true;
         const el=document.createElement("button");
-        if(bk){
+        if(loggable){
+          el.className="slot t-open t-past";
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Nachtragen</span>`;
+          el.onclick=()=>openBackdate({ date:new Date(date), time });
+        } else if(bk){
           const s=bookingStudent(bk);
           el.className="slot t-booked"+(bk.status==="requested"?" t-req":"")+(state.teacherManage===bk?" sel":"");
           el.innerHTML=`<span class="ts-time">${time}${bk.status==="requested"?' · Anfrage':''}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${esc(s.name.split(" ")[0])}${bk.isIntro?' <span class="ts-intro">· Intro</span>':''}</span>`;
@@ -2773,6 +2799,13 @@
         }
         slots.appendChild(el);
       });
+      // A past day without free slots still offers one tile to log a lesson on it.
+      if(isPast && !state.editAvail && (NOW-date)/864e5 <= 30 && !slots.querySelector(".t-past")){
+        const el=document.createElement("button"); el.className="slot t-open t-past";
+        el.innerHTML=`<span class="ts-add">+ Nachtragen</span>`;
+        el.onclick=()=>openBackdate({ date:new Date(date) });
+        slots.appendChild(el); any=true;
+      }
       if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent="\u00b7"; slots.appendChild(n); }
       col.appendChild(slots); row.appendChild(col);
     }
@@ -2818,54 +2851,113 @@
     });
   }
 
-  // Log a "forgotten" past session (tutor). Up to 30 days back — the server caps
-  // it too. Consumes a credit (may push the student to the floor) and creates the
-  // correctly-dated ledger entry, exactly like a normal tutor booking.
-  function openBackdate(){
-    const m=$("#backdateModal");
+  // Log "forgotten" past sessions (tutor), several in one go. Up to 30 days
+  // back — the server caps it too. Each row consumes a credit (may push the
+  // student to the floor) and creates the correctly-dated ledger entry, exactly
+  // like a normal tutor booking, but sends no e-mails (the lesson already
+  // happened). `pre` ({date, time}) pre-fills the first row when the sheet is
+  // opened from a past slot in the calendar.
+  const BD_TIMES=(()=>{ const t=[]; for(let mn=7*60; mn<=21*60; mn+=15){ t.push(String(Math.floor(mn/60)).padStart(2,"0")+":"+String(mn%60).padStart(2,"0")); } return t; })();
+  function bdDays(){
+    const out=[];
+    for(let i=0;i<=30;i++){
+      const d=new Date(NOW); d.setHours(0,0,0,0); d.setDate(d.getDate()-i);
+      const lab=DOW[(d.getDay()+6)%7]+" "+d.getDate()+". "+MONTHS_S[d.getMonth()];
+      out.push({ key:ymd(d), label: i===0 ? "Heute · "+lab : i===1 ? "Gestern · "+lab : lab });
+    }
+    return out;
+  }
+  function bdRowHtml(row){
     const list=state.students.slice().sort((a,b)=>a.name.localeCompare(b.name));
-    if(!list.length){ toast("Noch keine Schüler vorhanden"); return; }
-    const min=new Date(NOW); min.setDate(min.getDate()-30);
-    const times=[]; for(let mn=8*60; mn<=20*60+30; mn+=30){ times.push(String(Math.floor(mn/60)).padStart(2,"0")+":"+String(mn%60).padStart(2,"0")); }
-    m.innerHTML=`<div class="modal-card buy-card" id="bdCard">
+    const days=bdDays();
+    const times=BD_TIMES.includes(row.time) ? BD_TIMES : BD_TIMES.concat(row.time).sort();
+    return `<div class="bd-row" data-row>
+      <select class="bf-input bd-student" aria-label="Schüler"><option value="">Schüler wählen</option>${list.map(s=>`<option value="${esc(s.id)}"${s.id===row.studentId?" selected":""}>${esc(s.name)}</option>`).join("")}</select>
+      <select class="bf-input bd-day" aria-label="Tag">${days.map(d=>`<option value="${d.key}"${d.key===row.date?" selected":""}>${d.label}</option>`).join("")}</select>
+      <select class="bf-input bd-time" aria-label="Uhrzeit">${times.map(t=>`<option${t===row.time?" selected":""}>${t}</option>`).join("")}</select>
+      <button type="button" class="bd-x" aria-label="Zeile entfernen" title="Zeile entfernen">×</button>
+      <div class="bd-err" hidden></div>
+    </div>`;
+  }
+  function bdReadRows(){
+    return Array.from(document.querySelectorAll("#bdRows [data-row]")).map(el=>({
+      el, studentId:el.querySelector(".bd-student").value, date:el.querySelector(".bd-day").value, time:el.querySelector(".bd-time").value,
+    }));
+  }
+  function bdRefresh(){
+    const rows=bdReadRows();
+    rows.forEach(r=>{ r.el.querySelector(".bd-x").hidden = rows.length<2; });
+    const n=rows.length, btn=$("#bdConfirm");
+    if(btn) btn.innerHTML=`<span class="grainbtn"></span>${n>1 ? n+" Stunden nachtragen" : "Nachtragen"}`;
+  }
+  function bdAddRow(row){
+    const wrap=$("#bdRows"); if(!wrap) return;
+    wrap.insertAdjacentHTML("beforeend", bdRowHtml(row));
+    const el=wrap.lastElementChild;
+    el.querySelector(".bd-x").onclick=()=>{ el.remove(); bdRefresh(); };
+    el.querySelectorAll("select").forEach(x=>x.onchange=()=>{ const e=el.querySelector(".bd-err"); e.hidden=true; el.classList.remove("bad"); });
+    bdRefresh();
+  }
+  function openBackdate(pre){
+    const m=$("#backdateModal");
+    if(!state.students.length){ toast("Noch keine Schüler vorhanden"); return; }
+    const yest=new Date(NOW); yest.setDate(yest.getDate()-1);
+    const first = pre && pre.date ? { studentId:"", date:ymd(pre.date), time:pre.time||"16:00" } : { studentId:"", date:ymd(yest), time:"16:00" };
+    m.innerHTML=`<div class="modal-card buy-card bd-card" id="bdCard">
       <button class="modal-x" id="bdX" aria-label="Close">×</button>
       <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg></div>
-      <h3 class="buy-h">Stunde nachtragen</h3>
-      <p class="buy-p">Trage eine bereits gehaltene Stunde nach, bis zu <b>30 Tage</b> zurück. Es wird <b>1 Einheit</b> abgezogen und die Stunde erscheint im Verlauf.</p>
-      <label class="bf-lab" style="text-align:left;">Schüler<select class="bf-input" id="bdStudent">${list.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join("")}</select></label>
-      <div class="bf-grid">
-        <label class="bf-lab" style="text-align:left;">Datum<input class="bf-input" type="date" id="bdDate" min="${ymd(min)}" max="${ymd(NOW)}" value="${ymd(NOW)}"></label>
-        <label class="bf-lab" style="text-align:left;">Uhrzeit<select class="bf-input" id="bdTime">${times.map(t=>`<option${t==="16:00"?" selected":""}>${t}</option>`).join("")}</select></label>
-      </div>
+      <h3 class="buy-h">Stunden nachtragen</h3>
+      <p class="buy-p">Trage bereits gehaltene Stunden nach, bis zu <b>30 Tage</b> zurück. Pro Stunde wird <b>1 Einheit</b> abgezogen. Schüler bekommen dafür keine E-Mail.</p>
+      <div class="bd-head"><span>Schüler</span><span>Tag</span><span>Uhrzeit</span></div>
+      <div id="bdRows"></div>
+      <button type="button" class="bd-more" id="bdMore">+ Weitere Stunde</button>
       <button class="btn" id="bdConfirm" style="margin-top:8px;"><span class="grainbtn"></span>Nachtragen</button>
       <button class="btn ghost" id="bdCancel">Abbrechen</button>
     </div>`;
     m.hidden=false;
+    bdAddRow(first);
     $("#bdCard").onclick=(e)=>e.stopPropagation();
     $("#bdX").onclick=closeBackdate; $("#bdCancel").onclick=closeBackdate;
+    // A new row starts on the previous row's day, an hour later: after a busy
+    // day it's usually several students back to back.
+    $("#bdMore").onclick=()=>{
+      const rows=bdReadRows(), last=rows[rows.length-1];
+      if(!last){ bdAddRow(first); return; }
+      const [h,mi]=last.time.split(":").map(Number), mn=Math.min(h*60+mi+60, 21*60);
+      bdAddRow({ studentId:"", date:last.date, time:String(Math.floor(mn/60)).padStart(2,"0")+":"+String(mn%60).padStart(2,"0") });
+    };
     $("#bdConfirm").onclick=confirmBackdate;
   }
   function closeBackdate(){ const m=$("#backdateModal"); if(m){ m.hidden=true; m.innerHTML=""; } }
-  function confirmBackdate(){
-    const studentId=$("#bdStudent").value, dstr=$("#bdDate").value, time=$("#bdTime").value;
-    const s=studentById(studentId);
-    if(!s||!dstr||!/^\d{4}-\d{2}-\d{2}$/.test(dstr)||!time){ toast("Bitte Schüler, Datum und Uhrzeit wählen"); return; }
-    const d=new Date(dstr+"T00:00:00");
+  function bdRowError(row, msg){ row.el.classList.add("bad"); const e=row.el.querySelector(".bd-err"); e.textContent=msg; e.hidden=false; }
+  async function confirmBackdate(){
+    const rows=bdReadRows(); let missing=false;
+    rows.forEach(r=>{ if(!r.studentId){ bdRowError(r,"Bitte einen Schüler wählen"); missing=true; } });
+    if(missing || !rows.length) return;
     const btn=$("#bdConfirm"); if(btn) btn.disabled=true;
-    apiResult('POST', '/api/bookings/', { studentSlug:studentId, tutorSlug:state.myTutor, date:dstr, time, title:'Englischstunde' }).then(res=>{
-      if(btn) btn.disabled=false;
-      if(res.data && res.data.error==="too_far_back"){ toast("Nur bis zu 30 Tage rückwirkend möglich"); return; }
-      if(res.status===409){ toast(res.data && res.data.error==="slot_taken" ? "Zu dieser Zeit besteht bereits eine Buchung" : `${s.name.split(" ")[0]} hat das Limit offener Einheiten erreicht. Bitte zuerst begleichen`); return; }
-      if(!res.ok || !res.data){ toast("Nachtragen fehlgeschlagen"); return; }
-      const r=res.data;
-      state.bookings.push({ studentId, tutorId:state.myTutor, date:d, time, title:"Englischstunde", _pk:r.pk });
-      if(typeof r.credits==='number') setStudentCredits(studentId, r.credits);
-      const tut=tutorById(state.myTutor); const tf=tut?tut.name.split(" ")[0]:"";
-      if(s.log) s.log.unshift({ type:"book", label:"Stunde nachgetragen", sub:(tf?"mit "+tf+" · ":"")+fmtAT(d)+" · "+time, amt:"-1" });
-      closeBackdate();
-      renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
-      toast(`${s.name.split(" ")[0]} nachgetragen · ${MONTHS_S[d.getMonth()]} ${d.getDate()}, ${time}`);
-    });
+    const tut=tutorById(state.myTutor); const tf=tut?tut.name.split(" ")[0]:"";
+    const done=[];
+    // One at a time, so each row gets the server's answer on its own (credit
+    // floor, slot already taken) and the balances stay in order.
+    for(const r of rows){
+      const s=studentById(r.studentId); if(!s) continue;
+      const res=await apiResult('POST', '/api/bookings/', { studentSlug:r.studentId, tutorSlug:state.myTutor, date:r.date, time:r.time, title:'Englischstunde' });
+      if(res.data && res.data.error==="too_far_back"){ bdRowError(r,"Nur bis zu 30 Tage rückwirkend möglich"); continue; }
+      if(res.status===409){ bdRowError(r, res.data && res.data.error==="slot_taken" ? "Zu dieser Zeit besteht bereits eine Buchung" : `${s.name.split(" ")[0]} hat das Limit offener Einheiten erreicht`); continue; }
+      if(!res.ok || !res.data){ bdRowError(r,"Nachtragen fehlgeschlagen"); continue; }
+      const d=new Date(r.date+"T00:00:00");
+      state.bookings.push({ studentId:r.studentId, tutorId:state.myTutor, date:d, time:r.time, title:"Englischstunde", _pk:res.data.pk });
+      if(typeof res.data.credits==='number') setStudentCredits(r.studentId, res.data.credits);
+      if(s.log) s.log.unshift({ type:"book", label:"Stunde nachgetragen", sub:(tf?"mit "+tf+" · ":"")+fmtAT(d)+" · "+r.time, amt:"-1" });
+      r.el.remove();
+      done.push({ s, d, time:r.time });
+    }
+    if(btn) btn.disabled=false;
+    if(done.length){ renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek(); }
+    const left=bdReadRows().length;
+    if(!left) closeBackdate(); else bdRefresh();
+    if(done.length===1){ const x=done[0]; toast(`${x.s.name.split(" ")[0]} nachgetragen · ${MONTHS_S[x.d.getMonth()]} ${x.d.getDate()}, ${x.time}`); }
+    else if(done.length>1) toast(`${done.length} Stunden nachgetragen`+(left?` · ${left} offen`:""));
   }
 
   function teacherRemove(bk){
@@ -5348,7 +5440,7 @@
   $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>0){state.tWeekOffset--; renderTeacherWeek();} };
   $("#tNextWeek").onclick = ()=>{ if(state.tWeekOffset<6){state.tWeekOffset++; renderTeacherWeek();} };
   $("#tTodayBtn").onclick = ()=>{ state.tWeekOffset=0; renderTeacherWeek(); };
-  if($("#backdateBtn")) $("#backdateBtn").onclick = openBackdate;
+  if($("#backdateBtn")) $("#backdateBtn").onclick = ()=>openBackdate();
   $("#availToggle").onclick = ()=>{
     if(state.editAvail){ exitEditAvail(); return; }
     state.editAvail = true;

@@ -1520,11 +1520,19 @@ def api_bookings(request):
         # Booking.save() charged the credit on the locked instance; read it back.
         new_credits = locked.credits
 
+    # A lesson the tutor logs after the fact ("nachgetragen") already happened:
+    # no booking confirmation, cancel link or tutor notice, it only lands in the
+    # history and the credit ledger.
+    now_local = timezone.localtime()
+    logged_after_the_fact = not is_self and (
+        booking_date < today
+        or (booking_date == today and time_str <= now_local.strftime("%H:%M"))
+    )
     if is_self:
         # Tell the student the request is in; ask the tutor to confirm it.
         emails.queue_email(emails.send_lesson_request_student, b.pk)
         emails.queue_email(emails.send_lesson_request_tutor, b.pk)
-    else:
+    elif not logged_after_the_fact:
         # Confirm to the student (with a cancel link) and notify the tutor.
         emails.queue_email(emails.send_lesson_student_confirmation, b.pk)
         emails.queue_email(emails.send_lesson_tutor_notification, b.pk)
