@@ -31,6 +31,7 @@ const doPreview = process.argv.includes("--preview");
 const doBuy = process.argv.includes("--buy");
 const doQuickAdds = process.argv.includes("--quick-adds");
 const doMaterials = process.argv.includes("--materials");
+const doMethods = process.argv.includes("--methods");
 const doSchoolTests = process.argv.includes("--school-tests");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
@@ -303,6 +304,29 @@ setTimeout(() => {
           finish({ schoolTests: { rows, timeline, stats, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
         }, 80);
       }, 40);
+    }, 80);
+    return;
+  }
+
+  if (doMethods) {
+    // Tutor: open the Methoden tab, filter by a situation, open one method.
+    const tab = document.querySelector('.tab[data-view="methods"]');
+    if (tab) tab.click();
+    setTimeout(() => {
+      const q = (s) => [...document.querySelectorAll(s)];
+      const groups = q("#methodsContent .me-group-h h2").map((h) => h.textContent.trim());
+      const total = q("#methodsContent .me-card").length;
+      document.querySelector('#methodsContent [data-meth-f="sprechen"]').click();
+      const speaking = q("#methodsContent .me-name").map((n) => n.textContent.trim());
+      document.querySelector('#methodsContent [data-meth="korrektur"]').click();
+      const open = document.querySelector('#methodsContent .me-card.open');
+      const openName = open ? open.querySelector(".me-name").textContent.trim() : null;
+      const steps = open ? open.querySelectorAll(".me-body ol li").length : 0;
+      const search = document.querySelector("#methodSearch");
+      search.value = "Shadowing";
+      search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      const found = q("#methodsContent .me-name").map((n) => n.textContent.trim());
+      finish({ methods: { groups, total, speaking, openName, steps, found } });
     }, 80);
     return;
   }

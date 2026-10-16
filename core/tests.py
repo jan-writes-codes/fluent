@@ -1172,7 +1172,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False, materials=False, school_tests=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False, materials=False, methods=False, school_tests=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get(reverse("app")).content.decode()
@@ -1204,6 +1204,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--quick-adds")
             if materials:
                 cmd.append("--materials")
+            if methods:
+                cmd.append("--methods")
             if school_tests:
                 cmd.append("--school-tests")
             out = subprocess.run(
@@ -1221,7 +1223,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
 class DomRoleTests(_DomProbeBase):
     EXPECTED = {
         "maya":  ("Maya Karlsson", {"book", "account", "lessons", "files", "errors"}),
-        "davit": ("Davit Petrosyan", {"teacher", "students", "materials"}),
+        "davit": ("Davit Petrosyan", {"teacher", "students", "materials", "methods"}),
         "admin": ("Studio Admin", {"admin"}),
     }
 
@@ -1376,6 +1378,20 @@ class DomLessonTests(_DomProbeBase):
         self.assertEqual(m["skills"], ["Listening", "Reading", "Grammar", "Language in Use", "Writing", "Speaking"])
         self.assertIn("Airport announcements", m["topics"])
         self.assertIn("The present simple", m["topics"])
+
+
+class DomMethodsTests(_DomProbeBase):
+    def test_tutor_methods_tab_filters_and_opens(self):
+        r = self.run_probe(self.davit, methods=True)
+        self.assertEqual(r["initErrors"], [])
+        m = r["methods"]
+        self.assertEqual(m["groups"], ["Die sechs Grundstrategien", "Speziell für Englisch", "Motivation und Selbststeuerung"])
+        self.assertEqual(m["total"], 15)
+        self.assertIn("Fehler richtig korrigieren", m["speaking"])
+        self.assertNotIn("Verteilte Wiederholung", m["speaking"])
+        self.assertEqual(m["openName"], "Fehler richtig korrigieren")
+        self.assertEqual(m["steps"], 3)
+        self.assertEqual(m["found"], ["Nachsprechen"])
 
 
 class DomQuickAddTests(_DomProbeBase):

@@ -146,6 +146,7 @@
   .app[data-role="tutor"] .tab[data-view="teacher"],
   .app[data-role="tutor"] .tab[data-view="students"],
   .app[data-role="tutor"] .tab[data-view="materials"],
+  .app[data-role="tutor"] .tab[data-view="methods"],
   .app[data-role="admin"] .tab[data-view="admin"] { display: flex; }
   /* Students' nav in two groups: Organisation (Kalender, Konto) | Lernen. The
      learning group sits in its own tinted pill with a small label. */
@@ -188,6 +189,7 @@
     .app[data-role="tutor"] nav.tabs.open .tab[data-view="teacher"],
     .app[data-role="tutor"] nav.tabs.open .tab[data-view="students"],
     .app[data-role="tutor"] nav.tabs.open .tab[data-view="materials"],
+    .app[data-role="tutor"] nav.tabs.open .tab[data-view="methods"],
     .app[data-role="admin"] nav.tabs.open .tab[data-view="admin"] { display: flex; width: 100%; justify-content: flex-start; padding: 11px 14px; }
     .app[data-role="student"] nav.tabs.open .tab-group { flex-direction: column; align-items: stretch; margin: 6px 0 0;
       padding: 8px 0 0; background: none; box-shadow: none; border-top: 1px solid var(--line); border-radius: 0; }
@@ -732,6 +734,49 @@
   .fv-text { width: 100%; max-width: 900px; margin: 0; padding: 16px; background: #fff; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
   .fv-msg { margin: auto; color: var(--muted); font-size: 14px; }
 
+  /* ---------- Methoden (tutor): learning-psychology guide ---------- */
+  .me-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 4px 0 8px; }
+  .me-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .me-chip { font-family: var(--font-body); font-size: 13px; padding: 6px 12px; border-radius: 100px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--glass); color: var(--muted); transition: 0.14s; }
+  .me-chip:hover { border-color: color-mix(in oklch, var(--c1) 35%, transparent); }
+  .me-chip.on { color: var(--c3); font-weight: 600; border-color: transparent; background: color-mix(in oklch, var(--c1) 13%, transparent); }
+  .me-legend { font-size: 12px; color: var(--faint); margin: 0 2px 20px; }
+  .me-dots { color: var(--c1); letter-spacing: 1px; white-space: nowrap; }
+  .me-dots .off { color: var(--line); }
+  .me-group { margin-bottom: 26px; }
+  .me-group-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 2px 4px; }
+  .me-group-h h2 { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+  .me-group-n { font-size: 12px; color: var(--faint); white-space: nowrap; }
+  .me-group-sub { font-size: 13px; color: var(--muted); margin: 0 2px 12px; max-width: 70ch; }
+  .me-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+  @media (max-width: 1000px) { .me-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 620px) { .me-grid { grid-template-columns: 1fr; } }
+  .me-card { border: 1px solid var(--line); border-radius: 14px; background: var(--glass); min-width: 0; transition: border-color 0.14s; }
+  .me-card:hover { border-color: color-mix(in oklch, var(--c1) 35%, transparent); }
+  .me-card.open { grid-column: 1 / -1; border-color: color-mix(in oklch, var(--c1) 45%, transparent); }
+  .me-head { display: flex; flex-direction: column; gap: 5px; width: 100%; text-align: left; padding: 14px 16px; border: 0;
+    background: transparent; color: var(--ink); font-family: var(--font-body); cursor: pointer; border-radius: 14px; }
+  .me-head:focus-visible { outline: 2px solid var(--c1); outline-offset: -2px; }
+  .me-tags { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c2); font-weight: 700; }
+  .me-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: -0.01em; }
+  .me-en { font-size: 12px; color: var(--faint); }
+  .me-what { font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  .me-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--faint); margin-top: 2px; }
+  .me-foot .lnk { color: var(--c1); }
+  .me-body { padding: 4px 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 28px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+  @media (max-width: 760px) { .me-body { grid-template-columns: 1fr; } }
+  .me-sec { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .me-sec.wide { grid-column: 1 / -1; }
+  .me-lbl { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .me-sec p, .me-sec li { font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .me-sec ol { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+  .me-sec ol b { font-weight: 600; }
+  .me-ex { font-size: 14px; background: color-mix(in oklch, var(--c1) 7%, transparent); border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .me-ex b { color: var(--c3); font-weight: 600; }
+  .me-app { font-size: 13.5px; background: color-mix(in oklch, var(--c2) 12%, transparent); border-radius: 10px; padding: 9px 12px; }
+  .me-src { font-size: 12px; color: var(--faint); }
+
   .balance { padding: 28px; position: relative; }
   .balance .ring { position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%;
     background: radial-gradient(circle, color-mix(in oklch, var(--accent) 45%, transparent), transparent 65%); filter: blur(20px); }
@@ -1216,6 +1261,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5h6a2 2 0 0 1 2 2v13a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M20 4.5h-6a2 2 0 0 0-2 2v13a1.5 1.5 0 0 1 1.5-1.5H20z"/></svg>
           Lernmaterialien
         </button>
+        <button class="tab" data-view="methods">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>
+          Methoden
+        </button>
         <button class="tab" data-view="admin">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.3a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.3 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
           Admin
@@ -1425,6 +1474,16 @@
           <h1 class="title">Lernmaterialien.</h1>
           <p class="sub">Alle Themen nach Niveau und Bereich. Lege neue Themen an und lade Dateien hoch. Freigeschaltet werden sie pro Schüler im Tab <b>Schüler</b>.</p>
           <div id="materialsContent"></div>
+        </div>
+      </section>
+
+      <!-- ===================== METHODEN (tutor) ===================== -->
+      <section class="view" id="view-methods" data-screen-label="Methods">
+        <div class="wrap">
+          <div class="eyebrow">Tutor-Portal · Methoden</div>
+          <h1 class="title">Methoden.</h1>
+          <p class="sub">Lernpsychologische Methoden mit guter Studienlage, als Nachschlagewerk für deine Stunden. Tippe eine Methode an für Ablauf, Beispiel und Quelle.</p>
+          <div id="methodsContent"></div>
         </div>
       </section>
 
@@ -4828,6 +4887,196 @@
     return `<div class="list lesson-hist">${rows}</div>${more}`;
   }
 
+  // ---------- Methoden (tutor): learning-psychology guide ----------
+  // Static reference content. ev = strength of the research base (3 strong,
+  // 2 good, 1 first evidence). tags = the situations the filter chips offer.
+  const METHOD_TAGS = [
+    ["vokabeln", "Vokabeln behalten"], ["grammatik", "Grammatik festigen"], ["sprechen", "Sprechen & Schreiben"],
+    ["motivation", "Motivation"], ["pruefung", "Prüfung"],
+  ];
+  const METHOD_GROUPS = [
+    { id: 1, t: "Die sechs Grundstrategien", sub: "Gelten für jedes Fach und sind die am besten untersuchten Lernstrategien überhaupt." },
+    { id: 2, t: "Speziell für Englisch", sub: "Was die Spracherwerbsforschung über Fehler, Wortschatz und Sprechen weiß." },
+    { id: 3, t: "Motivation und Selbststeuerung", sub: "Für Schüler mit wenig Lust, wenig Selbstvertrauen oder Prüfungsnerven." },
+  ];
+  const METHODS = [
+    { id: "abrufen", g: 1, ev: 3, tags: ["vokabeln", "grammatik", "pruefung"],
+      name: "Abrufen statt Wiederlesen", en: "Retrieval Practice",
+      what: "Der Schüler holt Wissen aus dem Kopf, bevor du es zeigst oder erklärst.",
+      why: "Jeder Abruf stärkt die Erinnerung deutlich mehr als nochmal lesen oder zuhören. Der Effekt ist in hunderten Studien belegt, auch für Vokabeln und Grammatik.",
+      steps: ["<b>Start:</b> 3 Minuten „Was weißt du noch von letzter Woche?“, ohne Unterlagen.", "<b>Mitte:</b> Neue Wörter auf dem Arbeitsblatt abdecken und abfragen, statt sie vorzulesen.", "<b>Ende:</b> Der Schüler fasst die Stunde in 3 Sätzen zusammen, erst danach ergänzt du."],
+      ex: "Without looking at your notes, tell me three things you did last weekend.",
+      avoid: "Sofort einspringen, wenn es stockt. Gib 5 bis 10 Sekunden Zeit, auch Anstrengung beim Erinnern hilft dem Lernen.",
+      app: "Das Fehlertraining ist genau diese Methode: Der Schüler korrigiert alte Fehler selbst, bevor er die Lösung sieht.",
+      src: "Roediger & Karpicke 2006; Dunlosky et al. 2013" },
+    { id: "verteilt", g: 1, ev: 3, tags: ["vokabeln", "pruefung"],
+      name: "Verteilte Wiederholung", en: "Spaced Repetition",
+      what: "Stoff in wachsenden Abständen wiederholen, statt alles in einer Stunde zu pauken.",
+      why: "Was kurz vor dem Vergessen wieder abgerufen wird, bleibt viel länger. Gleich viel Lernzeit, auf mehrere Termine verteilt, bringt bessere Langzeitergebnisse als ein Block.",
+      steps: ["<b>Nach 1 Tag:</b> Hausaufgabe mit den neuen Wörtern der Stunde.", "<b>Nach 1 Woche:</b> 5 Minuten am Stundenanfang mit Wörtern und Fehlern der letzten Stunde.", "<b>Nach etwa 1 Monat:</b> Alte Themen in neue Übungen einbauen, z. B. alte Vokabeln in einem neuen Text."],
+      ex: "Before we start, let's see which words from two weeks ago you still remember.",
+      avoid: "Vor einer Schularbeit alles am Vortag durchgehen. Lieber 3 kurze Termine in den 2 Wochen davor.",
+      app: "Wörter und Fehler aus früheren Stunden findest du im Verlauf des Schülers. Plane sie bewusst in spätere Stunden ein.",
+      src: "Cepeda et al. 2006; Kang 2016" },
+    { id: "mischen", g: 1, ev: 2, tags: ["grammatik", "pruefung"],
+      name: "Mischen statt Blöcke", en: "Interleaving",
+      what: "Ähnliche Themen abwechselnd üben, statt 20 Aufgaben zum selben Thema hintereinander.",
+      why: "Wer mischt, muss bei jeder Aufgabe entscheiden, welche Regel passt. Genau das wird in Tests und im echten Gespräch verlangt. Fühlt sich schwerer an, wirkt aber länger.",
+      steps: ["Zuerst jedes Thema kurz einzeln einführen.", "Dann eine gemischte Übung: z. B. Past Simple, Present Perfect und Present Simple in zufälliger Reihenfolge.", "Bei jedem Satz fragen: „Woran hast du erkannt, welche Zeit passt?“"],
+      ex: "Here are eight sentences. Some need the past simple, some the present perfect. You decide.",
+      avoid: "Mischen, bevor die einzelnen Themen überhaupt verstanden sind. Das überfordert.",
+      src: "Rohrer & Taylor 2007; Nakata & Suzuki 2019" },
+    { id: "warum", g: 1, ev: 2, tags: ["grammatik"],
+      name: "Warum-Fragen stellen", en: "Elaborative Interrogation",
+      what: "Den Schüler erklären lassen, warum etwas so ist und wie es mit Bekanntem zusammenhängt.",
+      why: "Neues Wissen wird mit vorhandenem verknüpft und dadurch besser verstanden und behalten. Wirkt am besten, wenn schon etwas Vorwissen da ist.",
+      steps: ["Nach einer Regel nicht weitermachen, sondern fragen: „Warum, glaubst du, ist das so?“", "Vergleich mit Deutsch anstoßen: „Wie sagt man das auf Deutsch? Was ist anders?“", "Bei falschen Erklärungen nachfragen statt sofort korrigieren."],
+      ex: "Why do you think we say \"I have lived here for five years\" and not \"I live here for five years\"?",
+      avoid: "Warum-Fragen zu ganz neuem Stoff, zu dem der Schüler noch nichts weiß. Dann zuerst erklären.",
+      src: "Pressley et al. 1987; Dunlosky et al. 2013" },
+    { id: "bild", g: 1, ev: 2, tags: ["vokabeln"],
+      name: "Wort und Bild verbinden", en: "Dual Coding",
+      what: "Wörter und Erklärungen mit Bildern, Skizzen oder Zeitstrahlen kombinieren.",
+      why: "Information, die sprachlich und bildlich gespeichert ist, hat zwei Wege zurück ins Gedächtnis. Hilft besonders bei konkreten Wörtern und bei Zeitformen.",
+      steps: ["Neue konkrete Wörter mit einem Bild zeigen statt mit der deutschen Übersetzung.", "Zeitformen als Zeitstrahl zeichnen: Wo liegt die Handlung, wo ist jetzt?", "Den Schüler selbst eine schnelle Skizze zu einem Wort machen lassen."],
+      ex: "Let me draw this on a timeline. Here is now. Where does \"I had already left\" go?",
+      avoid: "Dekorative Bilder ohne Bezug zum Inhalt. Die lenken eher ab.",
+      app: "Im Arbeitsblatt der Stunde kannst du Wörter markieren. Eine kurze Skizze dazu im Bildschirm teilen wirkt zusätzlich.",
+      src: "Paivio 1986; Mayer 2009" },
+    { id: "beispiele", g: 1, ev: 2, tags: ["grammatik", "sprechen"],
+      name: "Konkrete Beispiele", en: "Concrete Examples",
+      what: "Abstrakte Regeln immer mit mehreren konkreten Beispielen aus dem Leben des Schülers zeigen.",
+      why: "Regeln allein bleiben abstrakt. Mehrere unterschiedliche Beispiele zeigen, was das Gemeinsame ist, und machen die Regel greifbar.",
+      steps: ["Regel kurz nennen, dann 2 bis 3 Beispiele aus dem Alltag des Schülers: Schule, Hobbys, Freunde.", "Den Schüler ein eigenes Beispiel bilden lassen.", "Gemeinsam prüfen: Passt das Beispiel zur Regel?"],
+      ex: "You play football, right? So: \"I have played football since I was six.\" Now give me one about your hobby.",
+      avoid: "Nur ein einziges Beispiel. Dann merkt sich der Schüler das Beispiel, aber nicht die Regel.",
+      src: "Rawson et al. 2015; Weinstein et al. 2018" },
+    { id: "korrektur", g: 2, ev: 3, tags: ["sprechen", "grammatik"],
+      name: "Fehler richtig korrigieren", en: "Corrective Feedback",
+      what: "Fehler gezielt korrigieren: kurz nebenbei (Recast) oder so, dass der Schüler die Lösung selbst findet (Prompt).",
+      why: "Korrektur wirkt nachweislich. Am stärksten, wenn der Schüler selbst korrigieren muss. Ein reines Nebenbei-Wiederholen wird oft überhört.",
+      steps: ["<b>Beim freien Sprechen:</b> Nicht unterbrechen, Fehler notieren, am Ende 2 bis 3 davon besprechen.", "<b>Bei geübtem Stoff:</b> Prompt statt Lösung: „Yesterday I go…?“ und warten.", "<b>Bei neuem Stoff:</b> Recast genügt, also die richtige Form kurz wiederholen und weitersprechen."],
+      ex: "Student: \"Yesterday I go to the cinema.\" Tutor: \"Yesterday I…?\" Student: \"…went!\"",
+      avoid: "Jeden Fehler sofort korrigieren. Das bremst den Redefluss und das Selbstvertrauen. Lieber wenige, wichtige Fehler.",
+      app: "Markierte Fehler landen im Fehlertraining des Schülers. Markiere vor allem wiederkehrende Fehler, nicht jeden Tippfehler.",
+      src: "Lyster & Saito 2010; Li 2010" },
+    { id: "chunks", g: 2, ev: 2, tags: ["vokabeln", "sprechen"],
+      name: "In Wortgruppen lernen", en: "Chunks & Collocations",
+      what: "Wörter mit ihren typischen Partnern lernen: „make a decision“ statt nur „decision“.",
+      why: "Muttersprachler denken in festen Wendungen. Wer sie als Ganzes lernt, spricht flüssiger und macht weniger typische Fehler wie „do a decision“.",
+      steps: ["Neue Wörter immer mit Verb oder Adjektiv aufschreiben: „take a photo“, „heavy rain“.", "Typische Verwechslungen gezielt üben: make oder do, say oder tell.", "Den Schüler die Wendung sofort in einem eigenen Satz verwenden lassen."],
+      ex: "Not \"do a photo\" but \"take a photo\". What else can you take? A break, a bus, a test…",
+      avoid: "Lange Listen einzelner Wörter mit deutscher Übersetzung ohne Zusammenhang.",
+      app: "Beim Markieren von Wörtern im Arbeitsblatt lieber die ganze Wendung markieren als nur das einzelne Wort.",
+      src: "Boers & Lindstromberg 2012; Lewis 1993" },
+    { id: "input", g: 2, ev: 2, tags: ["vokabeln"],
+      name: "Verständlicher Input", en: "Comprehensible Input",
+      what: "Viel Englisch lesen und hören lassen, das knapp über dem aktuellen Niveau liegt.",
+      why: "Sprache wird zu einem großen Teil durch verstandenen Input erworben. Wenn rund 95 % der Wörter bekannt sind, kann man neue aus dem Zusammenhang erschließen.",
+      steps: ["Texte oder Videos wählen, bei denen der Schüler fast alles versteht. Pro Seite höchstens eine Handvoll neuer Wörter.", "Vorher Interesse wecken: „What do you think this is about?“", "Danach kurz über den Inhalt sprechen, nicht nur Vokabeln abfragen."],
+      ex: "This article is about a skateboarder from Vienna. Read the first paragraph and tell me what surprised you.",
+      avoid: "Zu schwere Originaltexte. Wer jedes dritte Wort nachschlagen muss, lernt wenig und verliert die Lust.",
+      src: "Krashen 1985; Hu & Nation 2000" },
+    { id: "output", g: 2, ev: 2, tags: ["sprechen"],
+      name: "Zum Sprechen bringen", en: "Pushed Output",
+      what: "Den Schüler gezielt Sätze bilden lassen, die etwas über seinem bequemen Niveau liegen.",
+      why: "Erst beim eigenen Sprechen und Schreiben merkt man, was man noch nicht kann. Das lenkt die Aufmerksamkeit genau auf die Lücken.",
+      steps: ["Offene Fragen statt Ja-Nein-Fragen: „What would you do if…?“", "Bei kurzen Antworten nachhaken: „Can you say more? Why?“", "Eine Antwort umformulieren lassen: „Now say it in a more formal way.“"],
+      ex: "You said \"it was good\". Tell me what exactly was good and why, in three sentences.",
+      avoid: "Selbst den Großteil der Stunde sprechen. Als Faustregel sollte der Schüler mehr reden als du.",
+      src: "Swain 1985; Swain 1995" },
+    { id: "shadowing", g: 2, ev: 1, tags: ["sprechen"],
+      name: "Nachsprechen", en: "Shadowing",
+      what: "Der Schüler spricht einen gehörten Text fast gleichzeitig mit, wie ein Echo.",
+      why: "Trainiert Aussprache, Betonung und Sprechrhythmus. Erste Studien zeigen auch besseres Hörverstehen. Die Studienlage ist noch klein.",
+      steps: ["Kurze Audiodatei oder Video wählen, 30 bis 60 Sekunden.", "Erst einmal nur hören, dann mit Text mitlesen und mitsprechen.", "Zum Schluss ohne Text mitsprechen, nach Möglichkeit aufnehmen und vergleichen."],
+      ex: "Listen once. Now we play it again and you speak along with her, like an echo.",
+      avoid: "Zu schnelle oder zu lange Aufnahmen. Dann wird es frustrierend statt hilfreich.",
+      src: "Hamada 2016; Kadota 2019" },
+    { id: "feedback", g: 3, ev: 3, tags: ["motivation", "pruefung"],
+      name: "Feedback, das weiterbringt", en: "Feed up, Feed back, Feed forward",
+      what: "Rückmeldung beantwortet drei Fragen: Wohin will ich? Wo stehe ich? Was ist der nächste Schritt?",
+      why: "Feedback gehört zu den wirksamsten Einflüssen auf Lernen, aber nur, wenn es konkret ist und einen nächsten Schritt nennt. Lob für die Person allein bringt wenig.",
+      steps: ["<b>Wohin:</b> Am Stundenanfang das Ziel nennen: „Heute schaffst du es, über dein Wochenende zu erzählen.“", "<b>Wo stehe ich:</b> Konkret zurückmelden, was schon gut klappt.", "<b>Nächster Schritt:</b> Genau eine Sache zum Weiterüben nennen."],
+      ex: "Your past forms were almost all correct today. Next step: use \"because\" to give reasons.",
+      avoid: "Allgemeines Lob wie „Super gemacht!“ ohne Inhalt, oder eine lange Liste an Fehlern.",
+      app: "Die Zusammenfassung und Hausaufgabe einer Stunde eignen sich gut für den nächsten Schritt. Der Schüler sieht beides in seinem Verlauf.",
+      src: "Hattie & Timperley 2007" },
+    { id: "woop", g: 3, ev: 2, tags: ["motivation", "pruefung"],
+      name: "Ziel und Hindernis planen", en: "WOOP & Wenn-Dann-Pläne",
+      what: "Wunsch, bestes Ergebnis, inneres Hindernis und ein konkreter Wenn-Dann-Plan.",
+      why: "Nur positiv denken reicht nicht. Wer das Hindernis vorher benennt und einen Plan dafür hat, setzt Vorhaben deutlich häufiger um.",
+      steps: ["<b>Wunsch:</b> „Was willst du bis zur Schularbeit schaffen?“", "<b>Ergebnis und Hindernis:</b> „Wie fühlt sich das an? Was hält dich davon ab?“", "<b>Plan:</b> „Wenn ich nach der Schule aufs Handy schauen will, dann mache ich zuerst 10 Minuten Vokabeln.“"],
+      ex: "What usually stops you from doing your homework? Okay, so what's your plan when that happens?",
+      avoid: "Ziele vorgeben. Der Schüler muss sein eigenes Ziel und sein eigenes Hindernis finden.",
+      src: "Oettingen 2014; Gollwitzer & Sheeran 2006" },
+    { id: "erklaeren", g: 3, ev: 2, tags: ["grammatik", "motivation"],
+      name: "Erklären lassen", en: "Learning by Teaching",
+      what: "Der Schüler erklärt dir eine Regel oder ein Thema, als wärst du der Lernende.",
+      why: "Wer erklärt, muss Wissen ordnen und merkt dabei, was er noch nicht verstanden hat. Rollentausch macht den meisten Schülern außerdem Spaß.",
+      steps: ["Rollentausch ankündigen: „Heute bin ich dein Schüler.“", "Der Schüler erklärt eine Regel mit eigenen Beispielen.", "Du stellst absichtlich naive Fragen oder machst einen typischen Fehler, den er korrigieren soll."],
+      ex: "Imagine I'm new in your class. Explain to me when we use \"some\" and when \"any\".",
+      avoid: "Den Schüler bei Unsicherheiten bloßstellen. Lücken gemeinsam und locker schließen.",
+      src: "Fiorella & Mayer 2013" },
+    { id: "erfolge", g: 3, ev: 2, tags: ["motivation"],
+      name: "Kleine Erfolge sichtbar machen", en: "Selbstwirksamkeit",
+      what: "Fortschritte konkret zeigen, damit der Schüler erlebt: Ich kann das.",
+      why: "Eigene Erfolgserlebnisse sind die stärkste Quelle für Selbstvertrauen beim Lernen. Wer an sich glaubt, strengt sich mehr an und gibt seltener auf.",
+      steps: ["Aufgaben so wählen, dass der Schüler mit etwas Anstrengung Erfolg hat.", "Vorher und nachher vergleichen: einen Text von vor 2 Monaten mit einem von heute.", "Erfolge auf die eigene Anstrengung zurückführen: „Das hast du geschafft, weil du geübt hast.“"],
+      ex: "Look at this text from September. Now look at today's. Count the mistakes.",
+      avoid: "Zu leichte Aufgaben nur fürs Erfolgsgefühl. Schüler merken das und es zählt dann nicht.",
+      app: "Im Verlauf des Schülers siehst du, wie viele Fehler aus dem Training schon erledigt sind. Zeig ihm das ab und zu.",
+      src: "Bandura 1997; Schunk 1991" },
+  ];
+  function methodDots(n){ return `<span class="me-dots" title="Studienlage">${"●".repeat(n)}<span class="off">${"●".repeat(3-n)}</span></span>`; }
+  function renderMethods(){
+    const el=$("#methodsContent"); if(!el) return;
+    const f=state.methFilter||"all", q=(state.methQuery||"").trim().toLowerCase();
+    const tagName=Object.fromEntries(METHOD_TAGS);
+    const match=m=> (f==="all" || m.tags.includes(f)) &&
+      (!q || [m.name,m.en,m.what,m.why].join(" ").toLowerCase().includes(q));
+    const card=m=>{
+      const open=state.methOpen===m.id;
+      const body = open ? `<div class="me-body" id="me-b-${m.id}">
+          <div class="me-sec"><span class="me-lbl">Warum es wirkt</span><p>${m.why}</p></div>
+          <div class="me-sec"><span class="me-lbl">So geht's in einer Stunde</span><ol>${m.steps.map(s=>`<li>${s}</li>`).join("")}</ol></div>
+          <div class="me-sec"><span class="me-lbl">Beispiel</span><div class="me-ex"><b>Tutor:</b> ${esc(m.ex)}</div></div>
+          <div class="me-sec"><span class="me-lbl">Vermeiden</span><p>${m.avoid}</p></div>
+          ${m.app?`<div class="me-sec wide"><span class="me-lbl">In der App</span><div class="me-app">${m.app}</div></div>`:""}
+          <div class="me-sec wide"><span class="me-src">Quelle: ${m.src}</span></div>
+        </div>` : "";
+      return `<article class="me-card ${open?"open":""}" data-method="${m.id}">
+        <button class="me-head" data-meth="${m.id}" aria-expanded="${open}" aria-controls="me-b-${m.id}">
+          <span class="me-tags">${m.tags.map(t=>tagName[t]).join(" · ")}</span>
+          <span class="me-name">${m.name}</span><span class="me-en">${m.en}</span>
+          <span class="me-what">${m.what}</span>
+          <span class="me-foot">${methodDots(m.ev)}<span class="lnk">${open?"Schließen":"Öffnen →"}</span></span>
+        </button>${body}</article>`;
+    };
+    const groups=METHOD_GROUPS.map(g=>{
+      const ms=METHODS.filter(m=>m.g===g.id && match(m));
+      if(!ms.length) return "";
+      return `<div class="me-group"><div class="me-group-h"><h2>${g.t}</h2><span class="me-group-n">${ms.length} ${ms.length===1?"Methode":"Methoden"}</span></div>
+        <p class="me-group-sub">${g.sub}</p><div class="me-grid">${ms.map(card).join("")}</div></div>`;
+    }).join("");
+    const chips=[["all","Alle"],...METHOD_TAGS].map(([k,t])=>`<button class="me-chip ${f===k?"on":""}" data-meth-f="${k}" aria-pressed="${f===k}">${t}</button>`).join("");
+    const bar=el.querySelector(".me-bar");
+    if(!bar){
+      el.innerHTML=`<div class="me-bar"><div class="search-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="methodSearch" class="search-input" type="search" placeholder="Methode suchen…" autocomplete="off"></div><div class="me-chips"></div></div>
+        <p class="me-legend">Studienlage: <span class="me-dots">●●●</span> stark · <span class="me-dots">●●<span class="off">●</span></span> gut · <span class="me-dots">●<span class="off">●●</span></span> erste Hinweise</p><div class="me-list"></div>`;
+      $("#methodSearch").addEventListener("input", e=>{ state.methQuery=e.target.value; renderMethods(); });
+    }
+    el.querySelector(".me-chips").innerHTML=chips;
+    el.querySelector(".me-list").innerHTML=groups || `<div class="empty-list">Keine Methode gefunden.</div>`;
+    el.querySelectorAll("[data-meth-f]").forEach(b=> b.onclick=()=>{ state.methFilter=b.dataset.methF; renderMethods(); });
+    el.querySelectorAll("[data-meth]").forEach(b=> b.onclick=()=>{
+      state.methOpen = state.methOpen===b.dataset.meth ? null : b.dataset.meth;
+      renderMethods();
+      const c=el.querySelector(`[data-method="${b.dataset.meth}"]`);
+      if(c && state.methOpen && c.scrollIntoView) c.scrollIntoView({block:"nearest", behavior:"smooth"});
+    });
+  }
+
   // ---------- View switching ----------
   function setView(v) {
     state.view = v;
@@ -4842,6 +5091,7 @@
     if(v!=="session" && location.hash.startsWith("#stunde-")) history.replaceState(null, "", location.pathname + location.search);
     if(v==="students") renderRoster();
     if(v==="materials") renderMaterials();
+    if(v==="methods") renderMethods();
     document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b.dataset.view===v));
     document.querySelectorAll(".view").forEach(s=>s.classList.toggle("active", s.id==="view-"+v));
     $("#creditsPill").style.display = (state.role==="student") ? "" : "none";
