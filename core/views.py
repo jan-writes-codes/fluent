@@ -99,6 +99,7 @@ def serialize_user(u):
         "photo": u.photo,
         "avatarEmoji": u.avatar_emoji,
         "avatarBg": u.avatar_bg,
+        "weeklyLessons": float(u.weekly_lessons),
         "role": u.role,
         "billing": {
             "name": u.billing_name,
@@ -2307,6 +2308,22 @@ def api_settle(request):
     if not url:
         return JsonResponse({"error": "stripe_error"}, status=502)
     return JsonResponse({"url": url})
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_weekly_lessons(request, slug):
+    """Tutor sets how many lessons a week they plan with a student (0–20, in
+    half steps), for the weekly hours / income line in the student list."""
+    student = User.objects.filter(slug=slug, role="student").first()
+    if student is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    value = parse_body(request).get("weeklyLessons")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 20 or (value * 2) % 1:
+        return JsonResponse({"error": "Bitte 0 bis 20 in halben Schritten angeben."}, status=400)
+    student.weekly_lessons = Decimal(str(value))
+    student.save(update_fields=["weekly_lessons"])
+    return JsonResponse({"weeklyLessons": float(student.weekly_lessons)})
 
 
 @require_http_methods(["POST"])

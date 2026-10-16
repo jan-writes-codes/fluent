@@ -385,7 +385,10 @@
   .pf-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .pf-legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
   .pf-chart .empty { font-size: 12.5px; color: var(--faint); padding: 26px 0 22px; text-align: center; }
+  .rc-week { font: inherit; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 3px 6px; cursor: pointer; }
+  .rc-week:hover { border-color: var(--line); }
   .rc-week .rc-num { color: var(--ink); }
+  .rc-week-in { width: 68px; padding: 6px 8px; text-align: right; flex-shrink: 0; }
   .roster-week { font-size: 13px; color: var(--muted); margin: 0 2px 10px; }
   .roster-week b { color: var(--ink); }
   .pf-sum { font-size: 13px; color: var(--muted); margin-top: 3px; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -3315,9 +3318,7 @@
     const q=(state.studentQuery||"").trim().toLowerCase();
     const list=state.students.filter(s=> !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
     const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} von ${state.students.length}` : `${state.students.length} Schüler`;
-    const perWeek=new Map(state.students.map(s=>[s.id, lessonsPerWeek(s.id)]));
-    const total=[...perWeek.values()].reduce((a, b)=>a+b, 0), rw=$("#rosterWeek");
-    if(rw) rw.innerHTML = total ? `Im Schnitt <b>${fmtNum(total)} Stunden pro Woche</b> · ≈ <b>€ ${Math.round(total*state.creditPrice)}</b> pro Woche (Ø der letzten 8 Wochen, € ${state.creditPrice} pro Einheit)` : "";
+    renderRosterWeek();
     if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">Keine Schüler passen zu „${esc(q)}“.</div>`; renderTutorLists(); return; }
     list.forEach(s=>{
       const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
@@ -3325,13 +3326,14 @@
       card.innerHTML=`
         <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${avatarText(s)}</div>
         <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div></div>
-        <div class="rcredits rc-week" title="Stunden pro Woche, Ø der letzten 8 Wochen"><div class="rc-num">${fmtNum(perWeek.get(s.id)||0)}</div><div class="rc-lbl">pro Woche</div></div>
+        <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
         <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
         <div class="rc-actions">
           ${creditQuickAdds().map(n=>`<button class="mini-btn" data-add="${n}">+${n}</button>`).join("")}
         </div>`;
       card.querySelectorAll("[data-add]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); openSettleChooser(s, +btn.dataset.add, false); });
-      card.onclick=(e)=>{ if(e.target.closest("[data-add]")) return; openStudentModal(s); };
+      card.querySelector("[data-week]").onclick=(e)=>{ e.stopPropagation(); editWeekly(s, e.currentTarget); };
+      card.onclick=(e)=>{ if(e.target.closest("[data-add],[data-week],.rc-week-in")) return; openStudentModal(s); };
       card.style.cursor="pointer";
       el.appendChild(card);
     });
@@ -5053,16 +5055,34 @@
     </div>`;
   }
 
-  // Lessons per week, averaged over the last 8 weeks (or since the first
-  // lesson, if that is more recent), for planning the week's income.
-  function lessonsPerWeek(sid){
-    const from=NOW.getTime()-56*86400000;
-    const ls=state.bookings.filter(b=>b.studentId===sid && !b.isIntro && b._pk && b.status!=="requested" && lessonEnded(b));
-    const recent=ls.filter(b=>bookingStart(b).getTime()>=from);
-    if(!recent.length) return 0;
-    const first=Math.min(...ls.map(b=>bookingStart(b).getTime()));
-    const weeks=Math.min(8, Math.max(1, (NOW.getTime()+86400000-Math.max(first, from))/(7*86400000)));
-    return recent.length/weeks;
+  // Lessons per week: set by hand per student (not computed from bookings),
+  // summed into the weekly hours / income line above the student list.
+  function renderRosterWeek(){
+    const rw=$("#rosterWeek"); if(!rw) return;
+    const total=state.students.reduce((a, s)=>a+(s.weeklyLessons||0), 0);
+    rw.innerHTML = total
+      ? `Geplant: <b>${fmtNum(total)} Stunden pro Woche</b> · ≈ <b>€ ${Math.round(total*state.creditPrice)}</b> pro Woche (€ ${state.creditPrice} pro Einheit)`
+      : `Tippe bei einem Schüler auf „pro Woche“, um festzulegen, wie oft ihr euch seht.`;
+  }
+  function editWeekly(s, btn){
+    const inp=document.createElement("input");
+    // Text, not type=number: "1,5" must work whatever the browser's language.
+    inp.type="text"; inp.inputMode="decimal"; inp.value=fmtNum(s.weeklyLessons||0);
+    inp.className="bf-input rc-week-in"; inp.setAttribute("aria-label", `Stunden pro Woche mit ${s.name}`);
+    btn.replaceWith(inp); inp.focus(); inp.select();
+    let done=false;
+    const finish=async (save)=>{
+      if(done) return; done=true;
+      const v=Math.round(parseFloat(String(inp.value).replace(",", "."))*2)/2;
+      if(save && !isNaN(v) && v!==(s.weeklyLessons||0)){
+        const r=await apiResult('POST', `/api/students/${s.id}/weekly-lessons/`, { weeklyLessons: v });
+        if(r.ok) s.weeklyLessons=r.data.weeklyLessons; else toast((r.data && r.data.error) || "Speichern fehlgeschlagen");
+      }
+      renderRoster();
+    };
+    inp.onclick=e=>e.stopPropagation();
+    inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); finish(true); } if(e.key==="Escape") finish(false); };
+    inp.onblur=()=>finish(true);
   }
 
   // The student's progression in one list: every lesson with its summary,

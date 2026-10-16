@@ -23,6 +23,7 @@ Map of bug -> guarding test:
   * identity always shows Maya ........... DomRoleTests.test_identity_*
 """
 import hashlib
+from decimal import Decimal
 import hmac
 import io
 import json
@@ -4341,6 +4342,7 @@ class EnglishSiteTests(FluentDataMixin, TestCase):
 
 class ProgressChartDomTests(_DomProbeBase):
     def test_progress_charts_and_lessons_per_week(self):
+        User.objects.filter(pk=self.maya.pk).update(weekly_lessons=Decimal("1.5"))
         today = timezone.localdate()
         for days in (6, 13, 20, 27):  # one lesson a week for four weeks
             Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=days), time="09:00")
@@ -4354,8 +4356,30 @@ class ProgressChartDomTests(_DomProbeBase):
         self.assertTrue(all(c["svg"] for c in st["charts"]))
         self.assertTrue(any("Note 3" in t for t in st["charts"][2]["tips"]))
         per = dict(st["week"]["perStudent"])
-        self.assertEqual(per["Maya Karlsson"], "1")
-        self.assertIn("Stunden pro Woche", st["week"]["total"])
+        self.assertEqual(per["Maya Karlsson"], "1,5")  # set by hand, not from the four bookings
+        self.assertEqual(per["Ines Reyes"], "0")
+        self.assertIn("1,5 Stunden pro Woche", st["week"]["total"])
         # The student sees the same charts on their own page.
         mine = self.run_probe(self.maya, school_tests=True)["schoolTests"]["charts"]
         self.assertEqual(len(mine), 3)
+
+
+class WeeklyLessonsTests(FluentDataMixin, TestCase):
+    def _set(self, actor, slug, value):
+        self.client.force_login(actor)
+        return self.client.post(f"/api/students/{slug}/weekly-lessons/", data=json.dumps({"weeklyLessons": value}),
+                                content_type="application/json")
+
+    def test_tutor_sets_weekly_lessons(self):
+        r = self._set(self.davit, "maya", 2.5)
+        self.assertEqual((r.status_code, r.json()["weeklyLessons"]), (200, 2.5))
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.weekly_lessons, Decimal("2.5"))
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual({s["slug"]: s["weeklyLessons"] for s in payload["students"]}["maya"], 2.5)
+
+    def test_validation_and_roles(self):
+        for bad in (-1, 21, 1.3, "2", True, None):
+            self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
+        self.assertEqual(self._set(self.davit, "nobody", 1).status_code, 404)
+        self.assertEqual(self._set(self.maya, "maya", 3).status_code, 403)

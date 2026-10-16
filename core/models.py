@@ -37,6 +37,9 @@ class User(AbstractUser):
     # The login flow forces the user to pick their own password before they can
     # reach the app; self-set passwords (forced change, e-mail reset) clear it.
     must_change_password = models.BooleanField(default=False)
+    # Students only: how many lessons a week the tutor plans with this student,
+    # set by hand in the student list. Drives the weekly hours / income line.
+    weekly_lessons = models.DecimalField(max_digits=3, decimal_places=1, default=0)
 
     class Meta:
         db_table = 'core_user'
