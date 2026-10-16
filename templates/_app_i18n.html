@@ -1,0 +1,10 @@
+{% comment %}
+  Language support for the signed-in app, the login page and the payment-link
+  page, included in their <head>. The pages are written in German; in English
+  static/js/i18n/translate.js swaps the text using the dictionary in
+  static/js/i18n/en.js (see static/js/i18n/README.md). switch.js drives the
+  DE/EN buttons (data-set-lang).
+{% endcomment %}{% load static %}{% if LANGUAGE_CODE == "en" %}
+<script src="{% static 'js/i18n/en.js' %}"></script>
+<script src="{% static 'js/i18n/translate.js' %}"></script>{% endif %}
+<script src="{% static 'js/i18n/switch.js' %}" defer></script>

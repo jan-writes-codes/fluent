@@ -1,0 +1,12 @@
+{% if is_intro %}Trial lesson{% else %}English lesson{% endif %} cancelled.
+
+{{ person_name }} has cancelled {% if is_intro %}the trial lesson{% else %}the English lesson{% endif %}.
+
+Date:     {{ when }}
+Tutor:    {{ tutor_name }}
+Contact:  {{ person_name }}{% if person_email %} <{{ person_email }}>{% endif %}
+{% if not is_intro %}{% if refunded %}
+The credit has been returned to the student.{% else %}
+Cancelled within 24 hours. The credit was not refunded.{% endif %}
+{% endif %}
+The booking has been removed from your calendar in the tutor portal.

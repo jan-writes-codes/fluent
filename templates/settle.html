@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="de">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
 {% include "_consent.html" %}
 <meta charset="UTF-8" />
@@ -10,6 +10,7 @@
      declared #f5f2ea sat warm against the grain-tinted page and painted a
      permanent off-tone strip along the screen edges. -->
 <title>Offene Einheiten begleichen · The Green Pencil</title>
+{% include "_app_i18n.html" %}
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
 <style>
@@ -45,6 +46,7 @@
 </style>
 </head>
 <body>
+{% include "_app_lang_switch.html" %}
   <div class="card">
   {% if invalid %}
     <span class="badge">the green pencil</span>

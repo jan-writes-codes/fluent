@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
 {% include "_consent.html" %}
 <meta charset="UTF-8" />
@@ -13,6 +13,7 @@
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
 <meta name="csrf-token" content="{{ csrf_token }}">
+{% include "_app_i18n.html" %}
 {% include "_fonts.html" %}
 <style>
   :root {
@@ -1407,6 +1408,7 @@
             <div><div class="um-name" id="umName">Maya Karlsson</div><div class="um-mail" id="umMail">maya@fluent.at</div></div>
           </div>
           <button class="um-item" id="avatarPickBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>Profilbild ändern</button>
+          {% if LANGUAGE_CODE == "en" %}<button class="um-item" data-set-lang="de" data-no-i18n lang="de"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>Deutsch</button>{% else %}<button class="um-item" data-set-lang="en" data-no-i18n lang="en"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>English</button>{% endif %}
           <button class="um-item" id="logoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Abmelden</button>
         </div>
       </div>

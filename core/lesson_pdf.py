@@ -14,11 +14,37 @@ import io
 import logging
 from xml.sax.saxutils import escape
 
+from django.utils.translation import get_language
+
 from .receipts_pdf import _GREEN, _INK, _LINE, _MUTE, _draw_logo
 
 logger = logging.getLogger(__name__)
 
 _WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+_WEEKDAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+# The PDF follows the language of whoever downloads it (core.middleware
+# activates the account's language for app requests).
+_EN = {
+    "Englisch-Stunde": "English lesson", "mit": "with", "Themen": "Topics",
+    "Zusammenfassung": "Summary", "Wortschatz": "Vocabulary", "WORT": "WORD",
+    "BEDEUTUNG": "MEANING", "BEISPIEL": "EXAMPLE", "Fehler": "Mistakes",
+    "SO GESAGT": "YOU SAID", "RICHTIG": "CORRECT", "WARUM": "WHY", "erledigt": "done",
+    "offen": "open", "Übungen": "Exercises", "Hausaufgabe": "Homework",
+    "(nicht in diesem PDF)": "(not in this PDF)",
+    "Die Arbeitsblätter folgen auf den nächsten Seiten, mit den markierten Wörtern und Fehlern und euren Notizen. ":
+        "The worksheets follow on the next pages, with the marked words and mistakes and your notes. ",
+    "Alle Dateien findest du in deinem Bereich auf thegreenpencil.at.":
+        "You'll find all files in your area on thegreenpencil.at.",
+    "Materialien": "Materials",
+    "Zu dieser Stunde wurde noch nichts eingetragen.": "Nothing has been added to this lesson yet.",
+    "STUNDENÜBERSICHT": "LESSON OVERVIEW", "Seite": "Page", "Stunde": "Lesson",
+    "W": "V", "F": "M",
+}
+
+
+def _t(text):
+    return _EN.get(text, text) if get_language() == "en" else text
 _STORNO_RED = (0.72, 0.28, 0.17)  # muted red for the "as said" side of a mistake
 _CREAM = (0.965, 0.953, 0.922)
 _CREAM_LINE = (0.85, 0.83, 0.78)
@@ -262,7 +288,8 @@ def render_lesson_pdf(booking, sheet_bytes=None):
     M = 48
     HEADER_H = 72  # room for the brand mark on the first page
 
-    when = (f"{_WEEKDAYS[booking.date.weekday()]}, {booking.date.strftime('%d.%m.%Y')} · "
+    weekdays = _WEEKDAYS_EN if get_language() == "en" else _WEEKDAYS
+    when = (f"{weekdays[booking.date.weekday()]}, {booking.date.strftime('%d.%m.%Y')} · "
             f"{booking.time}–{_end_time(booking.time, booking.minutes)}")
     student = _clean(booking.student_name)
     tutor_first = _clean(booking.tutor_name).split(" ")[0]
@@ -284,9 +311,9 @@ def render_lesson_pdf(booking, sheet_bytes=None):
                         textColor=rgb(_GREEN))
 
     story = [
-        Paragraph(_para_text(booking.title or "Englisch-Stunde"), title),
+        Paragraph(_para_text(booking.title or _t("Englisch-Stunde")), title),
         Spacer(1, 4),
-        Paragraph(escape(" · ".join(p for p in [student, f"mit {tutor_first}" if tutor_first else ""] if p)
+        Paragraph(escape(" · ".join(p for p in [student, f"{_t('mit')} {tutor_first}" if tutor_first else ""] if p)
                          + f" · {when}"), meta),
         Spacer(1, 8),
     ]
@@ -325,18 +352,18 @@ def render_lesson_pdf(booking, sheet_bytes=None):
 
     if _clean(booking.notes):
         has_content = True
-        section("Themen", [Paragraph(_para_text(booking.notes), body)])
+        section(_t("Themen"), [Paragraph(_para_text(booking.notes), body)])
 
     if _clean(booking.summary):
         has_content = True
-        section("Zusammenfassung", [Paragraph(_para_text(booking.summary), body)])
+        section(_t("Zusammenfassung"), [Paragraph(_para_text(booking.summary), body)])
 
     cards = list(booking.error_cards.all().order_by("created_at"))
     vocab = [c for c in cards if c.kind == "vocab"]
     errors = [c for c in cards if c.kind != "vocab"]
     # Row labels shared by the tables and the badges on the worksheet pages.
-    labels = {c.pk: f"W{i}" for i, c in enumerate(vocab, 1)}
-    labels.update({c.pk: f"F{i}" for i, c in enumerate(errors, 1)})
+    labels = {c.pk: f"{_t('W')}{i}" for i, c in enumerate(vocab, 1)}
+    labels.update({c.pk: f"{_t('F')}{i}" for i, c in enumerate(errors, 1)})
 
     sheets = list(booking.files.filter(kind="worksheet").defer("data"))
     appended = []  # (session file, kind, bytes) for the pages after the overview
@@ -363,7 +390,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
         rows = [[label_cell(c, "#309050"), Paragraph(_para_text(c.front), cell_b),
                  Paragraph(_para_text(c.back), cell), Paragraph(_para_text(c.note), cell_mute)]
                 for c in vocab]
-        section("Wortschatz", [card_table(["", "WORT", "BEDEUTUNG", "BEISPIEL"], rows,
+        section(_t("Wortschatz"), [card_table(["", _t("WORT"), _t("BEDEUTUNG"), _t("BEISPIEL")], rows,
                                           [30] + _split(inner - 30, 0.28, 0.30, 0.42))], len(vocab))
 
     if errors:
@@ -371,7 +398,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
         rows = [[label_cell(c, "#c2702f"), Paragraph(_para_text(c.front), cell_wrong),
                  Paragraph(_para_text(c.back), cell_right), Paragraph(_para_text(c.note), cell_mute)]
                 for c in errors]
-        section("Fehler", [card_table(["", "SO GESAGT", "RICHTIG", "WARUM"], rows,
+        section(_t("Fehler"), [card_table(["", _t("SO GESAGT"), _t("RICHTIG"), _t("WARUM")], rows,
                                       [30] + _split(inner - 30, 0.33, 0.33, 0.34))], len(errors))
 
     exercises = list(booking.exercises.all())
@@ -386,8 +413,8 @@ def render_lesson_pdf(booking, sheet_bytes=None):
                 href = escape(e.link, {'"': "&quot;"})
                 parts.append(f"<font size='8.5'><a href=\"{href}\" color='#309050'>"
                              f"{escape(_clean(e.link))}</a></font>")
-            status = ("<font color='#309050'><b>erledigt</b></font>" if e.done
-                      else "<font color='#8a8a85'>offen</font>")
+            status = (f"<font color='#309050'><b>{_t('erledigt')}</b></font>" if e.done
+                      else f"<font color='#8a8a85'>{_t('offen')}</font>")
             rows.append([Paragraph("<br/>".join(parts), cell),
                          Paragraph(status, ParagraphStyle("st", parent=cell, fontSize=8.5,
                                                           alignment=2))])
@@ -398,7 +425,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ("LINEBELOW", (0, 0), (-1, -2), 0.5, rgb(_LINE)),
         ]))
-        section("Übungen", [t], len(exercises))
+        section(_t("Übungen"), [t], len(exercises))
 
     if _clean(booking.homework):
         has_content = True
@@ -409,26 +436,27 @@ def render_lesson_pdf(booking, sheet_bytes=None):
             ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
             ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
         ]))
-        section("Hausaufgabe", [box])
+        section(_t("Hausaufgabe"), [box])
 
     if sheets:
         has_content = True
         included = {f.pk for f, _, _ in appended}
         items = [Paragraph(f"&bull;&nbsp;&nbsp;{_para_text(f.name)}"
                            + ("" if f.pk in included
-                              else "&nbsp;&nbsp;<font size='8.5' color='#8a8a85'>(nicht in diesem PDF)</font>"),
+                              else "&nbsp;&nbsp;<font size='8.5' color='#8a8a85'>"
+                                   + _t("(nicht in diesem PDF)") + "</font>"),
                            body) for f in sheets]
         items.append(Spacer(1, 3))
         items.append(Paragraph(
-            ("Die Arbeitsblätter folgen auf den nächsten Seiten, mit den markierten Wörtern und Fehlern "
-             "und euren Notizen. "
+            (_t("Die Arbeitsblätter folgen auf den nächsten Seiten, mit den markierten Wörtern und Fehlern "
+                "und euren Notizen. ")
              if included else "")
-            + "Alle Dateien findest du in deinem Bereich auf thegreenpencil.at.", small))
-        section("Materialien", items, len(sheets))
+            + _t("Alle Dateien findest du in deinem Bereich auf thegreenpencil.at."), small))
+        section(_t("Materialien"), items, len(sheets))
 
     if not has_content:
         story.append(Spacer(1, 18))
-        story.append(Paragraph("Zu dieser Stunde wurde noch nichts eingetragen.", meta))
+        story.append(Paragraph(_t("Zu dieser Stunde wurde noch nichts eingetragen."), meta))
 
     # ---- Page furniture ----------------------------------------------------
     def first_page(c, doc):
@@ -436,7 +464,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
         _draw_logo(c, M, top)
         c.setFillColorRGB(*_GREEN)
         c.setFont("Helvetica-Bold", 10)
-        c.drawRightString(W - M, top - 6, "STUNDENÜBERSICHT")
+        c.drawRightString(W - M, top - 6, _t("STUNDENÜBERSICHT"))
         c.setFillColorRGB(*_MUTE)
         c.setFont("Helvetica", 10)
         c.drawRightString(W - M, top - 22, booking.date.strftime("%d.%m.%Y"))
@@ -449,7 +477,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
         c.setFillColorRGB(*_MUTE)
         c.setFont("Helvetica", 8.5)
         c.drawString(M, M - 18, "thegreenpencil.at")
-        c.drawRightString(W - M, M - 18, f"Seite {doc.page}")
+        c.drawRightString(W - M, M - 18, f"{_t('Seite')} {doc.page}")
 
     buf = io.BytesIO()
     # The frame pads its content by 6pt; take that off the margins so text lines
@@ -457,7 +485,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
     P = 6
     doc = SimpleDocTemplate(
         buf, pagesize=A4, leftMargin=M - P, rightMargin=M - P, topMargin=M - P, bottomMargin=M - P,
-        title=f"Stunde {booking.date.strftime('%d.%m.%Y')} · {student}".strip(" ·"),
+        title=f"{_t('Stunde')} {booking.date.strftime('%d.%m.%Y')} · {student}".strip(" ·"),
         author="The Green Pencil",
     )
     # The first page reserves space under the brand header; later pages don't.

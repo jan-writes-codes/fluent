@@ -39,6 +39,7 @@ urlpatterns = [
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('api/login/', views.api_login),
     path('api/logout/', views.api_logout),
+    path('api/language/', views.api_language),
     # Password lifecycle: forced first-login change, and the e-mailed
     # "Passwort vergessen" reset link (page + submit endpoint).
     path('api/password/change/', views.api_change_password),

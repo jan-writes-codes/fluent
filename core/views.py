@@ -32,6 +32,7 @@ from .models import (
 from django.db.models import Prefetch
 from . import emails, video
 from .ical import build_tutor_feed
+from .middleware import LANGUAGE_COOKIE
 from .receipts_pdf import render_receipt_pdf
 from .lesson_pdf import lesson_pdf_filename, render_lesson_pdf
 
@@ -1252,6 +1253,11 @@ def api_login(request):
     if user_obj is None:
         return JsonResponse({"error": INVALID}, status=400)
     login(request, user_obj)
+    # A language picked on the login page becomes the account's language.
+    picked = request.COOKIES.get(LANGUAGE_COOKIE)
+    if picked in ("de", "en") and picked != user_obj.language:
+        user_obj.language = picked
+        user_obj.save(update_fields=["language"])
     return JsonResponse({
         "ok": True,
         "role": user_obj.role,
@@ -1261,6 +1267,23 @@ def api_login(request):
         # instead of entering the app.
         "mustChangePassword": user_obj.must_change_password,
     })
+
+
+@require_http_methods(["POST"])
+def api_language(request):
+    """The DE/EN switch in the app and on the login page. Saved on the account
+    when signed in (the app, e-mails and PDFs then follow it) and in a cookie,
+    so the login page remembers it too."""
+    lang = parse_body(request).get("language")
+    if lang not in ("de", "en"):
+        return JsonResponse({"error": "Unbekannte Sprache."}, status=400)
+    if request.user.is_authenticated and request.user.language != lang:
+        request.user.language = lang
+        request.user.save(update_fields=["language"])
+    resp = JsonResponse({"ok": True, "language": lang})
+    resp.set_cookie(LANGUAGE_COOKIE, lang, max_age=60 * 60 * 24 * 365, samesite="Lax",
+                    secure=request.is_secure())
+    return resp
 
 
 @require_http_methods(["POST"])

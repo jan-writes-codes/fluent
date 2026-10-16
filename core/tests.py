@@ -4518,3 +4518,137 @@ class WeeklyLessonsTests(FluentDataMixin, TestCase):
             self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
         self.assertEqual(self._set(self.davit, "nobody", 1).status_code, 404)
         self.assertEqual(self._set(self.maya, "maya", 3).status_code, 403)
+
+
+from django.core import mail  # noqa: E402
+
+from .middleware import LANGUAGE_COOKIE as LANGUAGE_COOKIE_NAME  # noqa: E402
+
+
+class AppLanguageTests(FluentDataMixin, TestCase):
+    """The DE/EN switch for the signed-in app, the login page and app e-mails."""
+
+    def set_language(self, lang):
+        return self.client.post("/api/language/", data=json.dumps({"language": lang}),
+                                content_type="application/json")
+
+    def test_app_is_german_by_default(self):
+        self.client.force_login(self.maya)
+        html = self.client.get(reverse("app")).content.decode()
+        self.assertIn('<html lang="de"', html)
+        self.assertNotIn("js/i18n/translate.js", html)
+        self.assertIn('data-set-lang="en"', html)
+
+    def test_switch_saves_the_language_on_the_account(self):
+        self.client.force_login(self.maya)
+        resp = self.set_language("en")
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.language, "en")
+        html = self.client.get(reverse("app")).content.decode()
+        self.assertIn('<html lang="en"', html)
+        self.assertIn("js/i18n/en.js", html)
+        self.assertIn("js/i18n/translate.js", html)
+        self.assertIn('data-set-lang="de"', html)
+        # The calendar's day and month names are English too.
+        self.assertIn('const DOW = ["Mon"', html)
+
+    def test_unknown_language_is_rejected(self):
+        self.assertEqual(self.set_language("fr").status_code, 400)
+
+    def test_login_page_follows_the_cookie_and_login_keeps_it(self):
+        self.set_language("en")
+        self.assertIn(LANGUAGE_COOKIE_NAME, self.client.cookies)
+        self.assertContains(self.client.get("/login/"), '<html lang="en"')
+        resp = self.client.post("/api/login/", data=json.dumps(
+            {"email": "ines@fluent.at", "password": "password"}), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.language, "en")
+
+    def test_account_language_wins_over_a_stale_cookie(self):
+        self.maya.language = "en"
+        self.maya.save()
+        self.client.force_login(self.maya)
+        self.client.cookies[LANGUAGE_COOKIE_NAME] = "de"
+        self.assertContains(self.client.get(reverse("app")), '<html lang="en"')
+
+    def test_public_pages_ignore_the_app_language(self):
+        self.maya.language = "en"
+        self.maya.save()
+        self.client.force_login(self.maya)
+        self.assertContains(self.client.get("/"), '<html lang="de"')
+        self.assertContains(self.client.get("/en/"), '<html lang="en"')
+
+    def test_api_messages_stay_german_for_the_dictionary(self):
+        # The translator swaps German API messages for English in the browser,
+        # so the server keeps sending the German text whatever the language.
+        self.set_language("en")
+        resp = self.client.post("/api/login/", data=json.dumps(
+            {"email": "maya@fluent.at", "password": "wrong"}), content_type="application/json")
+        self.assertEqual(resp.json()["error"], "E-Mail oder Passwort ungültig.")
+
+    def test_lesson_mails_follow_each_recipients_language(self):
+        from . import emails
+        self.maya.language = "en"
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        self.davit.email = "davit@example.com"
+        self.davit.save()
+        b = Booking.objects.create(student=self.maya, tutor=self.davit, date=date(2026, 7, 6),
+                                   time="10:00", title="Speaking", cancel_token="tok123")
+        mail.outbox.clear()
+        emails.send_lesson_student_confirmation(b.pk)
+        emails.send_lesson_tutor_notification(b.pk)
+        student, tutor = mail.outbox
+        self.assertTrue(student.subject.startswith("Your English lesson is booked · Monday, 6 July 2026"))
+        self.assertIn("/en/cancel/tok123/", student.body)
+        self.assertTrue(tutor.subject.startswith("Neue Buchung: Maya Karlsson · Montag, 6. Juli 2026"))
+        self.assertIn("/cancel/tok123/", tutor.body)
+        self.assertNotIn("/en/cancel/", tutor.body)
+
+    def test_cancellation_mails_follow_each_recipients_language(self):
+        from . import emails
+        self.davit.language = "en"
+        self.davit.email = "davit@example.com"
+        self.davit.save()
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        b = Booking.objects.create(student=self.maya, tutor=self.davit, date=date(2026, 7, 6),
+                                   time="10:00", title="Speaking")
+        snapshot = emails._cancel_snapshot(b, refunded=True)
+        mail.outbox.clear()
+        emails.send_cancellation_notifications(snapshot)
+        student, tutor = mail.outbox
+        self.assertTrue(student.subject.startswith("Storniert: deine Englischstunde · Montag"))
+        self.assertTrue(tutor.subject.startswith("Cancelled: Maya Karlsson · English lesson · Monday"))
+        self.assertIn("Monday, 6 July 2026", tutor.body)
+
+    def test_password_reset_mail_in_english(self):
+        from . import emails
+        self.maya.language = "en"
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        mail.outbox.clear()
+        emails.send_password_reset(self.maya.pk, "https://example.com/reset/")
+        self.assertEqual(mail.outbox[0].subject, "Reset your password · The Green Pencil")
+        self.assertIn("https://example.com/reset/", mail.outbox[0].body)
+
+    def test_translator_in_a_headless_browser(self):
+        node = _node_bin()
+        if not node or not _jsdom_installed():
+            self.skipTest("node/jsdom not available — run `cd tests/frontend && npm install`")
+        out = subprocess.run([node, os.path.join(FRONTEND_DIR, "i18n_probe.js")],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        r = json.loads(out.stdout)
+        self.assertEqual(r["out"], "  Sign out ")          # surrounding spaces kept
+        self.assertEqual(r["keep"], "Abmelden")            # data-no-i18n left alone
+        self.assertEqual(r["ta"], "Abmelden")              # typed text left alone
+        self.assertEqual(r["note"], "Save")                # attribute changed later
+        self.assertEqual(r["req"], "Request sent to Davit · Mo 3")
+        self.assertEqual(r["one"], "1 outstanding credit · € 30")
+        self.assertEqual(r["many"], "3 outstanding credits · € 90")
+        self.assertEqual((r["att"], r["attTitle"], r["txt"]), ("Lesson booked", "Save", "Save"))
+        self.assertEqual(r["confirm"], "Sign out")
+        self.assertEqual(r["title"], "Save")

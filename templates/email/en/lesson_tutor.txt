@@ -1,0 +1,15 @@
+New lesson booked.
+
+{{ student_name }} has booked a lesson with you.
+
+Date:     {{ when }}
+Student:  {{ student_name }}{% if student_email %} <{{ student_email }}>{% endif %}
+Topic:    {{ title }}
+
+The booking is already in your calendar in the tutor portal.{% if student_email %}
+You can reply to {{ student_first }} directly at {{ student_email }}.{% endif %}
+{% if cancel_url %}
+Need to cancel? You can cancel the lesson here (if cancelled more than
+24 hours in advance, the credit will be returned):
+{{ cancel_url }}
+{% endif %}

@@ -31,13 +31,18 @@ _DOW_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "
 _MON_EN = ["", "January", "February", "March", "April", "May", "June", "July", "August",
            "September", "October", "November", "December"]
 
-# Guests who booked on the English site get the guest-facing mails (intro
-# confirmation, cancellation) in English: templates/email/en/. Everything the
-# studio or a logged-in student receives stays German.
+# Mail goes out in the recipient's language: a guest who booked on the English
+# site, or an account set to English (User.language), gets templates/email/en/.
+# The studio's own inbox always gets German.
 
 
 def _tpl(name, lang):
     return f"email/en/{name}" if lang == "en" else f"email/{name}"
+
+
+def _lang(user):
+    """The language an account's mail is written in ('de' without an account)."""
+    return "en" if user is not None and getattr(user, "language", "de") == "en" else "de"
 
 
 def _lang_prefix(lang):
@@ -235,13 +240,14 @@ def send_intro_tutor_notification(booking_id):
     msg.send()
 
 
-def _lesson_ctx(booking):
+def _lesson_ctx(booking, lang="de"):
+    en = lang == "en"
     name, email = _student_contact(booking)
-    name = name or "Ein Schüler"
+    name = name or ("A student" if en else "Ein Schüler")
     return {
-        **_booking_ctx(booking, "Tutor"),
+        **_booking_ctx(booking, "Tutor", lang),
         "student_name": name,
-        "student_first": _first(name, "dein Schüler"),
+        "student_first": _first(name, "your student" if en else "dein Schüler"),
         "student_email": email,
         "title": booking.title,
     }
@@ -253,14 +259,17 @@ def send_lesson_student_confirmation(booking_id):
     booking = Booking.objects.filter(pk=booking_id).first()
     if not booking or booking.is_intro:
         return
-    ctx = _lesson_ctx(booking)
+    lang = _lang(booking.student if booking.student_id else None)
+    ctx = _lesson_ctx(booking, lang)
     if not ctx["student_email"]:
         return
-    subject = f"Deine Englischstunde ist gebucht · {ctx['date_long']} {ctx['time_range']}"
+    subject = (f"Your English lesson is booked · {ctx['date_long']} {ctx['time_range']}"
+               if lang == "en" else
+               f"Deine Englischstunde ist gebucht · {ctx['date_long']} {ctx['time_range']}")
     msg = _message(
         subject, ctx["student_email"],
-        render_to_string("email/lesson_student.txt", ctx),
-        render_to_string("email/lesson_student.html", ctx),
+        render_to_string(_tpl("lesson_student.txt", lang), ctx),
+        render_to_string(_tpl("lesson_student.html", lang), ctx),
     )
     msg.send()
 
@@ -277,25 +286,28 @@ def send_lesson_tutor_notification(booking_id):
     to = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
     if not to:
         return
-    ctx = _lesson_ctx(booking)
-    subject = f"Neue Buchung: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}"
+    lang = _lang(booking.tutor)
+    ctx = _lesson_ctx(booking, lang)
+    subject = (f"New booking: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}"
+               if lang == "en" else
+               f"Neue Buchung: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}")
     # Reply goes to the student so the tutor can answer directly.
     reply_to = [ctx["student_email"]] if ctx["student_email"] else None
     msg = _message(
         subject, to,
-        render_to_string("email/lesson_tutor.txt", ctx),
-        render_to_string("email/lesson_tutor.html", ctx),
+        render_to_string(_tpl("lesson_tutor.txt", lang), ctx),
+        render_to_string(_tpl("lesson_tutor.html", lang), ctx),
         reply_to=reply_to,
     )
     msg.send()
 
 
-def _notice(subject, to, ctx, reply_to=None):
+def _notice(subject, to, ctx, reply_to=None, lang="de"):
     """Send the shared booking-notice mail (badge, heading, slot, body lines, CTA)."""
     msg = _message(
         subject, to,
-        render_to_string("email/booking_notice.txt", ctx),
-        render_to_string("email/booking_notice.html", ctx),
+        render_to_string(_tpl("booking_notice.txt", lang), ctx),
+        render_to_string(_tpl("booking_notice.html", lang), ctx),
         reply_to=reply_to,
     )
     msg.send()
@@ -306,8 +318,24 @@ def send_lesson_request_student(booking_id):
     booking = Booking.objects.filter(pk=booking_id).first()
     if not booking or booking.is_intro:
         return
-    ctx = _lesson_ctx(booking)
+    lang = _lang(booking.student if booking.student_id else None)
+    ctx = _lesson_ctx(booking, lang)
     if not ctx["student_email"]:
+        return
+    if lang == "en":
+        _notice(
+            f"Request sent · {ctx['date_long']} {ctx['time_range']}", ctx["student_email"], {
+                **ctx, "badge": "Request sent", "tone": "ok",
+                "heading": f"Your request is with {ctx['tutor_first']}.",
+                "who_label": "Tutor", "who": ctx["tutor_name"],
+                "body": [
+                    f"The slot is held for you and a credit is set aside. As soon as "
+                    f"{ctx['tutor_first']} confirms, you'll get the booking confirmation.",
+                    "If the request isn't confirmed, you get the credit back automatically.",
+                ],
+                "cta_url": f"{settings.SITE_URL}/app/", "cta_label": "Go to my bookings",
+            }, lang=lang,
+        )
         return
     _notice(
         f"Anfrage gesendet · {ctx['date_long']} {ctx['time_range']}", ctx["student_email"], {
@@ -332,8 +360,26 @@ def send_lesson_request_tutor(booking_id):
     to = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
     if not to:
         return
-    ctx = _lesson_ctx(booking)
+    lang = _lang(booking.tutor)
+    ctx = _lesson_ctx(booking, lang)
     deadline = timezone.localtime(booking.request_deadline())
+    if lang == "en":
+        _notice(
+            f"Please confirm: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}", to, {
+                **ctx, "badge": "New request", "tone": "ok",
+                "heading": f"{ctx['student_name']} would like to book a lesson.",
+                "who_label": "Student", "who": ctx["student_name"],
+                "body": [
+                    "Please confirm or decline the request in the tutor portal. Until then, "
+                    "nobody else can book the slot.",
+                    f"Without an answer by {deadline.strftime('%d.%m.%Y, %H:%M')}, the request is "
+                    "declined automatically and the credit refunded.",
+                ],
+                "cta_url": f"{settings.SITE_URL}/app/", "cta_label": "View request",
+            },
+            reply_to=[ctx["student_email"]] if ctx["student_email"] else None, lang=lang,
+        )
+        return
     _notice(
         f"Bitte bestätigen: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}", to, {
             **ctx, "badge": "Neue Anfrage", "tone": "ok",
@@ -357,6 +403,19 @@ def send_lesson_request_declined(snapshot, reason):
     if not snapshot.get("person_email"):
         return
     declined = reason == "declined"
+    if snapshot.get("lang") == "en":
+        _notice(
+            f"{'Declined' if declined else 'Not confirmed'}: your request · {snapshot['date_long']}",
+            snapshot["person_email"], {
+                **snapshot, "badge": "Declined" if declined else "Not confirmed", "tone": "warn",
+                "heading": ("Unfortunately this time doesn't work." if declined
+                            else "Your request wasn't confirmed in time."),
+                "who_label": "Tutor", "who": snapshot["tutor_name"],
+                "body": ["The credit is back in your account. Feel free to pick another time."],
+                "cta_url": f"{settings.SITE_URL}/app/", "cta_label": "Choose a new time",
+            }, lang="en",
+        )
+        return
     _notice(
         f"{'Abgelehnt' if declined else 'Nicht bestätigt'}: deine Anfrage · {snapshot['date_long']}",
         snapshot["person_email"], {
@@ -378,21 +437,30 @@ def _cancel_snapshot(booking, *, refunded=False):
     deletes the booking). Mirrors the confirmation recipients: an intro notifies the
     guest and the studio inbox; a paid lesson notifies the student and that lesson's
     own tutor."""
-    # A guest cancelling from the English page (/en/cancel/...) gets the English
-    # mail; everything else is German.
-    lang = "en" if booking.is_intro and get_language() == "en" else "de"
+    # A guest gets the language of the page they cancelled on (/en/cancel/...);
+    # a student and a tutor get their account's language.
+    if booking.is_intro:
+        lang = "en" if get_language() == "en" else "de"
+        tutor_lang = "de"
+    else:
+        lang = _lang(booking.student if booking.student_id else None)
+        tutor_lang = _lang(booking.tutor if booking.tutor_id else None)
     if booking.is_intro:
         person_name, person_email = booking.guest_name or "Gast", booking.guest_email or ""
         # Intros go to the studio-wide inbox, just like the booking notification.
         tutor_email = settings.TUTOR_NOTIFY_EMAIL or ""
     else:
         person_name, person_email = _student_contact(booking)
-        person_name = person_name or "Schüler"
+        person_name = person_name or ("Student" if lang == "en" else "Schüler")
         # Paid lessons go to that lesson's own tutor, not the studio inbox.
         tutor_email = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
     return {
         **_booking_ctx(booking, "Tutor", lang),
         "lang": lang,
+        "tutor_lang": tutor_lang,
+        # The date line once more in the tutor's language, for their copy.
+        "tutor_when": when(booking, tutor_lang),
+        "tutor_date_long": _date_long(booking.date, tutor_lang),
         "is_intro": booking.is_intro,
         "person_name": person_name,
         "person_first": _first(person_name, "du"),
@@ -413,7 +481,8 @@ def send_cancellation_notifications(snapshot):
     # The person who booked: the guest for an intro, the student for a paid lesson.
     if snapshot.get("person_email"):
         lang = snapshot.get("lang", "de")
-        subject = (f"Cancelled: your trial lesson · {snapshot['date_long']}" if lang == "en"
+        en_label = "trial lesson" if is_intro else "English lesson"
+        subject = (f"Cancelled: your {en_label} · {snapshot['date_long']}" if lang == "en"
                    else f"Storniert: deine {label} · {snapshot['date_long']}")
         msg = _message(
             subject, snapshot["person_email"],
@@ -424,13 +493,18 @@ def send_cancellation_notifications(snapshot):
 
     # The tutor: the lesson's own tutor for a paid lesson, the studio inbox for an intro.
     if snapshot.get("tutor_email"):
-        subject = f"Storniert: {snapshot['person_name']} · {label} · {snapshot['date_long']}"
+        tlang = snapshot.get("tutor_lang", "de")
+        ctx = {**snapshot, "when": snapshot.get("tutor_when", snapshot["when"]),
+               "date_long": snapshot.get("tutor_date_long", snapshot["date_long"])}
+        subject = (f"Cancelled: {ctx['person_name']} · {'Trial lesson' if is_intro else 'English lesson'}"
+                   f" · {ctx['date_long']}" if tlang == "en" else
+                   f"Storniert: {ctx['person_name']} · {label} · {ctx['date_long']}")
         # Reply lands with the person who cancelled, so the tutor can follow up directly.
         reply_to = [snapshot["person_email"]] if snapshot.get("person_email") else None
         msg = _message(
             subject, snapshot["tutor_email"],
-            render_to_string("email/cancellation_tutor.txt", snapshot),
-            render_to_string("email/cancellation_tutor.html", snapshot),
+            render_to_string(_tpl("cancellation_tutor.txt", tlang), ctx),
+            render_to_string(_tpl("cancellation_tutor.html", tlang), ctx),
             reply_to=reply_to,
         )
         msg.send()
@@ -454,7 +528,10 @@ def _receipt_pdf(receipt):
         return None
 
 
-def _mail_html(lines):
+_FOOTER = {"de": "The Green Pencil · Englisch-Nachhilfe", "en": "The Green Pencil · English tutoring"}
+
+
+def _mail_html(lines, lang="de"):
     """A plain, branded HTML body from a list of paragraph strings."""
     body = "".join(f"<p style='margin:0 0 12px'>{ln}</p>" for ln in lines)
     return (
@@ -462,15 +539,15 @@ def _mail_html(lines):
         "font-size:14px;line-height:1.6;color:#243528\">"
         f"{body}"
         "<p style='margin:20px 0 0;color:#7a8b7f;font-size:12px'>"
-        "The Green Pencil · Englisch-Nachhilfe</p></div>"
+        f"{_FOOTER[lang]}</p></div>"
     )
 
 
-def _send_with_pdf(subject, to, text_lines, html_lines, pdf, pdf_name):
+def _send_with_pdf(subject, to, text_lines, html_lines, pdf, pdf_name, lang="de"):
     """Send a notification with the receipt PDF attached. Bodies just describe what
     the attachment is; the PDF is the actual document."""
-    text = "\n".join(text_lines) + "\n\nThe Green Pencil · Englisch-Nachhilfe"
-    msg = _message(subject, to, text, _mail_html(html_lines))
+    text = "\n".join(text_lines) + "\n\n" + _FOOTER[lang]
+    msg = _message(subject, to, text, _mail_html(html_lines, lang))
     if pdf:
         msg.attach(pdf_name, pdf, "application/pdf")
     msg.send()
@@ -491,7 +568,20 @@ def send_purchase_notifications(receipt_id):
     student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
     business = _business_inbox()
 
-    if student_email:
+    if student_email and _lang(receipt.student) == "en":
+        _send_with_pdf(
+            f"Your receipt {receipt.number} · {receipt.credits} credits", [student_email],
+            [f"Hi {receipt.student_name},", "",
+             f"thank you for buying {receipt.credits} credits! Attached is your receipt "
+             f"{receipt.number} from {receipt.date_str} as a PDF.",
+             "Your credits are ready to use right away."],
+            [f"Hi {receipt.student_name},",
+             f"thank you for buying <strong>{receipt.credits} credits</strong>! Attached is "
+             f"your receipt <strong>{receipt.number}</strong> from {receipt.date_str} as a PDF.",
+             "Your credits are ready to use right away."],
+            pdf, pdf_name, lang="en",
+        )
+    elif student_email:
         subject = f"Dein Beleg {receipt.number} · {receipt.credits} Einheiten"
         _send_with_pdf(
             subject, [student_email],
@@ -537,7 +627,20 @@ def send_storno_notifications(receipt_id):
     n = -receipt.credits  # credits reversed (receipt.credits is negative)
     original_no = receipt.reverses.number if receipt.reverses_id and receipt.reverses else ""
 
-    if student_email:
+    if student_email and _lang(receipt.student) == "en":
+        _send_with_pdf(
+            f"Cancelled: your purchase · cancellation {receipt.number}", [student_email],
+            [f"Hi {receipt.student_name},", "",
+             f"your purchase of {n} credits (receipt {original_no}) has been cancelled and the "
+             f"amount refunded. Attached is the cancellation receipt {receipt.number} "
+             f"from {receipt.date_str} as a PDF."],
+            [f"Hi {receipt.student_name},",
+             f"your purchase of <strong>{n} credits</strong> (receipt {original_no}) has been "
+             f"cancelled and the amount refunded. Attached is the cancellation receipt "
+             f"<strong>{receipt.number}</strong> from {receipt.date_str} as a PDF."],
+            pdf, pdf_name, lang="en",
+        )
+    elif student_email:
         subject = f"Storniert: dein Kauf · Storno {receipt.number}"
         _send_with_pdf(
             subject, [student_email],
@@ -575,7 +678,8 @@ SECURITY_CONTACT = "davit@thegreenpencil.at"
 
 def _account_ctx(user):
     return {
-        "user_first": _first(user.get_full_name() or user.username, "du"),
+        "user_first": _first(user.get_full_name() or user.username,
+                             "there" if _lang(user) == "en" else "du"),
         "user_email": user.email,
         "site_url": settings.SITE_URL,
         "security_contact": SECURITY_CONTACT,
@@ -607,10 +711,12 @@ def send_password_reset(user_id, reset_url):
         return
     ctx = _account_ctx(user)
     ctx["reset_url"] = reset_url
+    lang = _lang(user)
     msg = _message(
-        "Passwort zurücksetzen · The Green Pencil", to,
-        render_to_string("email/password_reset.txt", ctx),
-        render_to_string("email/password_reset.html", ctx),
+        "Reset your password · The Green Pencil" if lang == "en"
+        else "Passwort zurücksetzen · The Green Pencil", to,
+        render_to_string(_tpl("password_reset.txt", lang), ctx),
+        render_to_string(_tpl("password_reset.html", lang), ctx),
     )
     msg.send()
 
@@ -625,10 +731,12 @@ def send_password_changed(user_id):
     if not to:
         return
     ctx = _account_ctx(user)
+    lang = _lang(user)
     msg = _message(
-        "Dein Passwort wurde geändert · The Green Pencil", to,
-        render_to_string("email/password_changed.txt", ctx),
-        render_to_string("email/password_changed.html", ctx),
+        "Your password was changed · The Green Pencil" if lang == "en"
+        else "Dein Passwort wurde geändert · The Green Pencil", to,
+        render_to_string(_tpl("password_changed.txt", lang), ctx),
+        render_to_string(_tpl("password_changed.html", lang), ctx),
     )
     msg.send()
 

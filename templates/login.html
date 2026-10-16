@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="de">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
 {% include "_consent.html" %}
 <meta charset="UTF-8" />
@@ -13,6 +13,7 @@
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="{% static 'favicon.svg' %}">
 <meta name="csrf-token" content="{{ csrf_token }}">
+{% include "_app_i18n.html" %}
 {% include "_fonts.html" %}
 <style>
   :root {
@@ -124,6 +125,7 @@
 </style>
 </head>
 <body>
+{% include "_app_lang_switch.html" %}
   <div class="field">
     <div class="blob b1"></div>
     <div class="blob b2"></div>

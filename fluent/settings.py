@@ -46,11 +46,14 @@ MIDDLEWARE = [
     'core.middleware.UploadSizeLimitMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     # Picks the language from the URL: public pages live unprefixed in German
-    # and under /en/ in English (see fluent/urls.py). Everything else is German.
+    # and under /en/ in English (see fluent/urls.py). The app's language is set
+    # per user further down (AppLanguageMiddleware).
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # The app (login, /app/, its API) follows the user's own language choice.
+    'core.middleware.AppLanguageMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.csp.ContentSecurityPolicyMiddleware',
@@ -190,9 +193,11 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # German is the site's language. The public pages (landing, FAQ, intro
-# booking, legal) also exist in English under /en/; the app stays German.
-# Short strings are translated through locale/en/LC_MESSAGES/django.po; the
-# prose pages (FAQ, legal) have their own English templates in templates/en/.
+# booking, legal) also exist in English under /en/. The app follows each
+# user's own choice (User.language). Short strings are translated through
+# locale/en/LC_MESSAGES/django.po; the prose pages (FAQ, legal) have their own
+# English templates in templates/en/; the app's screens are translated in the
+# browser from static/js/i18n/en.js (see static/js/i18n/README.md).
 LANGUAGE_CODE = 'de'
 LANGUAGES = [
     ('de', 'Deutsch'),

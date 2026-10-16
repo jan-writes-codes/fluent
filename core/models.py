@@ -40,6 +40,10 @@ class User(AbstractUser):
     # Students only: how many lessons a week the tutor plans with this student,
     # set by hand in the student list. Drives the weekly hours / income line.
     weekly_lessons = models.DecimalField(max_digits=3, decimal_places=1, default=0)
+    # Language of the app and of the e-mails and PDFs this user receives.
+    # German unless they switch to English (DE/EN switch in the app header).
+    LANGUAGES = [('de', 'Deutsch'), ('en', 'English')]
+    language = models.CharField(max_length=5, choices=LANGUAGES, default='de')
 
     class Meta:
         db_table = 'core_user'
