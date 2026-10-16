@@ -402,6 +402,12 @@ class EmojiAvatarTests(FluentDataMixin, TestCase):
         self.ines.refresh_from_db()
         self.assertEqual((self.ines.avatar_emoji, self.ines.avatar_bg), ("", ""))
 
+    def test_tutor_sets_own_avatar(self):
+        self.client.force_login(self.davit)
+        self.assertEqual(self.put_avatar("davit", {"emoji": "🦉", "bg": "#2f8a4d"}).status_code, 200)
+        self.davit.refresh_from_db()
+        self.assertEqual(self.davit.avatar_emoji, "🦉")
+
     def test_student_cannot_set_someone_elses_avatar(self):
         self.client.force_login(self.maya)
         self.assertEqual(self.put_avatar("ines", {"emoji": "🐼", "bg": "#8fb8f2"}).status_code, 403)

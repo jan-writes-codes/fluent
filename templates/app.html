@@ -1297,7 +1297,7 @@
             <div class="avatar" id="umAvatar" style="background: conic-gradient(from 140deg, #7cb342, #309050, #4cb56b, #7cb342); width:40px; height:40px;">MK</div>
             <div><div class="um-name" id="umName">Maya Karlsson</div><div class="um-mail" id="umMail">maya@fluent.at</div></div>
           </div>
-          <button class="um-item" id="avatarPickBtn" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>Profilbild ändern</button>
+          <button class="um-item" id="avatarPickBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>Profilbild ändern</button>
           <button class="um-item" id="logoutBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>Abmelden</button>
         </div>
       </div>
@@ -5228,7 +5228,7 @@
   function closeAvatarPicker(){ avPick=null; $("#avatarModal").hidden=true; }
   function renderAvatarPicker(){
     const p=avPick; if(!p) return;
-    const self = p.u.id===state.currentUser && state.role==="student";
+    const self = p.u===meIdentity;
     const prev={ avatarEmoji:p.emoji, avatarBg:p.bg };
     $("#avatarModal").innerHTML=`<div class="modal-card buy-card" id="avCard">
       <button class="modal-x" id="avX" aria-label="Close">×</button>
@@ -5255,18 +5255,23 @@
     if(!r.ok || !r.data){ toast((r.data && r.data.error) || "Profilbild konnte nicht gespeichert werden"); return; }
     u.avatarEmoji=r.data.avatarEmoji||""; u.avatarBg=r.data.avatarBg||""; u.photo=r.data.photo||null;
     closeAvatarPicker();
-    if(u.id===state.currentUser && state.role==="student") setIdentity(u);
+    // Tutors live in several client lists (booking chips, roster, the
+    // signed-in tutor); keep every copy in step with the saved picture.
+    [TUTORS, tutorAccounts, [tutorUser], [ADMIN]].forEach(list=>list.forEach(x=>{ if(x!==u && x.id===u.id){ x.avatarEmoji=u.avatarEmoji; x.avatarBg=u.avatarBg; x.photo=u.photo; } }));
+    if(u===meIdentity) setIdentity(u);
+    if(state.role==="student") renderTutors();
     if(state.teacherStudent===u) renderStudentModal();
     if(state.role==="tutor") renderRoster();
     toast(emoji ? "Profilbild gespeichert" : "Profilbild zurückgesetzt");
   }
 
   // ---------- Auth / roles ----------
+  let meIdentity = null;  // the account the header avatar shows (incl. admin "view as")
   function setIdentity(u){
+    meIdentity = u;
     const st=avatarStyle(u);
     const ma=$("#meAvatar"); ma.style.cssText=st; ma.innerHTML=avatarText(u);
     const um=$("#umAvatar"); um.style.cssText=st+";width:40px;height:40px;"; um.innerHTML=avatarText(u);
-    $("#avatarPickBtn").hidden = state.role!=="student";
     $("#umName").textContent=u.name; $("#umMail").textContent=u.email;
     const first=(u.name||"").trim().split(" ")[0];
     document.querySelectorAll("[data-hello]").forEach(e=>{ e.textContent = first ? "Hi "+first+"!" : ""; });
@@ -5352,7 +5357,7 @@
 
   $("#studentModal").onclick = closeStudentModal;
   $("#avatarModal").onclick = closeAvatarPicker;
-  $("#avatarPickBtn").onclick = ()=>{ $("#userMenu").hidden=true; const s=studentById(state.currentUser); if(s) openAvatarPicker(s); };
+  $("#avatarPickBtn").onclick = ()=>{ $("#userMenu").hidden=true; if(meIdentity) openAvatarPicker(meIdentity); };
   $("#lessonModal").onclick = closeLessonModal;
   $("#receiptModal").onclick = closeReceipt;
   $("#buyModal").onclick = closeBuy;
