@@ -312,7 +312,7 @@ setTimeout(() => {
     const tab = document.querySelector('.tab[data-view="materials"]');
     if (tab) tab.click();
     setTimeout(() => {
-      const skills = [...document.querySelectorAll("#materialsContent .mat-skill-h h3")].map((h) => h.textContent.trim());
+      const skills = [...document.querySelectorAll("#materialsContent .mat-sec-h h3")].map((h) => h.textContent.trim());
       const topics = [...document.querySelectorAll("#materialsContent .mat-topic-t")].map((t) => t.textContent.trim());
       finish({ materials: { skills, topics } });
     }, 80);

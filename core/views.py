@@ -296,6 +296,7 @@ def serialize_lesson_file(lf):
         "name": lf.original_name,
         "ext": file_ext(lf.original_name).upper() or "FILE",
         "kind": file_kind(lf.original_name),
+        "size": lf.size,
         "url": f"/api/lesson-files/download/{lf.pk}/",
     }
 

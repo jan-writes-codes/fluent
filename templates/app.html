@@ -598,7 +598,7 @@
   .les-chev svg { width: 18px; height: 18px; display: block; }
   .lesson.open .les-chev { transform: rotate(180deg); }
   .les-files { max-height: 0; overflow: hidden; transition: max-height 0.28s ease; }
-  .lesson.open .les-files { max-height: 240px; }
+  .lesson.open .les-files { max-height: 1600px; }
   .file-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px 11px 18px; border-top: 1px solid var(--line-2); text-decoration: none; color: var(--ink); transition: 0.13s; }
   .file-row:hover { background: rgba(36,53,40,0.04); }
   .file-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;
@@ -666,23 +666,71 @@
   .mat-lvl-t { font-size: 13.5px; font-weight: 500; }
   .mat-lvl-n { font-size: 11px; color: var(--faint); }
   @media (max-width: 560px) { .mat-lvl-t { display: none; } }
-  .mat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-  @media (max-width: 760px) { .mat-grid { grid-template-columns: 1fr; } }
-  .mat-skill { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
-  .mat-skill-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-  .mat-skill-h h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--ink); }
-  .mat-skill-n { font-size: 11.5px; color: var(--faint); }
-  .mat-topics { display: flex; flex-direction: column; gap: 8px; }
-  .mat-topic { border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; display: flex; flex-direction: column; gap: 7px; background: rgba(251,248,241,0.4); }
-  .mat-topic-h { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .mat-topic-t { font-size: 13.5px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .mat-levels[hidden] { display: none; }
+  .mat-tools { display: flex; gap: 10px; align-items: center; margin: 4px 0 14px; }
+  .mat-search { flex: 1; min-width: 0; }
+  .mat-skills { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 16px; }
+  .mat-sk { font-family: var(--font-body); font-size: 12.5px; padding: 6px 12px; border-radius: 100px; cursor: pointer;
+    border: 1px solid var(--line); background: transparent; color: var(--muted); transition: 0.14s; }
+  .mat-sk:hover { color: var(--ink); }
+  .mat-sk.on { background: var(--c1); border-color: var(--c1); color: #fbf8f1; font-weight: 600; }
+  .mat-lvl-group { margin-bottom: 18px; }
+  .mat-sec { border: 1px solid var(--line); border-radius: 14px; background: var(--glass); margin-bottom: 10px; overflow: hidden; }
+  .mat-sec-h { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px; border: 0; background: transparent;
+    cursor: pointer; text-align: left; font-family: var(--font-body); color: var(--ink); }
+  .mat-sec-h h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 15.5px; }
+  .mat-sec-n { margin-left: auto; font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+  .mat-chev { display: inline-block; width: 12px; color: var(--muted); font-size: 16px; line-height: 1; transition: transform 0.15s; transform: rotate(90deg); }
+  .mat-sec.closed .mat-sec-h .mat-chev, .mat-topic:not(.open) .mat-chev { transform: none; }
+  .mat-rows { border-top: 1px solid var(--line-2); }
+  .mat-empty { padding: 10px 16px; font-size: 12.5px; color: var(--faint); font-style: italic; }
+  .mat-topic { border-bottom: 1px solid var(--line-2); }
+  .mat-topic.open { background: rgba(251,248,241,0.45); }
+  .mat-topic-h { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 10px 4px 6px; }
+  .mat-topic-tg { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 7px 6px; border: 0; background: transparent;
+    cursor: pointer; text-align: left; font-family: var(--font-body); color: var(--ink); border-radius: 8px; }
+  .mat-topic-tg:hover { background: rgba(36,53,40,0.04); }
+  .mat-topic-t { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mat-pill { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    background: color-mix(in oklch, var(--c1) 12%, transparent); color: var(--c1); }
+  .mat-pill.zero { background: rgba(36,53,40,0.05); color: var(--faint); }
   .mat-topic-u { font-size: 11px; color: var(--faint); white-space: nowrap; }
-  .mat-ic { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 3px 5px; border-radius: 6px; }
+  @media (max-width: 560px) { .mat-topic-u { display: none; } }
+  .mat-ic { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
   .mat-ic:hover { color: var(--c1); background: rgba(36,53,40,0.06); }
   .mat-ic.danger:hover { color: #b8492c; }
   .mat-rename { flex: 1; min-width: 0; padding: 5px 8px; font-size: 13.5px; }
-  .mat-add { display: flex; gap: 8px; margin-top: auto; }
+  .mat-files { padding: 0 12px 10px 32px; display: flex; flex-direction: column; gap: 2px; }
+  .mat-file { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mat-file-n { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 5px 6px; border: 0; border-radius: 8px;
+    background: transparent; cursor: pointer; text-align: left; font-family: var(--font-body); color: var(--ink); }
+  .mat-file-n:hover { background: color-mix(in oklch, var(--c1) 8%, transparent); }
+  .mat-file-n .file-ic { width: 26px; height: 26px; }
+  .mat-fname { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mat-fmeta { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; color: var(--faint); white-space: nowrap; }
+  .mat-upload { align-self: flex-start; margin: 6px 0 0 6px; }
+  .mat-add { display: flex; gap: 8px; padding: 10px 14px 12px; }
   .mat-add .bf-input { flex: 1; min-width: 0; padding: 7px 10px; font-size: 13px; }
+  .mat-none { padding: 26px; text-align: center; color: var(--muted); font-size: 14px; }
+  /* File menu (open / download) and the in-app viewer */
+  .file-menu { position: absolute; z-index: 90; display: flex; flex-direction: column; min-width: 190px; padding: 5px; border-radius: 12px;
+    background: var(--bg-2); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .file-menu button, .file-menu a { font-family: var(--font-body); font-size: 13.5px; text-align: left; padding: 9px 12px; border-radius: 8px;
+    border: 0; background: transparent; color: var(--ink); cursor: pointer; text-decoration: none; }
+  .file-menu button:hover, .file-menu a:hover { background: color-mix(in oklch, var(--c1) 10%, transparent); }
+  .file-menu .fm-note { font-size: 11.5px; color: var(--faint); padding: 6px 12px 4px; }
+  .fv-overlay { z-index: 80; }
+  .fv-card { width: min(980px, 100%); height: min(92vh, 1200px); display: flex; flex-direction: column; background: var(--bg-2);
+    border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+  .fv-bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); }
+  .fv-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fv-bar .fv-x { position: static; flex-shrink: 0; }
+  .fv-body { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; background: rgba(36,53,40,0.05); }
+  .fv-page { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.12); max-width: 100%; }
+  .fv-img { max-width: 100%; height: auto; }
+  .fv-audio { width: min(520px, 100%); margin-top: 40px; }
+  .fv-text { width: 100%; max-width: 900px; margin: 0; padding: 16px; background: #fff; border-radius: 8px; white-space: pre-wrap; font-size: 13px; }
+  .fv-msg { margin: auto; color: var(--muted); font-size: 14px; }
 
   .balance { padding: 28px; position: relative; }
   .balance .ring { position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%;
@@ -1458,6 +1506,7 @@
   <div class="modal-overlay" id="backdateModal" hidden></div>
   <div class="modal-overlay" id="lessonModal" hidden></div>
   <div class="modal-overlay" id="matPickModal" hidden></div>
+  <div class="modal-overlay fv-overlay" id="fileViewer" hidden></div>
   <div class="modal-overlay" id="avatarModal" hidden></div>
 
 {{ django_data|json_script:"django-data" }}
@@ -3077,7 +3126,7 @@
     const prevToggle=$("#prevToggle");
     if(prevToggle) prevToggle.onclick=()=>{
       const p=$("#learnPreview"), show=p.hidden;
-      if(show){ p.innerHTML=lessonPreviewHtml(s); p.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open")); }
+      if(show){ p.innerHTML=lessonPreviewHtml(s); p.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open")); bindFileMenus(p); }
       p.hidden=!show;
       prevToggle.textContent = show ? "Hide preview" : ("Preview "+s.name.split(' ')[0]+"’s Learning tab");
     };
@@ -3636,12 +3685,13 @@
       </div>`;
     }).join("");
     el.querySelectorAll(".lesson:not(.locked) .les-head").forEach(h=> h.onclick=()=>h.closest(".lesson").classList.toggle("open"));
+    bindFileMenus(el);
   }
   function lessonRow(s,l){
     if(!isActive(s,l.id)) return `<div class="lesson locked"><div class="les-head"><span class="les-ic lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><span class="les-t">${esc(l.t)}</span><span class="les-tag">Gesperrt</span></div></div>`;
     const files=lessonFilesFor(l.id);
     const filesHtml = files.length
-      ? files.map(f=>`<a class="file-row" href="${esc(f.url)}"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${esc(f.name)}</span><span class="file-ext">${esc(f.ext||'FILE')}</span></a>`).join("")
+      ? files.map(f=>`<a class="file-row" href="${esc(f.url)}" data-filemenu="${f.id}" title="Öffnen oder herunterladen"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${esc(f.name)}</span><span class="file-ext">${esc(f.ext||'FILE')}</span></a>`).join("")
       : `<div class="micro" style="text-align:left;padding:8px 4px;">Noch keine Materialien. Dein Tutor hat für diese Lektion noch keine Dateien hinzugefügt.</div>`;
     return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${esc(l.t)}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
       <div class="les-files">${filesHtml}</div></div>`;
@@ -3677,68 +3727,199 @@
   }
 
   // ---------- Lernmaterialien (tutor): the topic library ----------
+  // Built for long lists: a search across all levels, a skill filter,
+  // collapsible skill sections and topics that fold down to one line.
   function unlockedCount(id){ return state.students.filter(s=>isActive(s,id)).length; }
+  const MAT_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip";
+  function matUi(){
+    if(!state.mat) state.mat = { q:"", skill:"", open:new Set(), closed:new Set() };
+    return state.mat;
+  }
+  function fmtSize(n){ return !n ? "" : n < 1024*1024 ? `${Math.max(1, Math.round(n/1024))} KB` : `${(n/1024/1024).toFixed(1).replace(".", ",")} MB`; }
   function renderMaterials(){
     const el=$("#materialsContent"); if(!el) return;
+    const ui=matUi();
     if(!LEVELS.some(l=>l.level===state.matLevel)) state.matLevel="A1";
-    const lvl=LEVELS.find(l=>l.level===state.matLevel);
-    const levelsHtml = LEVELS.map(l=>{
-      const n=topicsOf(l.level).length;
-      return `<button class="mat-lvl ${l.level===lvl.level?'on':''}" data-mat-lvl="${l.level}"><span class="lvl-badge ${l.level.toLowerCase()}">${l.level}</span><span class="mat-lvl-t">${l.title}</span><span class="mat-lvl-n">${n}</span></button>`;
-    }).join("");
-    const skillsHtml = SKILLS.map(sk=>{
-      const ls=topicsOf(lvl.level, sk.id);
-      const topicsHtml = ls.map(l=>{
-        const files=lessonFilesFor(l.id), u=unlockedCount(l.id);
-        const filesHtml = files.map(f=>`<span class="cm-file"><a href="${esc(f.url)}" title="Herunterladen">${esc(f.name)}</a><button class="cm-file-x" data-rmfile="${f.id}" data-lesson="${l.id}" title="Entfernen" aria-label="Datei entfernen">×</button></span>`).join("");
-        return `<div class="mat-topic" data-topic="${l.id}">
-          <div class="mat-topic-h"><span class="mat-topic-t">${esc(l.t)}</span>
-            <span class="mat-topic-u" title="Für so viele Schüler freigeschaltet">${u} Schüler</span>
-            <button class="mat-ic" data-rename="${l.id}" title="Umbenennen" aria-label="Thema umbenennen">✎</button>
-            <button class="mat-ic danger" data-deltopic="${l.id}" title="Thema löschen" aria-label="Thema löschen">×</button></div>
-          <div class="cm-files">${filesHtml}<label class="cm-upload">+ Datei<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf,.mp3,.m4a,.wav,.ogg,.png,.jpg,.jpeg,.gif,.webp,.zip" data-upload="${l.id}" hidden></label></div>
-        </div>`;
+    el.innerHTML = `<div class="mat-tools">
+        <div class="search-wrap mat-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="matSearch" class="search-input" type="search" placeholder="Thema oder Datei suchen (alle Niveaus)…" autocomplete="off" value="${esc(ui.q)}"></div>
+        <button class="mini-btn" id="matFold">Alle zuklappen</button>
+      </div>
+      <div class="mat-levels" id="matLevels"></div>
+      <div class="mat-skills" id="matSkills"></div>
+      <div id="matList"></div>`;
+    $("#matSearch").oninput=e=>{ ui.q=e.target.value; renderMatList(); };
+    $("#matFold").onclick=()=>{
+      const anyOpen = ui.open.size>0;
+      if(anyOpen) ui.open.clear();
+      else state.topics.filter(t=>t.level===state.matLevel).forEach(t=>ui.open.add(t.id));
+      renderMatList();
+    };
+    renderMatList();
+  }
+  function matMatches(l, needle){
+    if(!needle) return { show:true, files:lessonFilesFor(l.id) };
+    if(l.t.toLowerCase().includes(needle)) return { show:true, files:lessonFilesFor(l.id) };
+    const files=lessonFilesFor(l.id).filter(f=>f.name.toLowerCase().includes(needle));
+    return { show: files.length>0, files };
+  }
+  function renderMatList(){
+    const ui=matUi(), needle=ui.q.trim().toLowerCase(), searching=!!needle;
+    const lv=$("#matLevels"), sk=$("#matSkills"), list=$("#matList"); if(!list) return;
+    lv.hidden=searching;
+    lv.innerHTML = LEVELS.map(l=>`<button class="mat-lvl ${l.level===state.matLevel?'on':''}" data-mat-lvl="${l.level}"><span class="lvl-badge ${l.level.toLowerCase()}">${l.level}</span><span class="mat-lvl-t">${l.title}</span><span class="mat-lvl-n">${topicsOf(l.level).length}</span></button>`).join("");
+    sk.innerHTML = [{id:"", t:"Alle Bereiche"}, ...SKILLS].map(s=>`<button class="mat-sk ${ui.skill===s.id?'on':''}" data-mat-sk="${s.id}">${s.t}</button>`).join("");
+    const fold=$("#matFold"); if(fold) fold.textContent = ui.open.size ? "Alle zuklappen" : "Alle aufklappen";
+    const levels = searching ? LEVELS : LEVELS.filter(l=>l.level===state.matLevel);
+    const skills = SKILLS.filter(s=>!ui.skill || s.id===ui.skill);
+    const html = levels.map(lvl=>{
+      const secs = skills.map(s=>{
+        const rows = topicsOf(lvl.level, s.id).map(l=>({ l, m: matMatches(l, needle) })).filter(x=>x.m.show);
+        if(searching && !rows.length) return "";
+        const key=`${lvl.level}:${s.id}`, closed=!searching && ui.closed.has(key);
+        const nFiles=rows.reduce((a,x)=>a+lessonFilesFor(x.l.id).length, 0);
+        return `<section class="mat-sec ${closed?'closed':''}">
+          <button class="mat-sec-h" data-sec="${key}"><span class="mat-chev">›</span><h3>${s.t}</h3>
+            <span class="mat-sec-n">${rows.length} ${rows.length===1?"Thema":"Themen"} · ${nFiles} ${nFiles===1?"Datei":"Dateien"}</span></button>
+          ${closed ? "" : `<div class="mat-rows">
+            ${rows.map(x=>matTopicHtml(x.l, x.m.files, searching || ui.open.has(x.l.id))).join("") || `<div class="mat-empty">Noch keine Themen.</div>`}
+            ${searching ? "" : `<div class="mat-add"><input class="bf-input" data-add-input="${s.id}" placeholder="+ Neues Thema in ${s.t}" maxlength="200"><button class="mini-btn" data-add-topic="${s.id}">Anlegen</button></div>`}
+          </div>`}
+        </section>`;
       }).join("");
-      return `<div class="panel mat-skill">
-        <div class="mat-skill-h"><h3>${sk.t}</h3><span class="mat-skill-n">${ls.length} ${ls.length===1?"Thema":"Themen"}</span></div>
-        <div class="mat-topics">${topicsHtml || `<div class="empty-list" style="padding:4px 0 2px;">Noch keine Themen.</div>`}</div>
-        <div class="mat-add"><input class="bf-input" data-add-input="${sk.id}" placeholder="Neues Thema in ${sk.t}…" maxlength="200"><button class="mini-btn" data-add-topic="${sk.id}">Hinzufügen</button></div>
-      </div>`;
+      if(!secs) return "";
+      return searching ? `<div class="mat-lvl-group"><div class="cm-lvl-head"><span class="lvl-badge ${lvl.level.toLowerCase()}">${lvl.level}</span><span class="cm-lvl-name">${lvl.title}</span></div>${secs}</div>` : secs;
     }).join("");
-    el.innerHTML = `<div class="mat-levels">${levelsHtml}</div><div class="mat-grid">${skillsHtml}</div>`;
-    el.querySelectorAll("[data-mat-lvl]").forEach(b=> b.onclick=()=>{ state.matLevel=b.dataset.matLvl; renderMaterials(); });
-    el.querySelectorAll("[data-add-topic]").forEach(b=> b.onclick=()=>addTopic(b.dataset.addTopic));
-    el.querySelectorAll("[data-add-input]").forEach(inp=> inp.addEventListener("keydown", e=>{ if(e.key==="Enter") addTopic(inp.dataset.addInput); }));
-    el.querySelectorAll("[data-upload]").forEach(inp=> inp.onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; uploadLessonFile(inp.dataset.upload, f, renderMaterials); });
-    el.querySelectorAll("[data-rmfile]").forEach(b=> b.onclick=()=>{
+    list.innerHTML = html || `<div class="panel mat-none">Nichts gefunden für „${esc(ui.q)}“.</div>`;
+    lv.querySelectorAll("[data-mat-lvl]").forEach(b=> b.onclick=()=>{ state.matLevel=b.dataset.matLvl; renderMatList(); });
+    sk.querySelectorAll("[data-mat-sk]").forEach(b=> b.onclick=()=>{ ui.skill=b.dataset.matSk; renderMatList(); });
+    list.querySelectorAll("[data-sec]").forEach(b=> b.onclick=()=>{ const k=b.dataset.sec; ui.closed.has(k) ? ui.closed.delete(k) : ui.closed.add(k); renderMatList(); });
+    list.querySelectorAll("[data-toggle-topic]").forEach(b=> b.onclick=()=>{ const id=b.dataset.toggleTopic; ui.open.has(id) ? ui.open.delete(id) : ui.open.add(id); renderMatList(); });
+    list.querySelectorAll("[data-add-topic]").forEach(b=> b.onclick=()=>addTopic(b.dataset.addTopic));
+    list.querySelectorAll("[data-add-input]").forEach(inp=> inp.addEventListener("keydown", e=>{ if(e.key==="Enter") addTopic(inp.dataset.addInput); }));
+    list.querySelectorAll("[data-upload]").forEach(inp=> inp.onchange=(e)=>{ const f=e.target.files&&e.target.files[0]; ui.open.add(inp.dataset.upload); uploadLessonFile(inp.dataset.upload, f, renderMatList); });
+    list.querySelectorAll("[data-rmfile]").forEach(b=> b.onclick=()=>{
       if(!window.confirm("Diese Datei entfernen?")) return;
-      removeLessonFile(b.dataset.lesson, +b.dataset.rmfile, renderMaterials);
+      removeLessonFile(b.dataset.lesson, +b.dataset.rmfile, renderMatList);
     });
-    el.querySelectorAll("[data-rename]").forEach(b=> b.onclick=()=>startRenameTopic(b.dataset.rename));
-    el.querySelectorAll("[data-deltopic]").forEach(b=> b.onclick=()=>deleteTopic(b.dataset.deltopic));
+    list.querySelectorAll("[data-rename]").forEach(b=> b.onclick=()=>startRenameTopic(b.dataset.rename));
+    list.querySelectorAll("[data-deltopic]").forEach(b=> b.onclick=()=>deleteTopic(b.dataset.deltopic));
+    bindFileMenus(list);
+  }
+  function matTopicHtml(l, files, open){
+    const all=lessonFilesFor(l.id), u=unlockedCount(l.id);
+    return `<div class="mat-topic ${open?'open':''}" data-topic="${l.id}">
+      <div class="mat-topic-h">
+        <button class="mat-topic-tg" data-toggle-topic="${l.id}" aria-expanded="${open}"><span class="mat-chev">›</span><span class="mat-topic-t">${esc(l.t)}</span></button>
+        <span class="mat-pill ${all.length?'':'zero'}">${all.length} ${all.length===1?"Datei":"Dateien"}</span>
+        <span class="mat-topic-u" title="Für so viele Schüler freigeschaltet">${u} Schüler</span>
+        <button class="mat-ic" data-rename="${l.id}" title="Umbenennen" aria-label="Thema umbenennen">✎</button>
+        <button class="mat-ic danger" data-deltopic="${l.id}" title="Thema löschen" aria-label="Thema löschen">×</button>
+      </div>
+      ${open ? `<div class="mat-files">
+        ${files.map(f=>`<div class="mat-file">
+          <button class="mat-file-n" data-filemenu="${f.id}" title="Öffnen oder herunterladen"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="mat-fname">${esc(f.name)}</span></button>
+          <span class="mat-fmeta">${esc(f.ext||"")}${f.size?` · ${fmtSize(f.size)}`:""}</span>
+          <button class="mat-ic danger" data-rmfile="${f.id}" data-lesson="${l.id}" title="Entfernen" aria-label="Datei entfernen">×</button>
+        </div>`).join("")}
+        <label class="cm-upload mat-upload">+ Datei hochladen<input type="file" accept="${MAT_ACCEPT}" data-upload="${l.id}" hidden></label>
+      </div>` : ""}
+    </div>`;
   }
   function addTopic(skill){
     const inp=document.querySelector(`#materialsContent [data-add-input="${skill}"]`);
     const title=(inp && inp.value || "").trim(); if(!title) return;
     apiResult('POST', '/api/topics/', { level: state.matLevel, skill, title }).then(r=>{
       if(!r.ok || !r.data || r.data.error){ toast((r.data && r.data.error) || "Thema konnte nicht angelegt werden"); return; }
-      state.topics.push(r.data); renderMaterials(); toast("Thema „"+r.data.t+"“ angelegt");
+      state.topics.push(r.data); matUi().open.add(r.data.id); renderMatList(); toast("Thema „"+r.data.t+"“ angelegt");
     });
+  }
+
+  // ----- Files: open in the browser or download -----
+  // Every file name is a button with a small menu. "Im Browser öffnen" shows
+  // the file inside the app (PDFs via the bundled pdf.js), so nothing
+  // uploaded is ever rendered by the browser as its own page.
+  const allLessonFiles = ()=> Object.values(state.lessonFiles||{}).flat();
+  const canView = f => isPdf(f) || isImage(f) || /\.(mp3|m4a|wav|ogg|txt)$/i.test(f.name);
+  function bindFileMenus(root){
+    root.querySelectorAll("[data-filemenu]").forEach(b=> b.onclick=(e)=>{
+      e.preventDefault(); e.stopPropagation();
+      const f=allLessonFiles().find(x=>x.id===+b.dataset.filemenu); if(f) showFileMenu(b, f);
+    });
+  }
+  function closeFileMenu(){ const m=$("#fileMenu"); if(m) m.remove(); }
+  function showFileMenu(anchor, f){
+    const was=$("#fileMenu"), same=was && was.dataset.file===String(f.id);
+    closeFileMenu(); if(same) return;
+    const m=document.createElement("div"); m.id="fileMenu"; m.className="file-menu"; m.dataset.file=f.id;
+    m.innerHTML = (canView(f) ? `<button data-fm="view">Im Browser öffnen</button>` : `<span class="fm-note">Kann nicht im Browser angezeigt werden</span>`)
+      + `<a data-fm="dl" href="${esc(f.url)}">Herunterladen</a>`;
+    document.body.appendChild(m);
+    const r=anchor.getBoundingClientRect();
+    m.style.top=(window.scrollY + r.bottom + 4)+"px";
+    m.style.left=(window.scrollX + Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)))+"px";
+    const v=m.querySelector('[data-fm="view"]'); if(v) v.onclick=()=>{ closeFileMenu(); openFileViewer(f); };
+    m.querySelector('[data-fm="dl"]').onclick=()=>setTimeout(closeFileMenu, 0);
+  }
+  document.addEventListener("click", e=>{ const m=$("#fileMenu"); if(m && !m.contains(e.target)) closeFileMenu(); });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeFileMenu(); });
+  window.addEventListener("resize", closeFileMenu);
+  let viewerToken=0, viewerUrl=null;
+  function closeFileViewer(){
+    viewerToken++;
+    const m=$("#fileViewer"); if(m){ m.hidden=true; m.innerHTML=""; }
+    if(viewerUrl){ URL.revokeObjectURL(viewerUrl); viewerUrl=null; }
+  }
+  async function openFileViewer(f){
+    const m=$("#fileViewer"); if(!m) return;
+    const token=++viewerToken;
+    m.innerHTML=`<div class="fv-card" id="fvCard">
+      <div class="fv-bar"><span class="fv-name">${esc(f.name)}</span><a class="mini-btn" href="${esc(f.url)}">Herunterladen</a><button class="modal-x fv-x" id="fvX" aria-label="Schließen">×</button></div>
+      <div class="fv-body" id="fvBody"><div class="fv-msg">Wird geladen…</div></div></div>`;
+    m.hidden=false;
+    m.onclick=closeFileViewer; $("#fvCard").onclick=e=>e.stopPropagation(); $("#fvX").onclick=closeFileViewer;
+    const body=$("#fvBody");
+    const fail=()=>{ if(token===viewerToken) body.innerHTML=`<div class="fv-msg">Die Datei konnte nicht angezeigt werden. <a href="${esc(f.url)}">Herunterladen</a></div>`; };
+    try {
+      const r=await fetch(f.url); if(!r.ok) throw new Error("download");
+      if(isPdf(f)){
+        const lib=await loadPdfJs();
+        const doc=await lib.getDocument({ data: await r.arrayBuffer(), isEvalSupported: false }).promise;
+        if(token!==viewerToken) return;
+        body.innerHTML="";
+        const width=Math.min(body.clientWidth - 24, 900), dpr=window.devicePixelRatio||1;
+        for(let i=1; i<=doc.numPages; i++){
+          const page=await doc.getPage(i);
+          if(token!==viewerToken) return;
+          const vp=page.getViewport({ scale: width / page.getViewport({ scale:1 }).width });
+          const c=document.createElement("canvas"); c.className="fv-page";
+          c.width=Math.floor(vp.width*dpr); c.height=Math.floor(vp.height*dpr); c.style.width=vp.width+"px";
+          body.appendChild(c);
+          await page.render({ canvasContext: c.getContext("2d"), viewport: vp, transform: dpr!==1 ? [dpr,0,0,dpr,0,0] : null }).promise;
+        }
+        return;
+      }
+      const blob=await r.blob();
+      if(token!==viewerToken) return;
+      if(/\.txt$/i.test(f.name)){ const pre=document.createElement("pre"); pre.className="fv-text"; pre.textContent=await blob.text(); body.replaceChildren(pre); return; }
+      viewerUrl=URL.createObjectURL(blob);
+      body.innerHTML = isImage(f) ? `<img class="fv-img" src="${viewerUrl}" alt="${esc(f.name)}">` : `<audio class="fv-audio" controls src="${viewerUrl}"></audio>`;
+    } catch(e){ fail(); }
   }
   function startRenameTopic(id){
     const row=document.querySelector(`#materialsContent .mat-topic[data-topic="${id}"]`); const t=state.topics.find(x=>x.id===id);
     if(!row || !t) return;
-    const span=row.querySelector(".mat-topic-t");
+    const span=row.querySelector(".mat-topic-tg");
     const inp=document.createElement("input"); inp.className="bf-input mat-rename"; inp.value=t.t; inp.maxLength=200;
     span.replaceWith(inp); inp.focus(); inp.select();
     let done=false;
     const finish=(save)=>{
       if(done) return; done=true;
       const title=inp.value.trim();
-      if(!save || !title || title===t.t){ renderMaterials(); return; }
+      if(!save || !title || title===t.t){ renderMatList(); return; }
       apiResult('PATCH', '/api/topics/'+id+'/', { title }).then(r=>{
         if(r.ok && r.data && !r.data.error){ t.t=r.data.t; } else toast((r.data && r.data.error) || "Umbenennen fehlgeschlagen");
-        renderMaterials();
+        renderMatList();
       });
     };
     inp.addEventListener("keydown", e=>{ if(e.key==="Enter") finish(true); if(e.key==="Escape") finish(false); });
@@ -3754,7 +3935,7 @@
       state.topics=state.topics.filter(x=>x.id!==id);
       delete state.lessonFiles[id];
       state.students.forEach(s=>{ const a=activeSet(s), i=a.indexOf(id); if(i>=0) a.splice(i,1); });
-      renderMaterials(); toast("Thema gelöscht");
+      matUi().open.delete(id); renderMatList(); toast("Thema gelöscht");
     });
   }
   // ---------- Stunden, session pages & Training ----------
