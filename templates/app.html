@@ -2822,6 +2822,7 @@
     if(!/^\d{1,2}:\d{2}$/.test(time||"")){ toast("Gib eine gültige Zeit ein"); return; }
     const ws=addDays(startOfWeek(NOW), state.tWeekOffset*7);
     const date=addDays(ws, i), dk=ymd(date);
+    if(date<NOW && !sameDay(date,NOW)){ toast("Für vergangene Tage nicht möglich"); return; }
     if(bookingConflict(date,time,null,state.myTutor)){ toast("Das überschneidet eine Buchung. Wähle eine andere Zeit"); return; }
     const cm=customMap(state.myTutor); cm[dk]=cm[dk]||[];
     if(!cm[dk].includes(time) && !TIMES.includes(time)) cm[dk].push(time);
@@ -5457,7 +5458,9 @@
   $("#nextWeek").onclick = ()=>{ if(state.weekOffset<6){state.weekOffset++; renderWeek();} };
   $("#todayBtn").onclick = ()=>{ state.weekOffset=0; renderWeek(); };
 
-  $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>0){state.tWeekOffset--; renderTeacherWeek();} };
+  // Tutors can browse back up to a year to look up past lessons (and log missed
+  // ones from the last 30 days); ahead it stays six weeks.
+  $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>-52){state.tWeekOffset--; renderTeacherWeek();} };
   $("#tNextWeek").onclick = ()=>{ if(state.tWeekOffset<6){state.tWeekOffset++; renderTeacherWeek();} };
   $("#tTodayBtn").onclick = ()=>{ state.tWeekOffset=0; renderTeacherWeek(); };
   if($("#backdateBtn")) $("#backdateBtn").onclick = ()=>openBackdate();
