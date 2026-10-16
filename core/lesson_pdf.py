@@ -87,14 +87,73 @@ def _rect(r):
         return None
 
 
-def _overlay_page(width, height, x0, y0, marks):
-    """A one-page PDF carrying a worksheet page's highlights. ``marks`` is
-    [(card, label)]; each card's rects are [x, y, w, h] fractions of the visible
-    page measured from its top-left corner, as the lesson page stores them."""
+def _hex_rgb(color):
+    try:
+        return tuple(int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    except (TypeError, ValueError, IndexError):
+        return _INK
+
+
+# Highlighter strokes as on the lesson page (.sx-ink, multiplied at this opacity).
+_HL_INK_ALPHA = 0.38
+
+
+def _draw_ink(c, width, height, x0, y0, items):
+    """Pen, highlighter and text notes drawn on the lesson page (see
+    ``views._clean_ink_item``): highlighter first, so pen and text sit on top."""
+    X = lambda fx: x0 + fx * width  # noqa: E731
+    Y = lambda fy: y0 + (1 - fy) * height  # noqa: E731
+    order = {"hl": 0, "pen": 1, "text": 2}
+    for it in sorted(items, key=lambda i: order.get(i.get("type"), 3)):
+        kind = it.get("type")
+        rgb = _hex_rgb(it.get("color"))
+        try:
+            if kind in ("pen", "hl"):
+                pts = [(float(p[0]), float(p[1])) for p in it.get("pts") or []]
+                if not pts:
+                    continue
+                c.saveState()
+                c.setStrokeColorRGB(*rgb)
+                c.setFillColorRGB(*rgb)
+                lw = float(it.get("w") or 0.003) * width
+                if kind == "hl":
+                    c.setStrokeAlpha(_HL_INK_ALPHA)
+                    c.setFillAlpha(_HL_INK_ALPHA)
+                    c.setBlendMode("Multiply")
+                if len(pts) == 1:
+                    c.circle(X(pts[0][0]), Y(pts[0][1]), lw / 2, stroke=0, fill=1)
+                else:
+                    c.setLineWidth(lw)
+                    c.setLineCap(1)
+                    c.setLineJoin(1)
+                    path = c.beginPath()
+                    path.moveTo(X(pts[0][0]), Y(pts[0][1]))
+                    for px, py in pts[1:]:
+                        path.lineTo(X(px), Y(py))
+                    c.drawPath(path, stroke=1, fill=0)
+                c.restoreState()
+            elif kind == "text":
+                size = float(it.get("size") or 0.02) * width
+                x, y = X(float(it["x"])), Y(float(it["y"]))
+                c.setFillColorRGB(*rgb)
+                c.setFont("Helvetica", size)
+                # Same line height as the note on the lesson page (1.25).
+                for n, line in enumerate(str(it.get("text") or "").splitlines()):
+                    c.drawString(x, y - size * (0.97 + 1.25 * n), _clean(line))
+        except (TypeError, ValueError, KeyError):
+            continue
+
+
+def _overlay_page(width, height, x0, y0, marks, ink=()):
+    """A one-page PDF carrying a worksheet page's highlights and drawings.
+    ``marks`` is [(card, label)]; each card's rects are [x, y, w, h] fractions of
+    the visible page measured from its top-left corner, as the lesson page
+    stores them. ``ink`` is the page's pen/highlighter/text items."""
     from reportlab.pdfgen import canvas
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(x0 + width, y0 + height))
+    _draw_ink(c, width, height, x0, y0, ink)
     for card, label in marks:
         kind = "vocab" if card.kind == "vocab" else "error"
         rects = [r for r in (_rect(r) for r in card.rects) if r]
@@ -166,14 +225,15 @@ def _append_sheets(overview, appended, cards, labels):
             for n, page in enumerate(reader.pages, 1):
                 marks = [(c, labels[c.pk]) for c in cards
                          if c.source_file_id == f.pk and c.page == n and c.rects]
-                if marks:
+                ink = [i for i in (f.annotations or []) if isinstance(i, dict) and i.get("page") == n]
+                if marks or ink:
                     # Bake any /Rotate into the content so the page box is what
                     # was on screen, which the highlight fractions refer to.
                     if page.rotation:
                         page.transfer_rotation_to_content()
                     box = page.cropbox
                     overlay = _overlay_page(float(box.width), float(box.height),
-                                            float(box.left), float(box.bottom), marks)
+                                            float(box.left), float(box.bottom), marks, ink)
                     page.merge_page(PdfReader(io.BytesIO(overlay)).pages[0])
                 pages.append(page)
         except Exception:
@@ -360,7 +420,8 @@ def render_lesson_pdf(booking, sheet_bytes=None):
                            body) for f in sheets]
         items.append(Spacer(1, 3))
         items.append(Paragraph(
-            ("Die Arbeitsblätter folgen auf den nächsten Seiten, mit den markierten Wörtern und Fehlern. "
+            ("Die Arbeitsblätter folgen auf den nächsten Seiten, mit den markierten Wörtern und Fehlern "
+             "und euren Notizen. "
              if included else "")
             + "Alle Dateien findest du in deinem Bereich auf thegreenpencil.at.", small))
         section("Materialien", items, len(sheets))

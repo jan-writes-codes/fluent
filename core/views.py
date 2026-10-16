@@ -156,7 +156,7 @@ def serialize_booking(b, *, private=True):
 # Exercises + file metadata for the session pages, without the file bytes.
 SESSION_PREFETCH = (
     "exercises",
-    Prefetch("files", queryset=SessionFile.objects.defer("data").select_related("uploaded_by")),
+    Prefetch("files", queryset=SessionFile.objects.defer("data", "annotations").select_related("uploaded_by")),
 )
 
 
@@ -203,6 +203,8 @@ def serialize_session_file(f):
         "url": f"/api/session-files/{f.pk}/",
         # Linked from Lernmaterialien rather than uploaded to this lesson.
         "materialId": f.material_id,
+        # Goes up with every pen/highlighter/text change; 0 = nothing drawn yet.
+        "inkRev": f.annotations_rev,
     }
 
 
@@ -1182,6 +1184,8 @@ def app_view(request):
         "isAuthenticated": True,
         "role": user.role,
         "currentUserId": user.slug,
+        # Matches the ``by`` stamp on worksheet drawings (a student erases only their own).
+        "currentUserPk": user.pk,
         "currentUser": serialize_user(user),
         "students": [serialize_user(s) for s in visible_students],
         "tutors": [serialize_user(t) for t in tutors],
@@ -1958,6 +1962,113 @@ def api_session_file_detail(request, file_id):
     if data is None:
         raise Http404
     return _attachment(data, sf.name, sf.content_type)
+
+
+# Annotations (pen, highlighter, text notes) on a lesson's PDF worksheet.
+# Each item: {id, type: pen|hl|text, page, color, by, role} plus, for strokes,
+# ``w`` (line width as a fraction of the page width) and ``pts`` ([[x, y], ...]
+# as fractions of the page from its top-left corner); for text, ``x``/``y``
+# (its top-left corner), ``size`` (as a fraction of the page width) and ``text``.
+INK_TYPES = ("pen", "hl", "text")
+INK_MAX_ITEMS = 3000
+INK_MAX_POINTS = 1500
+INK_MAX_TOTAL_POINTS = 150000
+_INK_ID = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+_INK_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _ink_num(v, lo, hi):
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise ValueError
+    v = float(v)
+    if not (lo <= v <= hi):
+        raise ValueError
+    return round(v, 4)
+
+
+def _clean_ink_item(raw, user):
+    """A validated copy of one annotation from the client, stamped with who
+    drew it. Raises ValueError for anything malformed."""
+    if not isinstance(raw, dict):
+        raise ValueError
+    kind, iid, color = raw.get("type"), raw.get("id"), raw.get("color")
+    if kind not in INK_TYPES or not isinstance(iid, str) or not _INK_ID.match(iid):
+        raise ValueError
+    if not isinstance(color, str) or not _INK_COLOR.match(color):
+        raise ValueError
+    page = raw.get("page")
+    if isinstance(page, bool) or not isinstance(page, int) or not (1 <= page <= 2000):
+        raise ValueError
+    item = {"id": iid, "type": kind, "page": page, "color": color.lower(),
+            "by": user.pk, "role": "student" if user.role == "student" else "tutor"}
+    if kind == "text":
+        text = str(raw.get("text") or "").strip()[:500]
+        if not text:
+            raise ValueError
+        item.update(x=_ink_num(raw.get("x"), -0.05, 1.05), y=_ink_num(raw.get("y"), -0.05, 1.05),
+                    size=_ink_num(raw.get("size"), 0.005, 0.1), text=text)
+    else:
+        pts = raw.get("pts")
+        if not isinstance(pts, list) or not (1 <= len(pts) <= INK_MAX_POINTS):
+            raise ValueError
+        clean = []
+        for p in pts:
+            if not isinstance(p, (list, tuple)) or len(p) != 2:
+                raise ValueError
+            clean.append([_ink_num(p[0], -0.05, 1.05), _ink_num(p[1], -0.05, 1.05)])
+        item.update(w=_ink_num(raw.get("w"), 0.0005, 0.06), pts=clean)
+    return item
+
+
+@require_http_methods(["GET", "POST"])
+@require_roles("student", "tutor", "admin")
+def api_session_file_annotations(request, file_id):
+    """The drawings on a lesson worksheet. GET returns them (``?rev=`` with the
+    revision the page already has returns just the revision when nothing
+    changed). POST applies a change: ``add`` new items, ``remove`` items by id,
+    ``clear`` everything (tutor only; ``clear: n`` clears page n). A student
+    may only remove their own items. Changes are applied to what is stored, so
+    tutor and student drawing at the same time don't overwrite each other."""
+    sf = SessionFile.objects.defer("data").filter(pk=file_id, kind=SessionFile.KIND_WORKSHEET).first()
+    if not sf or not _session_booking(request, sf.booking_id):
+        return JsonResponse({"error": "not found"}, status=404)
+    if request.method == "GET":
+        if request.GET.get("rev") == str(sf.annotations_rev):
+            return JsonResponse({"rev": sf.annotations_rev})
+        return JsonResponse({"rev": sf.annotations_rev, "items": sf.annotations or []})
+    data = parse_body(request)
+    is_student = request.user.role == "student"
+    try:
+        add = [_clean_ink_item(i, request.user) for i in (data.get("add") or [])]
+    except (ValueError, TypeError):
+        return JsonResponse({"error": "Ungültige Zeichnung."}, status=400)
+    remove = data.get("remove") or []
+    if not isinstance(remove, list) or not all(isinstance(i, str) for i in remove):
+        return JsonResponse({"error": "Ungültige Zeichnung."}, status=400)
+    clear = data.get("clear")
+    if clear and is_student:
+        return JsonResponse({"error": "forbidden"}, status=403)
+    with db_transaction.atomic():
+        sf = SessionFile.objects.defer("data").select_for_update().get(pk=sf.pk)
+        items = list(sf.annotations or [])
+        if clear is True:
+            items = []
+        elif isinstance(clear, int) and not isinstance(clear, bool) and clear > 0:
+            items = [i for i in items if i.get("page") != clear]
+        if remove:
+            gone = set(remove)
+            items = [i for i in items
+                     if i.get("id") not in gone or (is_student and i.get("by") != request.user.pk)]
+        if add:
+            # Re-adding an item (undo of an erase) replaces any copy still there.
+            ids = {i["id"] for i in add}
+            items = [i for i in items if i.get("id") not in ids] + add
+        if len(items) > INK_MAX_ITEMS or sum(len(i.get("pts") or ()) for i in items) > INK_MAX_TOTAL_POINTS:
+            return JsonResponse({"error": "Zu viele Zeichnungen auf diesem Arbeitsblatt."}, status=400)
+        sf.annotations = items
+        sf.annotations_rev += 1
+        sf.save(update_fields=["annotations", "annotations_rev"])
+    return JsonResponse({"rev": sf.annotations_rev, "items": items})
 
 
 @require_http_methods(["POST"])

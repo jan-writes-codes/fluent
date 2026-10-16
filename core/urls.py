@@ -58,6 +58,7 @@ urlpatterns = [
     path('api/bookings/<int:pk>/files/import/', views.api_session_file_import),
     path('api/bookings/<int:pk>/pdf/', views.api_session_pdf),
     path('api/session-files/<int:file_id>/', views.api_session_file_detail),
+    path('api/session-files/<int:file_id>/annotations/', views.api_session_file_annotations),
     path('api/credits/<str:slug>/', views.api_credits),
     path('api/transactions/<int:txn_id>/cancel/', views.api_cancel_transaction),
     path('api/receipts/<str:number>/pdf/', views.api_receipt_pdf),

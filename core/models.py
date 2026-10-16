@@ -539,6 +539,12 @@ class SessionFile(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='session_uploads')
     created_at = models.DateTimeField(auto_now_add=True)
+    # Pen, highlighter and text notes drawn onto a PDF worksheet in the lesson,
+    # by tutor and student: a list of items (see ``views._clean_ink_item``), with
+    # positions as fractions of the page. ``annotations_rev`` goes up on every
+    # change so open lesson pages can tell when to fetch them again.
+    annotations = models.JSONField(default=list, blank=True)
+    annotations_rev = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['created_at']

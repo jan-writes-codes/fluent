@@ -4094,6 +4094,82 @@ class SessionPageTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(self.client.get(f"/api/lesson-files/download/{fid}/").content, b"%PDF unit1")
 
 
+    # ----- pen / highlighter / text notes on a worksheet -----
+    PEN = {"id": "s1", "type": "pen", "page": 1, "color": "#2153A8", "w": 0.003,
+           "pts": [[0.1, 0.1], [0.2, 0.15], [0.3, 0.1]]}
+    NOTE = {"id": "t1", "type": "text", "page": 2, "color": "#c0392b", "x": 0.5, "y": 0.4,
+            "size": 0.022, "text": "Look again!"}
+
+    def _ink(self, fid, body=None, actor=None):
+        url = f"/api/session-files/{fid}/annotations/"
+        if body is None:
+            self.client.force_login(actor or self.davit)
+            return self.client.get(url)
+        return self._json("post", url, body, actor=actor)
+
+    def test_annotations_saved_per_worksheet_and_shared(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        self.assertEqual(self._ink(fid).json(), {"rev": 0, "items": []})
+        r = self._ink(fid, {"add": [self.PEN]})
+        self.assertEqual(r.json()["rev"], 1)
+        item = r.json()["items"][0]
+        self.assertEqual((item["color"], item["role"], item["by"]), ("#2153a8", "tutor", self.davit.pk))
+        # The student adds a note at the same time: both survive.
+        r = self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        self.assertEqual([i["id"] for i in r.json()["items"]], ["s1", "t1"])
+        got = self._ink(fid, actor=self.maya).json()
+        self.assertEqual((got["rev"], len(got["items"])), (2, 2))
+        # Nothing new since rev 2: just the revision.
+        self.client.force_login(self.davit)
+        self.assertEqual(self.client.get(f"/api/session-files/{fid}/annotations/?rev=2").json(), {"rev": 2})
+        self.assertEqual(self._payload_booking(self.maya)["files"][0]["inkRev"], 2)
+        # Other students can't see or draw.
+        self.assertEqual(self._ink(fid, actor=self.ines).status_code, 404)
+        self.assertEqual(self._ink(fid, {"add": [self.PEN]}, actor=self.ines).status_code, 404)
+
+    def test_student_erases_only_own_and_tutor_clears(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        self._ink(fid, {"add": [self.PEN]})
+        self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        r = self._ink(fid, {"remove": ["s1", "t1"]}, actor=self.maya)
+        self.assertEqual([i["id"] for i in r.json()["items"]], ["s1"])
+        self.assertEqual(self._ink(fid, {"clear": True}, actor=self.maya).status_code, 403)
+        # Undo of an erase re-adds the item.
+        self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        self.assertEqual(len(self._ink(fid, {"clear": 2}).json()["items"]), 1)
+        self.assertEqual(self._ink(fid, {"clear": True}).json()["items"], [])
+
+    def test_bad_annotations_refused(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        for bad in ({**self.PEN, "type": "circle"}, {**self.PEN, "color": "red"},
+                    {**self.PEN, "page": 0}, {**self.PEN, "pts": []}, {**self.PEN, "pts": [[0.1, "x"]]},
+                    {**self.PEN, "pts": [[0.1, 9]]}, {**self.PEN, "id": "<script>"},
+                    {**self.PEN, "pts": [[0.1, 0.1]] * 1501}, {**self.NOTE, "text": "  "}):
+            self.assertEqual(self._ink(fid, {"add": [bad]}).status_code, 400, bad)
+        self.assertEqual(SessionFile.objects.get(pk=fid).annotations_rev, 0)
+        hw = self._upload(self.maya, name="hw.pdf").json()["file"]["id"]
+        self.assertEqual(self._ink(hw, {"add": [self.PEN]}, actor=self.maya).status_code, 404)
+
+    def test_annotations_in_lesson_pdf(self):
+        from reportlab import rl_config
+        from core.lesson_pdf import render_lesson_pdf
+        sheet = SessionFile.objects.create(booking=self.b, kind="worksheet", name="Unit7.pdf",
+                                           data=LessonPdfTests._sheet(), size=1)
+        sheet.annotations = [
+            {**self.PEN, "by": self.davit.pk},
+            {**self.PEN, "id": "h1", "type": "hl", "color": "#ffe14d", "w": 0.02, "pts": [[0.5, 0.5]]},
+            {**self.NOTE, "by": self.maya.pk},
+            {"id": "junk", "type": "pen", "page": 1, "pts": "nope"},
+        ]
+        sheet.save()
+        with mock.patch.object(rl_config, "pageCompression", 0):
+            raw = render_lesson_pdf(self.b)
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(raw))
+        self.assertIn("Look again!", reader.pages[-1].extract_text())
+        self.assertIn("Worksheet page 1", reader.pages[-2].extract_text())
+
+
 class CreateAdminFromEnvTests(TestCase):
     """`createadmin --from-env` runs in every Render build."""
 
