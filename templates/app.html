@@ -5365,12 +5365,11 @@
     $("#avSave").onclick=()=>saveAvatar(p.emoji, p.bg);
     if($("#avReset")) $("#avReset").onclick=()=>saveAvatar("", "");
   }
-  async function saveAvatar(emoji, bg){
-    const u=avPick && avPick.u; if(!u) return;
-    const r=await apiResult('PUT', '/api/users/'+encodeURIComponent(u.id)+'/avatar/', { emoji, bg });
-    if(!r.ok || !r.data){ toast((r.data && r.data.error) || "Profilbild konnte nicht gespeichert werden"); return; }
-    u.avatarEmoji=r.data.avatarEmoji||""; u.avatarBg=r.data.avatarBg||""; u.photo=r.data.photo||null;
-    closeAvatarPicker();
+  // Show the new picture at once and save in the background: the test site's
+  // server can take ~30 s to wake up, and a waiting dialog invites repeat clicks.
+  // A failed save puts the previous picture back.
+  function applyAvatar(u, v){
+    u.avatarEmoji=v.avatarEmoji||""; u.avatarBg=v.avatarBg||""; u.photo=v.photo||null;
     // Tutors live in several client lists (booking chips, roster, the
     // signed-in tutor); keep every copy in step with the saved picture.
     [TUTORS, tutorAccounts, [tutorUser], [ADMIN]].forEach(list=>list.forEach(x=>{ if(x!==u && x.id===u.id){ x.avatarEmoji=u.avatarEmoji; x.avatarBg=u.avatarBg; x.photo=u.photo; } }));
@@ -5378,7 +5377,16 @@
     if(state.role==="student") renderTutors();
     if(state.teacherStudent===u) renderStudentModal();
     if(state.role==="tutor") renderRoster();
+  }
+  async function saveAvatar(emoji, bg){
+    const u=avPick && avPick.u; if(!u) return;
+    const before={ avatarEmoji:u.avatarEmoji, avatarBg:u.avatarBg, photo:u.photo };
+    closeAvatarPicker();
+    applyAvatar(u, emoji ? { avatarEmoji:emoji, avatarBg:bg, photo:null } : { ...before, avatarEmoji:"", avatarBg:"" });
     toast(emoji ? "Profilbild gespeichert" : "Profilbild zurückgesetzt");
+    const r=await apiResult('PUT', '/api/users/'+encodeURIComponent(u.id)+'/avatar/', { emoji, bg });
+    if(!r.ok || !r.data){ applyAvatar(u, before); toast((r.data && r.data.error) || "Profilbild konnte nicht gespeichert werden"); return; }
+    applyAvatar(u, r.data);
   }
 
   // ---------- Auth / roles ----------
