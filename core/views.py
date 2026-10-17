@@ -133,7 +133,8 @@ def serialize_booking(b, *, private=True):
         "summary": b.summary,
         "homework": b.homework,
         "homeworkDone": b.homework_done,
-        "callLink": b.call_link,
+        # The lesson's own link, else the fixed one from LESSON_CALL_LINK.
+        "callLink": b.join_link,
         # "requested" until the tutor confirms a student's own booking.
         "status": b.status,
         # Guest "intro" bookings have no student account; the tutor UI shows the
@@ -145,6 +146,8 @@ def serialize_booking(b, *, private=True):
     }
     if private:
         data["tutorNotes"] = b.tutor_notes
+        # Only a link set on this lesson itself (empty = it uses the fixed one).
+        data["callLinkOwn"] = b.call_link
     # Session page content, when the caller prefetched it (see SESSION_PREFETCH).
     cache = getattr(b, "_prefetched_objects_cache", {})
     if "exercises" in cache:
@@ -781,7 +784,11 @@ def login_view(request):
     # forced "pick your own password" step before the app becomes reachable.
     if request.user.is_authenticated:
         if getattr(request.user, "must_change_password", False):
-            return render(request, "login.html", {"mode": "force"})
+            # The same step lets them put in their own e-mail address (the one
+            # they log in with and get receipts on) instead of the handed-over one.
+            return render(request, "login.html", {
+                "mode": "force", "current_email": emails._account_email(request.user),
+            })
         return redirect("app")
     return render(request, "login.html", {"mode": "login"})
 
@@ -1218,6 +1225,8 @@ def app_view(request):
             "enabled": video.enabled_providers(),
             "connection": None,
         },
+        "lessonCallLink": dj_settings.LESSON_CALL_LINK,
+        "whatsapp": dj_settings.TUTOR_WHATSAPP,
     }
     if user.role == "tutor":
         conn = VideoConnection.objects.filter(tutor=user).first()
@@ -1338,6 +1347,16 @@ def api_change_password(request):
     if problem:
         return JsonResponse({"error": problem}, status=400)
     user = request.user
+    # Optional: their own e-mail address in the same step (it's also the login).
+    if (data.get("email") or "").strip():
+        new_email = data["email"].strip().lower()
+        try:
+            validate_email(new_email)
+        except ValidationError:
+            return JsonResponse({"error": "Bitte eine gültige E-Mail-Adresse eingeben."}, status=400)
+        if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
+            return JsonResponse({"error": "Diese E-Mail wird bereits verwendet."}, status=400)
+        user.email = new_email
     _set_own_password(user, password)
     # Keep the current session alive across the hash change (every *other*
     # session, e.g. one still holding the temp password, is invalidated).
@@ -1539,12 +1558,16 @@ def api_bookings(request):
     # API can't be driven into a clash or onto a closed slot. Expired requests are
     # cleared first so they don't hold a slot past their deadline.
     expire_booking_requests()
+    is_self = request.user.role == "student"
     conflict = _slot_unavailable(tutor, booking_date, time_str)
+    # A closed slot is only closed to students: the tutor sees the whole week
+    # and may put a student into any free time.
+    if conflict == "slot_closed" and not is_self:
+        conflict = None
     if conflict:
         return JsonResponse({"error": conflict}, status=409)
 
     settings = get_settings()
-    is_self = request.user.role == "student"
     # Every booking consumes one credit — the deduction and the ledger entry are
     # performed by Booking.save() so no creation path can skip them. The view's job
     # is the policy guard: a student may only book what they have; a tutor/admin may
@@ -1649,6 +1672,8 @@ def api_booking_detail(request, pk):
     # A reschedule must land on a free, open slot — same guard as creating one.
     if ("date" in data or "time" in data) and b.tutor_id:
         conflict = _slot_unavailable(b.tutor, b.date, b.time, exclude_pk=b.pk)
+        if conflict == "slot_closed" and not is_student:
+            conflict = None  # closed to students only, see api_bookings
         if conflict:
             return JsonResponse({"error": conflict}, status=409)
     # A student moving their own booking needs the tutor's OK again for the new
@@ -1960,7 +1985,13 @@ def api_session_files(request, pk):
         )
     if f.size > MAX_LESSON_FILE_BYTES:
         return JsonResponse({"error": "Datei zu groß (max. 10 MB)."}, status=400)
-    kind = SessionFile.KIND_HOMEWORK if request.user.role == "student" else SessionFile.KIND_WORKSHEET
+    # The tutor's upload is a worksheet, or a Hausübung when sent as kind=assignment.
+    if request.user.role == "student":
+        kind = SessionFile.KIND_HOMEWORK
+    elif request.POST.get("kind") == SessionFile.KIND_ASSIGNMENT:
+        kind = SessionFile.KIND_ASSIGNMENT
+    else:
+        kind = SessionFile.KIND_WORKSHEET
     sf = SessionFile.objects.create(
         booking=b, kind=kind, name=name, size=f.size, data=f.read(),
         content_type=mimetypes.guess_type(name)[0] or "application/octet-stream",
@@ -2052,7 +2083,7 @@ def api_session_file_annotations(request, file_id):
     ``clear`` everything (tutor only; ``clear: n`` clears page n). A student
     may only remove their own items. Changes are applied to what is stored, so
     tutor and student drawing at the same time don't overwrite each other."""
-    sf = SessionFile.objects.defer("data").filter(pk=file_id, kind=SessionFile.KIND_WORKSHEET).first()
+    sf = SessionFile.objects.defer("data").filter(pk=file_id, kind__in=SessionFile.SHEET_KINDS).first()
     if not sf or not _session_booking(request, sf.booking_id):
         return JsonResponse({"error": "not found"}, status=404)
     if request.method == "GET":
@@ -2097,20 +2128,24 @@ def api_session_file_annotations(request, file_id):
 @require_http_methods(["POST"])
 @require_roles("tutor", "admin")
 def api_session_file_import(request, pk):
-    """Put a Lernmaterialien file into a lesson as a worksheet. The lesson only
-    links to it, so the file is stored once however many lessons use it."""
+    """Put a Lernmaterialien file into a lesson as a worksheet (or, with
+    ``kind: "assignment"``, as a Hausübung). The lesson only links to it, so the
+    file is stored once however many lessons use it."""
     b = _session_booking(request, pk)
     if not b:
         return JsonResponse({"error": "not found"}, status=404)
-    lf = LessonFile.objects.defer("data").filter(pk=parse_body(request).get("materialId")).first()
+    data = parse_body(request)
+    kind = (SessionFile.KIND_ASSIGNMENT if data.get("kind") == SessionFile.KIND_ASSIGNMENT
+            else SessionFile.KIND_WORKSHEET)
+    lf = LessonFile.objects.defer("data").filter(pk=data.get("materialId")).first()
     if not lf:
         return JsonResponse({"error": "Datei nicht gefunden."}, status=404)
     if not LessonFile.objects.filter(pk=lf.pk, data__isnull=False).exists():
         return JsonResponse({"error": "Diese Datei ist nicht mehr verfügbar."}, status=400)
-    sf = SessionFile.objects.defer("data").filter(booking=b, material=lf).first()
+    sf = SessionFile.objects.defer("data").filter(booking=b, material=lf, kind=kind).first()
     if not sf:
         sf = SessionFile.objects.create(
-            booking=b, kind=SessionFile.KIND_WORKSHEET, name=lf.original_name, size=lf.size,
+            booking=b, kind=kind, name=lf.original_name, size=lf.size,
             data=None, material=lf, uploaded_by=request.user,
             content_type=lf.content_type or mimetypes.guess_type(lf.original_name)[0] or "application/octet-stream",
         )

@@ -142,6 +142,7 @@
   .app[data-role="student"] .tab[data-view="book"],
   .app[data-role="student"] .tab[data-view="account"],
   .app[data-role="student"] .tab[data-view="lessons"],
+  .app[data-role="student"] .tab[data-view="homework"],
   .app[data-role="student"] .tab[data-view="files"],
   .app[data-role="student"] .tab[data-view="errors"],
   .app[data-role="tutor"] .tab[data-view="teacher"],
@@ -185,6 +186,7 @@
     .app[data-role="student"] nav.tabs.open .tab[data-view="book"],
     .app[data-role="student"] nav.tabs.open .tab[data-view="account"],
     .app[data-role="student"] nav.tabs.open .tab[data-view="lessons"],
+    .app[data-role="student"] nav.tabs.open .tab[data-view="homework"],
     .app[data-role="student"] nav.tabs.open .tab[data-view="files"],
     .app[data-role="student"] nav.tabs.open .tab[data-view="errors"],
     .app[data-role="tutor"] nav.tabs.open .tab[data-view="teacher"],
@@ -470,6 +472,10 @@
   a.lnk { color: var(--c1); text-decoration: none; font-weight: 600; font-size: 13px; }
   a.lnk:hover { text-decoration: underline; }
   .sx-wrap { max-width: 1500px; padding: 14px 24px 24px; }
+  .sx.wide .sx-main { grid-template-columns: minmax(0, 1fr); }
+  .sx.wide .sx-side { display: none; }
+  .sx-wrap:has(.sx.wide) { max-width: none; }
+  .sx-widebtn[aria-pressed="true"] { color: var(--c1); font-weight: 600; }
   .sx-bar { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; margin-bottom: 12px; }
   .sx-back { flex: 0 0 100%; width: auto; margin: 0 0 -8px; padding: 2px 0; text-align: left; font-size: 12.5px; }
   .sx-ttl { flex: 1 1 260px; min-width: 0; }
@@ -485,6 +491,30 @@
   .sx-chip.on { background: var(--c1); border-color: var(--c1); color: #fbf8f1; font-weight: 600; }
   .sx-chip.add { border-style: dashed; color: var(--c1); font-weight: 600; }
   .sx-chip.pdf { text-decoration: none; color: var(--ink); font-weight: 600; }
+  /* Hausübung (HÜ) = blue, Arbeitsblatt (AB) = the usual green. */
+  .sx-chip.hu { border-color: color-mix(in oklch, #2f6fb0 40%, transparent); }
+  .sx-chip.add.hu { color: #2f6fb0; }
+  .sx-chip.hu.on { background: #2f6fb0; border-color: #2f6fb0; color: #fbf8f1; }
+  .hu-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 1px 6px; margin-right: 6px; border-radius: 6px; background: rgba(47,111,176,0.14); color: #2f6fb0; vertical-align: 1px; }
+  .sx-chip.hu.on .hu-tag { background: rgba(255,255,255,0.22); color: #fbf8f1; }
+  .sx-addwrap { position: relative; display: inline-flex; }
+  .sx-addmenu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 210px; display: flex; flex-direction: column; padding: 6px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--bg); box-shadow: var(--shadow); }
+  .sx-addmenu[hidden] { display: none; }
+  .sx-am-h { font-size: 11px; color: var(--faint); padding: 6px 10px 4px; }
+  .sx-am-it { font-family: var(--font-body); font-size: 13.5px; text-align: left; padding: 9px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); cursor: pointer; }
+  .sx-am-it:hover { background: var(--glass); }
+  .hw-card { padding: 18px 22px; border-color: color-mix(in oklch, #2f6fb0 35%, transparent); background: color-mix(in oklch, #2f6fb0 6%, var(--glass)); }
+  .hw-card .section-h { margin: 0 0 2px; }
+  .hw-file { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 13.5px; flex-wrap: wrap; }
+  .hw-file .lnk { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; color: #2f6fb0; font-weight: 600; text-align: left; }
+  .hw-dl { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .hw-item { padding: 14px 2px; border-top: 1px solid var(--line-2); cursor: pointer; }
+  .hw-item:first-child { border-top: 0; }
+  .hw-item.done { opacity: 0.7; }
+  .hw-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; font-size: 14px; }
+  .hw-item.cur .hw-head b { color: #2f6fb0; }
+  .sx-file.hu { gap: 6px; }
   .sx-main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; height: calc(100dvh - 186px); min-height: 520px; }
   .sx-doc { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border: 1px solid var(--line);
     border-radius: var(--radius); overflow: hidden; background: color-mix(in oklch, var(--bg-2) 80%, #5c6b5c 8%); }
@@ -664,6 +694,7 @@
   .fb-yours { margin-bottom: 14px; }
   .fb-yours .fy { font-size: 16px; color: var(--ink); line-height: 1.4; overflow-wrap: anywhere; }
   .fb-yours.ok .fy { color: var(--good); font-weight: 600; }
+  .fb-yours.bad .fy { color: #c0392b; font-weight: 600; text-decoration: line-through; text-decoration-thickness: 1.5px; }
   .flash-actions .kbd { display: inline-block; font-size: 11px; font-weight: 600; line-height: 1.5; border: 1px solid currentColor; border-bottom-width: 2px;
     border-radius: 5px; padding: 0 5px; margin-left: 8px; opacity: 0.55; vertical-align: 1px; }
   @media (hover: none) { .flash-actions .kbd { display: none; } }
@@ -980,6 +1011,17 @@
   .slot .ts-add { font-size: 10.5px; color: var(--faint); letter-spacing: 0.01em; }
   .slot.t-open:hover .ts-add { color: var(--c1); }
   .slot.t-open.t-past { border-style: dashed; background: transparent; opacity: 0.75; }
+  .slot.t-open.t-closed { background: transparent; border-style: dotted; padding: 6px 11px; }
+  .slot.t-open.t-closed .ts-time { color: var(--muted); font-weight: 500; }
+  .slot.t-open.t-closed:not(.sel) .ts-add { color: var(--faint); font-size: 10px; }
+  .slot.t-open.t-closed:hover { border-style: solid; }
+  .t-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -2px 0 12px; font-size: 11.5px; color: var(--muted); }
+  .t-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .t-legend i { width: 14px; height: 10px; border-radius: 4px; border: 1px solid var(--line); display: inline-block; }
+  .t-legend .lg-open { background: var(--glass); border-color: color-mix(in oklch, var(--accent) 45%, transparent); }
+  .t-legend .lg-closed { border-style: dotted; }
+  .t-legend .lg-booked { background: color-mix(in oklch, var(--good) 22%, transparent); border-color: transparent; }
+  .t-legend .lg-req { background: color-mix(in oklch, #c2782f 16%, transparent); border: 1px dashed color-mix(in oklch, #c2782f 55%, transparent); }
   .slot.t-open.t-past:hover { opacity: 1; }
   /* Stunden nachtragen: one row per lesson */
   .bd-card { width: min(560px, 100%); }
@@ -1189,10 +1231,20 @@
   .cal-url input { flex: 1; min-width: 0; font-family: var(--font-body); font-size: 12.5px; color: var(--ink);
     background: rgba(36,53,40,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; text-overflow: ellipsis; }
   .cal-url .mini-btn { flex-shrink: 0; }
-  .time-edit { display: flex; align-items: center; gap: 12px; }
+  .time-edit { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
   .time-edit .bf-input { width: auto; flex: 0 0 auto; color-scheme: light; }
   .time-end { font-size: 12.5px; color: var(--muted); }
-  .join-btn { margin-top: 14px; }
+  .join-btn { margin-top: 10px; }
+  .join-box { margin-top: 14px; padding: 14px; border-radius: 14px; background: color-mix(in oklch, var(--good) 9%, transparent); border: 1px solid color-mix(in oklch, var(--good) 24%, transparent); }
+  .join-box .join-h { font-weight: 700; font-size: 14px; color: var(--c3); }
+  .ics-quiet { display: block; margin: 12px auto 0; font-size: 12.5px; color: var(--muted); }
+  .next-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin: 4px 0 26px; }
+  .next-grid > :only-child { grid-column: 1 / -1; }
+  .next-panel { padding: 18px 22px 8px; }
+  .next-panel .section-h { margin: 0 0 2px; }
+  .next-li { cursor: pointer; }
+  .next-li .tail { flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 760px){ .next-grid { grid-template-columns: 1fr; } }
   .join-mini { font-family: var(--font-body); font-size: 11.5px; font-weight: 500; padding: 5px 11px; border-radius: 8px; text-decoration: none;
     background: linear-gradient(120deg, var(--c1), #277a42); color: #fbf8f1; white-space: nowrap; transition: 0.15s; }
   .join-mini:hover { filter: brightness(1.07); }
@@ -1365,6 +1417,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5.5h16M4 12h16M4 18.5h10"/></svg>
             Stunden
           </button>
+          <button class="tab" data-view="homework">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11l3 3v13H5z"/><path d="M9 12l2 2 4-4"/></svg>
+            Hausübungen
+          </button>
           <button class="tab" data-view="files">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
             Materialien
@@ -1418,6 +1474,7 @@
       <section class="view active" id="view-book">
         <div class="wrap">
           <div class="hello" data-hello></div>
+          <div id="nextLessons"></div>
           <div class="eyebrow">Live-Verfügbarkeit · 45-Minuten-Stunden</div>
           <h1 class="title">Buch deine nächste Englischstunde.</h1>
           <p class="sub">Wähle einen Tutor, ein freies Zeitfenster und buche es. Jede Stunde dauert 45 Minuten und kostet eine Einheit.</p>
@@ -1527,6 +1584,16 @@
         </div>
       </section>
 
+      <!-- ===================== HAUSÜBUNGEN (student) ===================== -->
+      <section class="view" id="view-homework" data-screen-label="Homework">
+        <div class="wrap">
+          <div class="eyebrow">Lernen · Hausübungen</div>
+          <h1 class="title">Deine Hausübungen.</h1>
+          <p class="sub">Was dein Tutor dir bis zur nächsten Stunde aufgegeben hat. Öffne ein Blatt, um direkt darauf zu schreiben, oder lade es zum Ausdrucken herunter.</p>
+          <div id="homeworkContent"></div>
+        </div>
+      </section>
+
       <!-- ===================== FEHLER-TRAINING ===================== -->
       <section class="view" id="view-errors" data-screen-label="Error training">
         <div class="wrap">
@@ -1572,6 +1639,7 @@
                   <button id="tNextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
                 </div>
               </div>
+              <div class="t-legend"><span><i class="lg-open"></i>Verfügbar · Schüler können buchen</span><span><i class="lg-closed"></i>Nicht freigegeben · nur du trägst ein</span><span><i class="lg-booked"></i>Gebucht</span><span><i class="lg-req"></i>Anfrage</span></div>
               <div class="cal-scroll"><div class="days-row" id="tDaysRow"></div></div>
             </div>
 
@@ -1702,6 +1770,8 @@
 
   // ---------- Data (from Django) ----------
   const DJ = JSON.parse(document.getElementById("django-data").textContent);
+  // The one call link every lesson uses unless it has its own (LESSON_CALL_LINK).
+  const DEFAULT_CALL = DJ.lessonCallLink || "";
   const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
   async function api(method, url, body) {
@@ -1732,9 +1802,10 @@
   }
 
   // Multipart upload (files). Returns the parsed JSON on success, or {error}.
-  async function apiUpload(url, file) {
+  async function apiUpload(url, file, fields) {
     try {
       const fd = new FormData(); fd.append('file', file);
+      Object.entries(fields || {}).forEach(([k, v]) => fd.append(k, v));
       const r = await fetch(url, { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: fd });
       if (r.status === 401) { logout(); return null; }
       const data = await r.json().catch(() => null);
@@ -2125,6 +2196,33 @@
       section.appendChild(grid);
       daysRow.appendChild(section);
     });
+    renderNextLessons();
+  }
+
+  // Top of the student's calendar: the lessons already booked (with the way
+  // into each one) and the current homework, before the "book more" calendar.
+  function renderNextLessons(){
+    const el=$("#nextLessons"); if(!el) return;
+    if(state.role!=="student"){ el.innerHTML=""; return; }
+    const next=state.bookings.filter(b=>b.studentId===state.currentUser && !lessonEnded(b))
+      .sort((a,b)=>bookingStart(a)-bookingStart(b)).slice(0, 3);
+    const hw=currentHomework(state.currentUser);
+    if(!next.length && !hw){ el.innerHTML=""; return; }
+    el.innerHTML=`<div class="next-grid">
+      ${next.length ? `<div class="panel next-panel"><div class="section-h"><h2>Deine nächsten Stunden</h2></div>
+        <div class="list">${next.map((b, i)=>{
+          const t=tutorById(b.tutorId)||{ name:"Tutor" }, req=b.status==="requested";
+          return `<div class="li next-li" data-next="${i}">
+            <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
+            <div class="info"><div class="t">${esc(b.title)}${req?'<span class="req-chip" title="Wartet auf Bestätigung durch deinen Tutor">Angefragt</span>':""}</div><div class="s">${fmtLong(b.date)} · ${b.time}–${endTime(b.time, lessonMins(b))} · ${esc(t.name)}</div></div>
+            <div class="tail">${!req && b.callLink ? `<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener" data-stop>Zum Call</a>` : ""}${!req && b._pk && !b.isIntro ? `<button class="mini-btn" data-open-lesson="${b._pk}">Stunde öffnen</button>` : ""}</div>
+          </div>`; }).join("")}</div></div>` : ""}
+      ${hw ? homeworkCardHtml(hw) : ""}
+    </div>`;
+    el.querySelectorAll("[data-stop]").forEach(a=> a.onclick=e=>e.stopPropagation());
+    el.querySelectorAll("[data-open-lesson]").forEach(btn=> btn.onclick=e=>{ e.stopPropagation(); openSession(+btn.dataset.openLesson); });
+    el.querySelectorAll("[data-next]").forEach(row=> row.onclick=()=>openManage(next[+row.dataset.next]));
+    bindHomeworkCard(el);
   }
 
 
@@ -2356,13 +2454,8 @@
           <p class="confirm-p">${fmtLong(b.date)}<br/>${b.time} – ${endTime(b.time)} mit ${esc(t.name)}</p>
           ${b.status === "requested" ? `<p class="confirm-p" style="margin-top:8px;">${esc(t.name.split(" ")[0])} bestätigt deine Anfrage und du bekommst dann eine E-Mail. Der Termin ist so lange für dich reserviert.</p>` : ""}
         </div>
-        <button class="btn" id="icsBtn">
-          <span class="grainbtn"></span>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg>
-          ${resched ? "Kalender aktualisieren" : "Zum Kalender hinzufügen"}
-        </button>
-        <button class="btn ghost" id="bookMoreBtn" style="margin-top:10px;">Fertig</button>
-        <div class="micro">Lädt eine <b style='color:var(--c1)'>.ics</b>-Datei für Apple Kalender, Google Kalender oder Outlook.</div>
+        <button class="btn" id="bookMoreBtn"><span class="grainbtn"></span>Fertig</button>
+        <button class="btn-text ics-quiet" id="icsBtn">${resched ? "Neue Kalender-Datei (.ics) herunterladen" : "Kalender-Datei (.ics) herunterladen"}</button>
       `;
       $("#icsBtn").onclick = ()=>downloadIcs(b);
       $("#bookMoreBtn").onclick = ()=>{ state.justBooked=null; renderSummary(); };
@@ -2393,7 +2486,12 @@
           </div>
           ${hasPage ? `<a class="btn" id="openLessonBtn" href="#stunde-${b._pk}"><span class="grainbtn"></span>Stunde öffnen →</a>` : ""}
         ` : `
-        ${b.callLink?`<a class="btn join-btn" href="${esc(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:2px 0 0;">Dein Tutor stellt den Call-Link vor der Stunde hier ein.</div>`}
+        ${b.status==="requested" ? `<div class="micro" style="text-align:left;margin:2px 0 0;">Wartet auf Bestätigung. Danach kannst du hier in deine Stunde einsteigen.</div>` : `
+        <div class="join-box">
+          <div class="join-h">Steig hier in deine Stunde ein</div>
+          ${b.callLink?`<a class="btn join-btn" href="${esc(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:6px 0 0;">Dein Tutor stellt den Call-Link vor der Stunde hier ein.</div>`}
+          ${b._pk && !b.isIntro ? `<a class="btn ghost" id="openLessonNow" href="#stunde-${b._pk}" style="margin-top:8px;">Stunde öffnen · Arbeitsblätter &amp; Notizen</a>` : ""}
+        </div>`}
         <div class="notes-block">
           <label class="field-label">Themen für die Stunde</label>
           <textarea class="notes-ta" id="noteTA" placeholder="Themen, Fragen oder Ziele für diese Stunde…">${esc(b.notes)}</textarea>
@@ -2420,6 +2518,7 @@
         <button class="btn-text" id="manageBack">← Zurück zum Kalender</button>
       `;
       if (hasPage) $("#openLessonBtn").onclick = (e)=>{ e.preventDefault(); state.managing=null; openSession(b._pk); };
+      if ($("#openLessonNow")) $("#openLessonNow").onclick = (e)=>{ e.preventDefault(); openSession(b._pk); };
       if (ended) { $("#manageBack").onclick = ()=>{ state.managing=null; renderSummary(); }; return; }
       if (mod) {
         $("#reschBtn").onclick = ()=>startReschedule(b);
@@ -2471,7 +2570,7 @@
     const t = tutorById(s.tutorId);
     state.credits -= 1;
     // A student's booking is a request until the tutor confirms it.
-    const booking = { studentId: state.currentUser, tutorId: s.tutorId, date: new Date(s.date), time: s.time, title: "Englischstunde", status: "requested" };
+    const booking = { studentId: state.currentUser, tutorId: s.tutorId, date: new Date(s.date), time: s.time, title: "Englischstunde", status: "requested", callLink: DEFAULT_CALL };
     state.bookings.push(booking);
     meLog().unshift({ type:"book", label:"Angefragt bei "+t.name, sub: "Stunde · "+MONTHS_S[s.date.getMonth()]+" "+s.date.getDate(), amt:"-1" });
     state.selected = null;
@@ -2586,19 +2685,12 @@
     // Card payments need a completed account (real e-mail + receipt address).
     const missing = stripeOn ? paymentSetupMissing(studentById(state.currentUser)) : [];
     const needBilling = missing.length > 0;
-    // Every tutor in the system (with their e-mail), so the student can pick who
-    // to ask for a manual top-up — keyed on the tutor's real e-mail address.
-    const tutors = (tutorAccounts && tutorAccounts.length)
-      ? tutorAccounts.filter(t=>t.email).map(t=>({ name:t.name||"Tutor", email:t.email }))
-      : [];
-    const fallback = { name:"dein Tutor", email:"davit@fluent.at" };
-    const list = tutors.length ? tutors : [fallback];
-    const t0 = list[0];
-    const firstName = (t)=> (t.name||"").split(" ")[0] || t.name || "Tutor";
-    const mailHref = (t)=> `mailto:${t.email}?subject=${encodeURIComponent('Einheiten aufladen: '+p.n+'er-Paket')}&body=${encodeURIComponent('Hallo '+firstName(t)+', ich möchte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}`;
-    const tutorPicker = (list.length>1)
-      ? `<label class="bf-lab" style="margin-bottom:14px;text-align:left;">Tutor wählen<select class="bf-input" id="buyTutorSel">${list.map((t,i)=>`<option value="${i}">${esc(t.name)} · ${esc(t.email)}</option>`).join("")}</select></label>`
-      : ``;
+    // "Tutor schreiben" opens a WhatsApp chat (TUTOR_WHATSAPP) with the
+    // request already typed, addressed to the student's tutor.
+    const t0 = TUTORS[0] || { name:"" };
+    const tutorFirst = (t0.name||"").split(" ")[0] || "dein Tutor";
+    const mailHref = ()=> `https://wa.me/${encodeURIComponent(DJ.whatsapp||"")}?text=${encodeURIComponent('Hallo '+tutorFirst+', ich möchte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}`;
+    const waNum = DJ.whatsapp ? "+"+String(DJ.whatsapp).replace(/^(\d{2})(\d{3})(\d+)$/, "$1 $2 $3") : "";
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic">${stripeOn ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>` : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>`}</div>
@@ -2610,15 +2702,14 @@
       <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) sicher per Karte. Deine <b>${p.n} Einheiten</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       <label class="buy-consent"><input type="checkbox" id="buyConsent"><span>Ich stimme den <a href="/agb/" target="_blank" rel="noopener">AGB</a> zu und habe die <a href="/widerruf/" target="_blank" rel="noopener">Widerrufsbelehrung</a> zur Kenntnis genommen. Löse ich eine Einheit vor Ablauf der Widerrufsfrist ein, wünsche ich die vorzeitige Leistungserbringung ausdrücklich und nehme zur Kenntnis, dass mein Widerrufsrecht bei vollständiger Erbringung erlischt.</span></label>
       <button class="btn" id="buyStripe" disabled><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
-      <a class="btn ghost" id="buyMail" href="${esc(mailHref(t0))}">Lieber Tutor schreiben</a>
+      <a class="btn ghost" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener">Lieber Tutor auf WhatsApp schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
       <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
       : `<h3 class="buy-h">Einheiten fügt dein Tutor hinzu</h3>
-      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b id="buyTutorName">${esc(firstName(t0))}</b>. Die Einheiten werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
-      ${tutorPicker}
+      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die Einheiten werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       ${billingComplete(studentById(state.currentUser)) ? "" : `<div class="credit-warn" role="alert">⚠ Deine Rechnungsadresse ist noch unvollständig. Ergänze sie vorher in deinem Konto, sonst steht sie nicht auf deinem Beleg.</div>`}
-      <div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span id="buyTutorEmail">${esc(t0.email)}</span></div>
-      <a class="btn" id="buyMail" href="${esc(mailHref(t0))}"><span class="grainbtn"></span>Tutor schreiben</a>
+      ${waNum ? `<div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg><span>WhatsApp ${esc(waNum)}</span></div>` : ""}
+      <a class="btn" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener"><span class="grainbtn"></span>Auf WhatsApp schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>`}
     </div>`;
     m.hidden=false;
@@ -2628,13 +2719,6 @@
     if (stripeOn && $("#buyStripe")) $("#buyStripe").onclick=()=>startStripeCheckout(p);
     // FAGG: the pay button unlocks only once the buyer accepts the terms.
     if ($("#buyConsent")) $("#buyConsent").onchange=(e)=>{ const b=$("#buyStripe"); if(b) b.disabled=!e.target.checked; };
-    const selEl=$("#buyTutorSel");
-    if(selEl){ selEl.onchange=()=>{
-      const t=list[parseInt(selEl.value,10)]||t0;
-      const mail=$("#buyMail"); if(mail) mail.href=mailHref(t);
-      const nm=$("#buyTutorName"); if(nm) nm.textContent=firstName(t);
-      const em=$("#buyTutorEmail"); if(em) em.textContent=t.email;
-    }; }
   }
 
   function startStripeCheckout(p){
@@ -2738,7 +2822,8 @@
       const amtCls = a.amt.startsWith("+")?"plus":(a.amt.startsWith("-")?"minus":"");
       const who = (opts.showStudent && a.studentName) ? `${esc(a.studentName)} · ` : "";
       const sub = [who + esc(a.sub||""), a.date].filter(Boolean).join(" · ");
-      const receiptBtn = a.receiptNo?`<button class="rcpt-link" data-receipt="${a.receiptNo}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${a.receiptNo}</button>`:"";
+      // Receipts are for tutor and admin; students get theirs by e-mail.
+      const receiptBtn = (a.receiptNo && state.role!=="student")?`<button class="rcpt-link" data-receipt="${a.receiptNo}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${a.receiptNo}</button>`:"";
       let cancelCtl = "";
       if (isAdmin && a.cancellable && a.id) {
         const undoLabel = a.type==="open" ? "Rückgängig machen" : "Kauf stornieren";
@@ -2870,10 +2955,20 @@
           slots.appendChild(el);
           return;
         }
-        if(!open && !bk && !loggable) return;
+        // The whole week stays visible: every full hour that isn't open to
+        // students shows too, so the tutor can still put a student there
+        // (students can't book it, it was never published as availability).
+        const closedHour = !isPast && !bk && !conflict && !open && time.endsWith(":00");
+        if(!open && !bk && !loggable && !closedHour) return;
         any=true;
         const el=document.createElement("button");
-        if(loggable){
+        if(closedHour){
+          const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
+          el.className="slot t-open t-closed"+(isSel?" sel":"");
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">nicht freigegeben</span>`;
+          el.title="Für Schüler nicht buchbar. Tippen, um selbst einen Schüler einzutragen";
+          el.onclick=()=>teacherSelectSlot(date,time,true);
+        } else if(loggable){
           el.className="slot t-open t-past";
           el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Nachtragen</span>`;
           el.onclick=()=>openBackdate({ date:new Date(date), time });
@@ -2902,7 +2997,7 @@
     }
   }
 
-  function teacherSelectSlot(date,time){ state.teacherManage=null; state.teacherSel={ dateKey:ymd(date), date:new Date(date), time }; renderTeacherWeek(); renderTeacherSummary(); }
+  function teacherSelectSlot(date,time,closed){ state.teacherManage=null; state.teacherSel={ dateKey:ymd(date), date:new Date(date), time, closed:!!closed }; renderTeacherWeek(); renderTeacherSummary(); }
   function teacherManageSlot(bk){ state.teacherSel=null; state.teacherManage=bk; renderTeacherWeek(); renderTeacherSummary(); }
   function toggleAvail(date,time){ const dk=ymd(date), k=dk+"|"+time; const newOpen = !slotOpen(date,time,state.myTutor); availMap(state.myTutor)[k] = newOpen; api('POST', '/api/availability/', { date: dk, time, isOpen: newOpen, tutorSlug: state.myTutor }); renderTeacherWeek(); renderWeek(); }
   function exitEditAvail(){ state.editAvail=false; const t=$("#availToggle"); if(t){ t.classList.remove("active"); t.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Verfügbarkeit bearbeiten`; } renderTeacherWeek(); renderTeacherSummary(); renderWeek(); }
@@ -2934,7 +3029,7 @@
       if (res.status === 409) { toast(`${s.name.split(" ")[0]} hat das Limit offener Einheiten erreicht. Bitte zuerst begleichen`); return; }
       if (!res.ok || !res.data) { toast("Buchung fehlgeschlagen"); return; }
       const r = res.data;
-      state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title:"Englischstunde", _pk:r.pk });
+      state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title:"Englischstunde", _pk:r.pk, status:r.status||"confirmed", callLink:DEFAULT_CALL, callLinkOwn:"" });
       if (typeof r.credits === 'number') setStudentCredits(studentId, r.credits);
       s.log.unshift({ type:"book", label:"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt:"-1" });
       state.teacherSel=null; state.teacherManage=null;
@@ -3103,10 +3198,15 @@
       const opts=state.students.map(s=>`<option value="${esc(s.id)}">${esc(s.name)} (${s.credits} Einheiten)</option>`).join("");
       card.innerHTML=`
         <div class="manage-eyebrow">Schüler eintragen</div>
-        <div class="sum-rows" style="margin-bottom:16px;">
+        <div class="sum-rows" style="margin-bottom:12px;">
           <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(sel.date)}</span></div>
-          <div class="sum-row"><span class="k">Zeit</span><span class="v hl">${sel.time} – ${endTime(sel.time)}</span></div>
         </div>
+        <label class="field-label">Startzeit</label>
+        <div class="time-edit" style="margin-bottom:12px;">
+          <input type="time" class="bf-input" id="assignTime" value="${sel.time}" step="300" min="07:00" max="21:00" aria-label="Startzeit">
+          <span class="time-end" id="assignEnd">endet ${endTime(sel.time)}</span>
+        </div>
+        ${sel.closed ? `<div class="micro" style="text-align:left;margin:-4px 0 12px;">Diese Zeit ist nicht als Verfügbarkeit freigegeben. Schüler können sie nicht buchen, nur du trägst hier jemanden ein.</div>` : ""}
         <label class="field-label">Schüler</label>
         <select class="t-select" id="assignSel">${opts}</select>
         <div class="assign-note" id="assignNote"></div>
@@ -3118,7 +3218,13 @@
         ? `Bucht die Stunde und zieht <b style='color:var(--c1)'>1 Einheit</b> von ${esc(s.name.split(" ")[0])} ab (→ ${s.credits-1}).`
         : `<span class="warn">${esc(s.name.split(" ")[0])} hat keine Einheiten mehr offen.</span>`; };
       selEl.onchange=note; note();
-      $("#assignBtn").onclick=()=>teacherAssign(sel.date, sel.time, selEl.value);
+      $("#assignTime").oninput=(e)=>{ if(/^\d{2}:\d{2}$/.test(e.target.value)) $("#assignEnd").textContent="endet "+endTime(e.target.value); };
+      $("#assignBtn").onclick=()=>{
+        const tm=$("#assignTime").value;
+        if(!/^\d{2}:\d{2}$/.test(tm)){ toast("Gib eine gültige Startzeit ein"); return; }
+        if(bookingConflict(sel.date, tm, null, state.myTutor)){ toast("Das überschneidet eine andere Buchung. Wähle eine andere Zeit"); return; }
+        teacherAssign(sel.date, tm, selEl.value);
+      };
       $("#assignCancel").onclick=()=>{ state.teacherSel=null; renderTeacherWeek(); renderTeacherSummary(); };
       return;
     }
@@ -3143,13 +3249,14 @@
         ` : `
         <label class="field-label">Titel der Stunde</label>
         <input class="bf-input" id="tTitle" value="${esc(bk.title)}">
-        <label class="field-label" style="margin-top:12px;">Startzeit <span class="lbl-only">· ${lessonMins(bk)} Min.</span></label>
+        <label class="field-label" style="margin-top:12px;">Tag und Startzeit <span class="lbl-only">· ${lessonMins(bk)} Min.</span></label>
         <div class="time-edit">
-          <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00">
+          <input type="date" class="bf-input" id="tDateInput" value="${ymd(bk.date)}" aria-label="Tag">
+          <input type="time" class="bf-input" id="tTimeInput" value="${bk.time}" step="300" min="07:00" max="21:00" aria-label="Startzeit">
           <span class="time-end" id="tTimeEnd">endet ${endTime(bk.time, lessonMins(bk))}</span>
         </div>
-        <label class="field-label" style="margin-top:12px;">Call-Link <span class="lbl-only">· Zoom, Teams…</span></label>
-        <input class="bf-input" id="tCallLink" type="url" placeholder="https://… Meeting-Link einfügen" value="${esc(bk.callLink)}">
+        <label class="field-label" style="margin-top:12px;">Call-Link <span class="lbl-only">· ${DEFAULT_CALL ? "leer = euer fester Link" : "Zoom, Teams…"}</span></label>
+        <input class="bf-input" id="tCallLink" type="url" placeholder="${DEFAULT_CALL ? esc(DEFAULT_CALL) : "https://… Meeting-Link einfügen"}" value="${esc(bk.callLinkOwn!=null ? bk.callLinkOwn : bk.callLink)}">
         ${hasPage ? "" : `
         <label class="field-label" style="margin-top:12px;">Themen für die Stunde</label>
         <textarea class="notes-ta" id="tNoteTA" placeholder="Notizen für ${first}…">${esc(bk.notes)}</textarea>
@@ -3168,22 +3275,32 @@
       if($("#tNoteTA")) $("#tNoteTA").oninput=(e)=>{ bk.notes=e.target.value; };
       if($("#tPrivTA")) $("#tPrivTA").oninput=(e)=>{ bk.tutorNotes=e.target.value; };
       if($("#tTimeInput")) $("#tTimeInput").oninput=(e)=>{ const v=e.target.value; if(/^\d{2}:\d{2}$/.test(v)) $("#tTimeEnd").textContent="endet "+endTime(v, lessonMins(bk)); };
-      if($("#tCallLink")) $("#tCallLink").oninput=(e)=>{ bk.callLink=e.target.value.trim(); };
+      if($("#tCallLink")) $("#tCallLink").oninput=(e)=>{ bk.callLinkOwn=e.target.value.trim(); };
       if($("#tNoteSave")) $("#tNoteSave").onclick=()=>{
         // Same rule as the server: web links only, a bare host gets https://.
-        if(bk.callLink && !/^https?:\/\//i.test(bk.callLink)){
-          if(/^[a-z][a-z0-9+.-]*:/i.test(bk.callLink) && !/^[^/:]+:\d/.test(bk.callLink)){ toast("Link muss mit http(s):// beginnen."); return; }
-          bk.callLink="https://"+bk.callLink; $("#tCallLink").value=bk.callLink;
+        let own = bk.callLinkOwn!=null ? bk.callLinkOwn : (bk.callLink||"");
+        if(own && !/^https?:\/\//i.test(own)){
+          if(/^[a-z][a-z0-9+.-]*:/i.test(own) && !/^[^/:]+:\d/.test(own)){ toast("Link muss mit http(s):// beginnen."); return; }
+          own="https://"+own; $("#tCallLink").value=own;
         }
-        const nt=$("#tTimeInput").value;
-        if(/^\d{2}:\d{2}$/.test(nt) && nt!==bk.time){
-          if(bookingConflict(bk.date, nt, bk, bk.tutorId)){ toast("Diese Startzeit überschneidet eine andere Buchung und wurde nicht geändert"); }
-          else { bk.time=nt; const dk=ymd(bk.date); if(!dayTimes(bk.date, bk.tutorId).includes(nt)){ const cm=customMap(bk.tutorId); cm[dk]=cm[dk]||[]; cm[dk].push(nt); } toast("Stunde verschoben auf "+nt); }
+        bk.callLinkOwn=own; bk.callLink=own || DEFAULT_CALL;
+        const nt=$("#tTimeInput").value, ndv=$("#tDateInput").value;
+        const nd=/^\d{4}-\d{2}-\d{2}$/.test(ndv) ? new Date(ndv+"T00:00:00") : bk.date;
+        const tm=/^\d{2}:\d{2}$/.test(nt) ? nt : bk.time;
+        if(tm!==bk.time || !sameDay(nd, bk.date)){
+          if(bookingConflict(nd, tm, bk, bk.tutorId)){ toast("Diese Zeit überschneidet eine andere Buchung. Die Stunde wurde nicht verschoben"); }
+          else {
+            bk.date=nd; bk.time=tm;
+            const dk=ymd(nd); if(!dayTimes(nd, bk.tutorId).includes(tm)){ const cm=customMap(bk.tutorId); cm[dk]=cm[dk]||[]; cm[dk].push(tm); }
+            toast("Stunde verschoben auf "+fmtLong(nd)+", "+tm);
+          }
         } else { toast("Details gespeichert"); }
         // Notes are only sent when edited here; otherwise the lesson page owns them.
-        if (bk._pk) api('PUT', '/api/bookings/' + bk._pk + '/', Object.assign(
-          { title: bk.title, callLink: bk.callLink, time: bk.time },
-          hasPage ? {} : { notes: bk.notes, tutorNotes: bk.tutorNotes }));
+        if (bk._pk) apiResult('PUT', '/api/bookings/' + bk._pk + '/', Object.assign(
+          { title: bk.title, callLink: own, date: ymd(bk.date), time: bk.time },
+          hasPage ? {} : { notes: bk.notes, tutorNotes: bk.tutorNotes })).then(r=>{
+            if(!r.ok) toast(r.data && r.data.error==="slot_taken" ? "Zu dieser Zeit gibt es schon eine Buchung. Bitte neu laden" : "Speichern fehlgeschlagen");
+          });
         renderTeacherWeek(); renderTutorLists(); renderAccount(); renderWeek(); renderTeacherSummary();
       };
       $("#tRemove").onclick=()=>teacherRemove(bk);
@@ -3339,6 +3456,8 @@
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Verlauf der Stunden</h2><span class="micro" style="margin:0;">Stunden und Tests auf einen Blick</span></div>
         ${studentTimelineHtml(s)}
         </div><div class="st-col-side">
+        <div class="section-h" style="margin:20px 2px 6px;"><h2>Hausübungen</h2><span class="micro" style="margin:0;">neueste zuerst</span></div>
+        <div class="panel hw-modal" id="modalHomework" style="padding:4px 16px;">${homeworkListHtml(s.id, { tutor:true, limit:5 })}</div>
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Training</h2></div>
         ${errorTrainingMgrHtml(s)}
         <div class="section-h" style="margin:20px 2px 6px;"><h2>Notizen</h2></div>
@@ -3364,6 +3483,7 @@
     $("#studentModal").querySelectorAll("[data-session]").forEach(btn=> btn.onclick=()=>openSession(+btn.dataset.session));
     $("#maddCustom").onclick=()=>openCustomTopUp(s, true);
     bindSchoolTests($("#modalTests"), s.id, renderStudentModal);
+    bindHomeworkCard($("#modalHomework"));
     bindLevelCharts($("#studentModal"), s.id);
     const tlAll=$("#tlAll"); if(tlAll) tlAll.onclick=()=>{ state.timelineAll=true; renderStudentModal(); };
     const settleLinkBtn = $("#settleLinkBtn");
@@ -4259,6 +4379,51 @@
   }
   function closeLessonModal(){ const m=$("#lessonModal"); m.hidden=true; m.innerHTML=""; rerenderLearning(); }
 
+  // ----- Hausübungen -----
+  // A lesson "has homework" when the tutor wrote some or set a HÜ sheet in it.
+  // The current one is the latest such lesson the student hasn't ticked off.
+  function homeworkLessons(sid){
+    return state.bookings.filter(b=>b.studentId===sid && b._pk && !b.isIntro && (b.homework || assignments(b).length))
+      .sort((a,b)=>bookingStart(b)-bookingStart(a));
+  }
+  function currentHomework(sid){ return homeworkLessons(sid).find(b=>!b.homeworkDone) || null; }
+  function hwFilesHtml(b){
+    return assignments(b).map(f=>`<div class="hw-file"><span class="hu-tag">HÜ</span><button class="lnk" data-hw-open="${b._pk}:${f.id}">${esc(f.name)}</button><a class="hw-dl" href="${esc(f.url)}" title="Herunterladen zum Ausdrucken">↓ Herunterladen</a></div>`).join("");
+  }
+  function homeworkCardHtml(b){
+    return `<div class="panel hw-card"><div class="section-h"><h2>Deine aktuelle Hausübung</h2><span class="lnk" data-go-homework>Alle →</span></div>
+      <div class="micro" style="text-align:left;margin:0 0 8px;">Aus der Stunde vom ${fmtAT(b.date)}</div>
+      ${b.homework ? `<div class="ld-text">${esc(b.homework)}</div>` : ""}
+      ${hwFilesHtml(b)}</div>`;
+  }
+  function bindHomeworkCard(root){
+    root.querySelectorAll("[data-hw-open]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); const [pk, fid]=btn.dataset.hwOpen.split(":").map(Number); openSession(pk, fid); });
+    root.querySelectorAll("[data-go-homework]").forEach(a=> a.onclick=()=>setView("homework"));
+    root.querySelectorAll("[data-hw-done]").forEach(cb=> cb.onchange=async ()=>{
+      const b=bookingByPk(+cb.dataset.hwDone); if(!b) return;
+      if(!await saveBooking(b, { homeworkDone: cb.checked })){ cb.checked=!cb.checked; return; }
+      rerenderLearning(); renderNextLessons(); if(state.view==="homework") renderHomework();
+    });
+    root.querySelectorAll("[data-session]").forEach(r=> r.onclick=(e)=>{ if(e.target.closest("button,a,input,label")) return; openSession(+r.dataset.session); });
+  }
+  // One block per lesson with homework; the student ticks it off, the tutor sees the tick.
+  function homeworkListHtml(sid, opts){
+    const tutor=opts && opts.tutor, list=homeworkLessons(sid).slice(0, opts && opts.limit || 999);
+    if(!list.length) return `<div class="empty-list">${tutor ? "Noch keine Hausübungen." : "Gerade keine Hausübungen. Neue kommen aus deinen Stunden."}</div>`;
+    const cur=currentHomework(sid);
+    return list.map(b=>`<div class="hw-item ${b.homeworkDone?"done":""} ${b===cur?"cur":""}" data-session="${b._pk}">
+        <div class="hw-head"><b>${b===cur ? "Aktuell · " : ""}Stunde vom ${fmtAT(b.date)}</b><span class="lh-pill ${b.homeworkDone?"done":"open"}">${b.homeworkDone ? "erledigt ✓" : "offen"}</span></div>
+        ${b.homework ? `<div class="ld-text">${esc(b.homework)}</div>` : ""}
+        ${hwFilesHtml(b)}
+        ${tutor ? "" : `<label class="sess-hw-done"><input type="checkbox" data-hw-done="${b._pk}" ${b.homeworkDone?"checked":""}> ${b.homeworkDone ? "Erledigt" : "Als erledigt markieren"}</label>`}
+      </div>`).join("");
+  }
+  function renderHomework(){
+    const el=$("#homeworkContent"); if(!el) return;
+    el.innerHTML=`<div class="panel" style="padding:8px 22px;">${homeworkListHtml(state.currentUser)}</div>`;
+    bindHomeworkCard(el);
+  }
+
   // ----- Stunden list (student) -----
   function renderLessonHistory(){
     const pg=$("#myProgress"); if(pg) pg.innerHTML=progressStatsHtml(state.currentUser) + studentWayHtml(state.currentUser) + progressChartsHtml(state.currentUser);
@@ -4290,10 +4455,11 @@
   // built around the worksheet worked through in the lesson: the PDF fills the
   // left, and the tutor marks words and mistakes right in it; a side panel holds
   // the resulting Wortschatz / Fehler lists, the exercises and the notes.
-  function openSession(pk){
+  function openSession(pk, fileId){
     const b=bookingByPk(pk); if(!b) return;
     if(state.view!=="session") state.sessionReturn = state.view;
     state.sessionPk = pk;
+    if(fileId){ if(!state.sx || state.sx.pk!==pk) state.sx={ pk, fileId, tab:"notes", zoom:1, token:0 }; else state.sx.fileId=fileId; }
     if(location.hash !== "#stunde-"+pk) history.pushState(null, "", "#stunde-"+pk);
     closeStudentModalIfOpen();
     setView("session");
@@ -4341,7 +4507,10 @@
   }
   const isPdf = f => /\.pdf$/i.test(f.name);
   const isImage = f => /\.(png|jpe?g|gif|webp)$/i.test(f.name);
-  const worksheets = b => (b.files||[]).filter(f=>f.kind==="worksheet");
+  // What the lesson's PDF viewer shows: worksheets (AB, worked through together)
+  // and Hausübungen (HÜ, set until next time). Both sides can write on either.
+  const worksheets = b => (b.files||[]).filter(f=>f.kind==="worksheet" || f.kind==="assignment");
+  const assignments = b => (b.files||[]).filter(f=>f.kind==="assignment");
   const ZOOMS = [0.6, 0.8, 1, 1.25, 1.5, 2];
 
   function renderSession(){
@@ -4369,6 +4538,7 @@
           <aside class="sx-side" id="sxSide"></aside>
         </div>
       </div>`;
+      applyWide();
       bindSheetEvents(b, sx);
       bindInkEvents(b, sx);
       renderSheet(b, sx);
@@ -4388,22 +4558,33 @@
         <div class="sx-meta">${lessonEnded(b) ? "" : "Geplant · "}${fmtLong(b.date)} · ${b.time}–${endTime(b.time)} · mit ${esc(tutor ? s.name : t.name)}${b.status==="requested" ? ' <span class="req-chip">Angefragt</span>' : ""}</div>
       </div>
       <div class="sx-files">
-        ${worksheets(b).map(f=>`<button class="sx-chip ${f.id===sx.fileId?"on":""}" data-sheet="${f.id}" title="${esc(f.name)}">${esc(f.name.replace(/\.[^.]+$/, ""))}</button>`).join("")}
-        ${tutor ? `<label class="sx-chip add">+ Arbeitsblatt<input type="file" id="sheetUpload" hidden></label><button class="sx-chip add" id="sheetFromMat">+ Aus Lernmaterialien</button>` : ""}
+        ${worksheets(b).map(f=>`<button class="sx-chip ${f.kind==="assignment"?"hu":""} ${f.id===sx.fileId?"on":""}" data-sheet="${f.id}" title="${f.kind==="assignment"?"Hausübung: ":""}${esc(f.name)}">${f.kind==="assignment"?'<span class="hu-tag">HÜ</span>':""}${esc(f.name.replace(/\.[^.]+$/, ""))}</button>`).join("")}
+        ${tutor ? [["worksheet","+ AB","Arbeitsblatt für diese Stunde"],["assignment","+ HÜ","Hausübung bis zum nächsten Mal"]].map(([k, l, t])=>`<span class="sx-addwrap"><button class="sx-chip add ${k==="assignment"?"hu":""}" data-addmenu="${k}" title="${t}" aria-haspopup="true">${l}</button>
+          <span class="sx-addmenu" data-menu="${k}" hidden><span class="sx-am-h">${t}</span><label class="sx-am-it">Datei hochladen<input type="file" data-upload="${k}" hidden></label><button class="sx-am-it" data-frommat="${k}">Aus Lernmaterialien</button></span></span>`).join("") : ""}
         <a class="sx-chip pdf" href="/api/bookings/${b._pk}/pdf/" target="_blank" rel="noopener" title="Stundenübersicht als PDF${tutor ? ", zum Verschicken" : ""}">↓ PDF</a>
       </div>`;
     $("#sessBack").onclick=leaveSession;
     if($("#sessTitle")) $("#sessTitle").onchange=()=>{ const v=$("#sessTitle").value.trim(); if(v) saveBooking(b, { title: v }); };
     bar.querySelectorAll("[data-sheet]").forEach(c=> c.onclick=()=>{ sx.fileId=+c.dataset.sheet; closeSxPop(); renderSession(); });
-    bindSheetUpload(b, sx, $("#sheetUpload"));
-    if($("#sheetFromMat")) $("#sheetFromMat").onclick=()=>openMaterialPicker(b, sx);
+    const menus=[...bar.querySelectorAll("[data-menu]")];
+    const closeMenus=()=>menus.forEach(m=>m.hidden=true);
+    bar.querySelectorAll("[data-addmenu]").forEach(btn=> btn.onclick=(e)=>{
+      e.stopPropagation();
+      const m=bar.querySelector(`[data-menu="${btn.dataset.addmenu}"]`), open=m.hidden;
+      closeMenus(); m.hidden=!open;
+      if(open) setTimeout(()=>document.addEventListener("click", closeMenus, { once:true }), 0);
+    });
+    bar.querySelectorAll("[data-upload]").forEach(inp=> bindSheetUpload(b, sx, inp, inp.dataset.upload));
+    bar.querySelectorAll("[data-frommat]").forEach(btn=> btn.onclick=()=>{ closeMenus(); openMaterialPicker(b, sx, btn.dataset.frommat); });
   }
 
   // Tutor picks a Lernmaterialien file for this lesson. The lesson only links
   // to it on the server, so the file isn't stored a second time.
-  function openMaterialPicker(b, sx){
+  function openMaterialPicker(b, sx, kind){
     const m=$("#matPickModal"); if(!m) return;
-    const linked=new Set((b.files||[]).map(f=>f.materialId).filter(Boolean));
+    kind = kind==="assignment" ? "assignment" : "worksheet";
+    const hu = kind==="assignment";
+    const linked=new Set((b.files||[]).filter(f=>f.kind===kind).map(f=>f.materialId).filter(Boolean));
     let q="";
     const close=()=>{ m.hidden=true; m.innerHTML=""; };
     const listHtml=()=>{
@@ -4414,7 +4595,7 @@
             const files=lessonFilesFor(l.id).filter(f=>!needle || f.name.toLowerCase().includes(needle) || l.t.toLowerCase().includes(needle));
             if(!files.length) return "";
             return `<div class="mp-topic">${esc(l.t)}</div>`+files.map(f=> linked.has(f.id)
-              ? `<div class="mp-file done"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="mp-n">${esc(f.name)}</span><span class="mp-tag">schon in der Stunde</span></div>`
+              ? `<div class="mp-file done"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="mp-n">${esc(f.name)}</span><span class="mp-tag">${hu ? "schon als Hausübung" : "schon in der Stunde"}</span></div>`
               : `<button class="mp-file" data-mat="${f.id}"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="mp-n">${esc(f.name)}</span><span class="mp-tag">${esc(f.ext||"")}</span></button>`).join("");
           }).join("");
           return rows ? `<div class="skill-h sm">${g.t}</div>${rows}` : "";
@@ -4425,8 +4606,8 @@
     };
     m.innerHTML=`<div class="modal-card mp-card" id="mpCard">
       <button class="modal-x" id="mpX" aria-label="Schließen">×</button>
-      <div class="nm">Aus Lernmaterialien</div>
-      <p class="micro" style="text-align:left;margin:6px 0 12px;">Die Datei wird mit der Stunde verknüpft, nicht kopiert.</p>
+      <div class="nm">${hu ? "Hausübung aus Lernmaterialien" : "Arbeitsblatt aus Lernmaterialien"}</div>
+      <p class="micro" style="text-align:left;margin:6px 0 12px;">${hu ? "Die Datei erscheint bei deinem Schüler unter Hausübungen. Sie wird verknüpft, nicht kopiert." : "Die Datei wird mit der Stunde verknüpft, nicht kopiert."}</p>
       <input class="bf-input" id="mpSearch" placeholder="Datei oder Thema suchen…" autocomplete="off">
       <div class="mp-list" id="mpList">${listHtml()}</div>
     </div>`;
@@ -4436,7 +4617,7 @@
     $("#mpX").onclick=close;
     const bindList=()=> $("#mpList").querySelectorAll("[data-mat]").forEach(btn=> btn.onclick=async ()=>{
       btn.disabled=true;
-      const r=await apiResult('POST', `/api/bookings/${b._pk}/files/import/`, { materialId: +btn.dataset.mat });
+      const r=await apiResult('POST', `/api/bookings/${b._pk}/files/import/`, { materialId: +btn.dataset.mat, kind });
       if(!r.ok || !r.data || !r.data.file){ btn.disabled=false; toast((r.data && r.data.error) || "Hinzufügen fehlgeschlagen"); return; }
       if(!(b.files||[]).some(f=>f.id===r.data.file.id)) b.files=[...(b.files||[]), r.data.file];
       sx.fileId=r.data.file.id; close(); renderSession(); toast(r.data.file.name+" hinzugefügt");
@@ -4446,15 +4627,15 @@
     $("#mpSearch").focus();
   }
 
-  async function uploadSheet(b, sx, file){
+  async function uploadSheet(b, sx, file, kind){
     if(!file) return;
     if(file.size > 10*1024*1024){ toast("Datei zu groß (max. 10 MB)"); return; }
     if(isPdf(file)) file = await recognizeScannedPdf(file);
     toast("Wird hochgeladen…");
-    const r=await apiUpload(`/api/bookings/${b._pk}/files/`, file);
+    const r=await apiUpload(`/api/bookings/${b._pk}/files/`, file, kind==="assignment" ? { kind } : null);
     if(!r || r.error){ toast((r && r.error) || "Hochladen fehlgeschlagen"); return; }
     b.files=[...(b.files||[]), r.file];
-    if(r.file.kind==="worksheet") sx.fileId=r.file.id;
+    if(r.file.kind==="worksheet" || r.file.kind==="assignment") sx.fileId=r.file.id;
     renderSession(); toast("Hochgeladen");
   }
   // A scanned worksheet has no text to mark, so recognise it first (in this
@@ -4479,7 +4660,7 @@
       return r.file;
     } catch(e){ return file; }
   }
-  function bindSheetUpload(b, sx, input){ if(input) input.onchange=()=>{ uploadSheet(b, sx, input.files[0]); input.value=""; }; }
+  function bindSheetUpload(b, sx, input, kind){ if(input) input.onchange=()=>{ uploadSheet(b, sx, input.files[0], kind); input.value=""; }; }
 
   // ----- the worksheet viewer -----
   async function renderSheet(b, sx){
@@ -4490,17 +4671,20 @@
     closeNoteEditor(true);
     renderInkBar(b, sx, f);
     const dl = f ? `<a class="sx-tool" href="${esc(f.url)}">Herunterladen</a>` : "";
+    // Full width: the sheet takes the whole page and the side panel steps aside.
+    const wide = f ? `<button class="sx-tool sx-widebtn" id="sxWide" aria-pressed="${!!state.sxWide}" title="${state.sxWide ? "Wortschatz, Fehler und Notizen wieder zeigen" : "Arbeitsblatt über die ganze Seite"}">${state.sxWide ? "⤡ Seitenleiste" : "⤢ Ganze Seite"}</button>` : "";
     const del = f && tutor ? `<button class="sx-tool danger" id="sxDelSheet">Entfernen</button>` : "";
     if(!f){
       tools.innerHTML=`<span class="sx-tname">Arbeitsblatt</span>`;
       pages.innerHTML = tutor
-        ? `<label class="sx-drop"><input type="file" id="sxDropInput" hidden><b>PDF hier ablegen oder auswählen</b><span>Das Arbeitsblatt, das ihr in der Stunde durchgeht. Darin markierst du dann Wörter und Fehler. Oder oben „Aus Lernmaterialien“ wählen.</span></label>`
+        ? `<label class="sx-drop"><input type="file" id="sxDropInput" hidden><b>PDF hier ablegen oder auswählen</b><span>Das Arbeitsblatt, das ihr in der Stunde durchgeht. Darin markierst du dann Wörter und Fehler. Oben bei „+ AB“ geht es auch aus den Lernmaterialien, bei „+ HÜ“ legst du eine Hausübung an.</span></label>`
         : `<div class="sx-drop static"><b>Kein Arbeitsblatt</b><span>Zu dieser Stunde wurde kein Arbeitsblatt hochgeladen.</span></div>`;
       bindSheetUpload(b, sx, $("#sxDropInput"));
       return;
     }
     if(!isPdf(f)){
-      tools.innerHTML=`<span class="sx-tname">${esc(f.name)}</span><span class="sp"></span>${dl}${del}`;
+      tools.innerHTML=`<span class="sx-tname">${esc(f.name)}</span><span class="sp"></span>${wide}${dl}${del}`;
+      bindWide(b, sx);
       pages.innerHTML = isImage(f)
         ? `<img class="sx-img" src="${esc(f.url)}" alt="${esc(f.name)}">`
         : `<div class="sx-drop static"><b>${esc(f.name)}</b><span>Diese Datei kann hier nicht angezeigt werden.</span><a class="btn ghost" style="width:auto;margin-top:12px;" href="${esc(f.url)}">Herunterladen</a></div>`;
@@ -4510,7 +4694,8 @@
     const mark = tutor ? `<span class="sx-legend"><i class="v"></i>Text markieren → Wortschatz oder <i class="e"></i>Fehler</span>` : `<span class="sx-legend"><i class="v"></i>Wortschatz <i class="e"></i>Fehler</span>`;
     tools.innerHTML=`<span class="sx-pageno" id="sxPageNo">Seite 1</span>
       <span class="sx-zoom"><button class="sx-tool" data-zoom="-1" aria-label="Verkleinern">−</button><span id="sxZoomVal">${Math.round(sx.zoom*100)} %</span><button class="sx-tool" data-zoom="1" aria-label="Vergrößern">+</button></span>
-      ${mark}<span class="sp"></span>${dl}${del}`;
+      ${mark}<span class="sp"></span>${wide}${dl}${del}`;
+    bindWide(b, sx);
     tools.querySelectorAll("[data-zoom]").forEach(z=> z.onclick=()=>{
       const i=ZOOMS.indexOf(sx.zoom), n=Math.max(0, Math.min(ZOOMS.length-1, (i<0?2:i)+(+z.dataset.zoom)));
       if(ZOOMS[n]!==sx.zoom){ sx.zoom=ZOOMS[n]; closeSxPop(); renderSheet(b, sx); }
@@ -4561,6 +4746,11 @@
     }
     if(sx.gotoCard) gotoCard(b, sx, sx.gotoCard);
   }
+  function bindWide(b, sx){
+    const btn=$("#sxWide"); if(!btn) return;
+    btn.onclick=()=>{ state.sxWide=!state.sxWide; applyWide(); closeSxPop(); renderSheet(b, sx); };
+  }
+  function applyWide(){ const x=document.querySelector("#sessionContent .sx"); if(x) x.classList.toggle("wide", !!state.sxWide); }
   function currentSheetPage(){
     const pages=$("#sxPages"); if(!pages) return 1;
     const mid=pages.scrollTop + pages.clientHeight/3;
@@ -4744,16 +4934,20 @@
     const tutor=state.role!=="student", t=inkPrefs.tool, ink=inkFile(f.id);
     const tool=(id, label, title)=>`<button class="ink-tool ${t===id?"on":""}" data-ink-tool="${id}" title="${title}" aria-pressed="${t===id}">${INK_ICONS[id]}<span>${label}</span></button>`;
     const kind = t==="pen"||t==="hl"||t==="text" ? t : null;
+    // While a text note is open, colour and size apply to that note.
+    const ed = kind==="text" && noteEditor ? noteEditor : null;
+    const curColor = ed ? ed.color : kind && inkPrefs.color[kind];
+    const curSize = ed ? INK_SIZES.text.reduce((best, v, n)=>Math.abs(v-ed.size) < Math.abs(INK_SIZES.text[best]-ed.size) ? n : best, 0) : inkPrefs.size;
     bar.hidden=false;
     bar.innerHTML=`<span class="grp">
         ${tool("select", "Auswahl", tutor ? "Text auswählen, um Wörter und Fehler zu markieren" : "Blättern und Text auswählen")}
         ${tool("pen", "Stift", "Mit Stift, Finger oder Maus schreiben")}
         ${tool("hl", "Textmarker", "Hervorheben")}
-        ${tool("text", "Text", "Tippe aufs Blatt, um eine Notiz zu schreiben. Tippe eine Notiz an, um sie zu ändern.")}
+        ${tool("text", "Text", "Tippe aufs Blatt, um eine Notiz zu schreiben. Tippe eine Notiz an, um Text, Farbe oder Größe zu ändern.")}
         ${tool("erase", "Radierer", "Über Striche oder Notizen fahren, um sie zu löschen")}
       </span>
-      ${kind ? `<span class="sep"></span><span class="grp">${INK_COLORS[kind].map(c=>`<button class="ink-dot ${inkPrefs.color[kind]===c?"on":""}" data-ink-color="${c}" aria-label="Farbe ${c}"><i style="background:${c}"></i></button>`).join("")}</span>
-        <span class="sep"></span><span class="grp">${[0,1,2].map(n=>`<button class="ink-dot ink-size ${inkPrefs.size===n?"on":""}" data-ink-size="${n}" aria-label="${["Dünn","Mittel","Dick"][n]}"><i style="width:${6+n*4}px;height:${6+n*4}px"></i></button>`).join("")}</span>` : ""}
+      ${kind ? `<span class="sep"></span><span class="grp">${INK_COLORS[kind].map(c=>`<button class="ink-dot ${curColor===c?"on":""}" data-ink-color="${c}" aria-label="Farbe ${c}"><i style="background:${c}"></i></button>`).join("")}</span>
+        <span class="sep"></span><span class="grp">${[0,1,2].map(n=>`<button class="ink-dot ink-size ${curSize===n?"on":""}" data-ink-size="${n}" aria-label="${["Dünn","Mittel","Dick"][n]}"><i style="width:${6+n*4}px;height:${6+n*4}px"></i></button>`).join("")}</span>` : ""}
       <span class="sp"></span>
       <button class="ink-tool" id="inkUndo" title="Rückgängig (Strg+Z)" ${ink.undo.length?"":"disabled"}>${INK_ICONS.undo}<span>Rückgängig</span></button>
       ${tutor ? `<button class="ink-tool danger" id="inkClear" title="Alle Zeichnungen und Notizen auf diesem Arbeitsblatt löschen" ${ink.items.length?"":"disabled"}>Alles löschen</button>` : ""}`;
@@ -4763,8 +4957,18 @@
       if(inkPrefs.tool!=="select") window.getSelection().removeAllRanges();
       renderInkBar(b, sx, f);
     });
-    bar.querySelectorAll("[data-ink-color]").forEach(btn=> btn.onclick=()=>{ inkPrefs.color[kind]=btn.dataset.inkColor; renderInkBar(b, sx, f); });
-    bar.querySelectorAll("[data-ink-size]").forEach(btn=> btn.onclick=()=>{ inkPrefs.size=+btn.dataset.inkSize; renderInkBar(b, sx, f); });
+    // Keep the open note focused while a colour or size is picked for it.
+    bar.onpointerdown=bar.onmousedown=(e)=>{ if(noteEditor && e.target.closest("[data-ink-color],[data-ink-size]")) e.preventDefault(); };
+    bar.querySelectorAll("[data-ink-color]").forEach(btn=> btn.onclick=()=>{
+      const c=btn.dataset.inkColor;
+      if(ed && noteEditor===ed){ ed.color=c; ed.el.style.color=c; ed.el.focus(); }
+      inkPrefs.color[kind]=c; renderInkBar(b, sx, f);
+    });
+    bar.querySelectorAll("[data-ink-size]").forEach(btn=> btn.onclick=()=>{
+      const n=+btn.dataset.inkSize;
+      if(ed && noteEditor===ed){ ed.size=INK_SIZES.text[n]; ed.el.style.fontSize=ed.size*ed.el.parentElement.parentElement.offsetWidth+"px"; ed.el.dispatchEvent(new Event("input")); ed.el.focus(); }
+      inkPrefs.size=n; renderInkBar(b, sx, f);
+    });
     $("#inkUndo").onclick=()=>inkUndo(f.id);
     if($("#inkClear")) $("#inkClear").onclick=()=>{
       if(!ink.items.length || !window.confirm("Alle Zeichnungen und Notizen auf diesem Arbeitsblatt löschen? Markierte Wörter und Fehler bleiben.")) return;
@@ -4984,6 +5188,7 @@
     div.querySelector(".sx-notes").appendChild(ta);
     noteEditor={ fileId:sx.fileId, page:+div.dataset.page, id:it ? it.id : null, el:ta, item:it, x, y, size, color };
     if(it) paintInkPage(div, sx.fileId);
+    renderInkBar(b, sx, (b.files||[]).find(x=>x.id===sx.fileId));
     fit(); ta.focus(); setTimeout(()=>{ if(noteEditor && noteEditor.el===ta) ta.focus(); }, 0);
   }
   function closeNoteEditor(save){
@@ -4992,11 +5197,14 @@
     const text=ed.el.value.replace(/\s+$/, "");
     ed.el.remove();
     const old=ed.item;
-    if(save && old && text===old.text) save=false;
+    if(save && old && text===old.text && ed.color===old.color && ed.size===old.size) save=false;
     if(save && (text.trim() || old)){
       const add = text.trim() ? [{ id:inkUid(), type:"text", page:ed.page, color:ed.color, size:ed.size, x:ed.x, y:ed.y, text, by:inkMe }] : [];
       inkApply(ed.fileId, { add, remove: old ? [old] : [] });
     } else paintAllInk(ed.fileId);
+    // The bar showed the note's colour; back to the pen's own.
+    const b=state.sx && state.sx.fileId===ed.fileId && bookingByPk(state.sx.pk);
+    if(b) renderInkBar(b, state.sx, (b.files||[]).find(x=>x.id===ed.fileId));
   }
   document.addEventListener("keydown", e=>{
     if(state.view!=="session" || !state.sx || !state.sx.fileId) return;
@@ -5046,7 +5254,7 @@
     const side=$("#sxSide"); if(!side) return;
     const tutor=state.role!=="student", first=esc(bookingStudent(b).name.split(" ")[0]);
     const vocab=lessonCards(b,"vocab"), errs=lessonCards(b,"error"), ex=b.exercises||[];
-    const hwOpen = b.homework && !b.homeworkDone;
+    const hwOpen = (b.homework || assignments(b).length) && !b.homeworkDone;
     const tabs=[["vocab","Wortschatz",vocab.length],["error","Fehler",errs.length],["ex","Übungen",ex.length],["notes","Notizen",0]];
     let body="";
     if(sx.tab==="vocab" || sx.tab==="error"){
@@ -5080,8 +5288,9 @@
       body=`<div class="sx-block"><h4>Zusammenfassung${tutor ? ` <span>sieht ${first}</span>` : ""}</h4>
           ${tutor ? ta("sessSummary", b.summary, "Was ihr gemacht habt, wie es gelaufen ist…") : (b.summary ? `<div class="ld-text">${esc(b.summary)}</div>` : `<div class="sx-empty">Noch keine Zusammenfassung.</div>`)}</div>
         <div class="sx-block"><h4>Hausaufgabe</h4>
-          ${tutor ? ta("sessHomework", b.homework, "Bis zur nächsten Stunde…") : (b.homework ? `<div class="ld-text">${esc(b.homework)}</div>` : `<div class="sx-empty">Keine Hausaufgabe.</div>`)}
-          ${b.homework ? `<label class="sess-hw-done"><input type="checkbox" id="hwDone" ${b.homeworkDone?"checked":""} ${tutor?"disabled":""}> ${b.homeworkDone ? "Erledigt" : (tutor ? `${first} hat sie noch nicht abgehakt` : "Als erledigt markieren")}</label>` : ""}
+          ${tutor ? ta("sessHomework", b.homework, "Bis zur nächsten Stunde…") : (b.homework ? `<div class="ld-text">${esc(b.homework)}</div>` : (assignments(b).length ? "" : `<div class="sx-empty">Keine Hausaufgabe.</div>`))}
+          ${assignments(b).map(f=>`<div class="sx-file hu"><span class="hu-tag">HÜ</span><button class="lnk" data-sheet-open="${f.id}">${esc(f.name)}</button><a href="${esc(f.url)}" title="Herunterladen" aria-label="Herunterladen">↓</a></div>`).join("")}
+          ${b.homework || assignments(b).length ? `<label class="sess-hw-done"><input type="checkbox" id="hwDone" ${b.homeworkDone?"checked":""} ${tutor?"disabled":""}> ${b.homeworkDone ? "Erledigt" : (tutor ? `${first} hat sie noch nicht abgehakt` : "Als erledigt markieren")}</label>` : ""}
           ${handins.map(f=>`<div class="sx-file"><a href="${esc(f.url)}">${esc(f.name)}</a><span>${Math.max(1, Math.round(f.size/1024))} KB</span><button class="sx-x" data-delfile="${f.id}" title="Entfernen" aria-label="Entfernen">×</button></div>`).join("")}
           ${!tutor ? `<label class="sx-upload">+ Hausaufgabe hochladen<input type="file" id="hwUpload" hidden></label>` : (handins.length ? "" : `<div class="sx-empty">${first} hat noch nichts abgegeben.</div>`)}
         </div>
@@ -5155,6 +5364,7 @@
       if(!r || r.error){ toast((r && r.error) || "Hochladen fehlgeschlagen"); return; }
       b.files=[...(b.files||[]), r.file]; renderSidePanel(b, sx); toast("Hochgeladen");
     };
+    side.querySelectorAll("[data-sheet-open]").forEach(btn=> btn.onclick=()=>{ sx.fileId=+btn.dataset.sheetOpen; closeSxPop(); renderSession(); });
     side.querySelectorAll("[data-delfile]").forEach(btn=> btn.onclick=async ()=>{
       if(!window.confirm("Diese Datei entfernen?")) return;
       const id=+btn.dataset.delfile, r=await apiResult('DELETE', `/api/session-files/${id}/`);
@@ -5224,20 +5434,24 @@
         return;
       }
       if(e.key==="ArrowLeft"){ e.preventDefault(); $("#flashAgain").click(); }
-      else if(e.key==="ArrowRight"){ e.preventDefault(); $("#flashKnown").click(); }
+      else if(e.key==="ArrowRight"){ e.preventDefault(); if(!$("#flashKnown").hidden) $("#flashKnown").click(); }
     };
     if(flashKeys) document.removeEventListener("keydown", flashKeys);
     flashKeys=onKey; document.addEventListener("keydown", onKey);
     const finish=()=>{ document.removeEventListener("keydown", onKey); if(flashKeys===onKey) flashKeys=null; closeLessonModal(); if(onDone) onDone(); };
     const reveal=()=>{
       const c=deck[i], tryEl=$("#flashTry"), mine=tryEl ? tryEl.value.trim() : "";
+      // A typed answer decides the card: wrong shows red and can't count as "Gewusst".
+      let wrong=false;
       if(mine){
-        const ok=norm(mine)===norm(c.back);
-        $("#flashYours").innerHTML=`<div class="fb-yours ${ok?"ok":""}"><div class="flash-lab">Deine Antwort</div><div class="fy">${esc(mine)}${ok ? " ✓" : ""}</div></div>`;
+        const ok=norm(mine)===norm(c.back); wrong=!ok;
+        $("#flashYours").innerHTML=`<div class="fb-yours ${ok?"ok":"bad"}"><div class="flash-lab">Deine Antwort</div><div class="fy">${esc(mine)}${ok ? " ✓" : " ✗"}</div></div>`;
       }
       if(tryEl) tryEl.hidden=true;
       $("#flashBack").hidden=false; $("#flashReveal").hidden=true; $("#flashRate").hidden=false;
-      $("#flashKnown").focus();
+      const kn=$("#flashKnown");
+      if(wrong){ kn.hidden=true; $("#flashAgain").classList.remove("ghost"); $("#flashAgain").focus(); }
+      else kn.focus();
     };
     const show=()=>{
       if(i>=deck.length){
@@ -5885,12 +6099,26 @@
   }
 
   // ---------- View switching ----------
+  // The open tab survives a reload (per browser tab), so a refresh doesn't
+  // drop you back on the calendar. Lesson pages keep their own #stunde-… link.
+  const VIEW_KEY = "tgp.view";
+  const ROLE_VIEWS = { student: ["book","account","lessons","homework","files","errors"], tutor: ["teacher","students","materials","methods"], admin: ["admin"] };
+  function rememberView(v){ if(v==="session") return; try { sessionStorage.setItem(VIEW_KEY, state.role+":"+v); } catch(e){} }
+  // Read once at load: the role's own start view is set (and stored) before
+  // the remembered one gets restored.
+  const SAVED_VIEW = (()=>{ try { return sessionStorage.getItem(VIEW_KEY)||""; } catch(e){ return ""; } })();
+  function rememberedView(){
+    const [role, v]=SAVED_VIEW.split(":");
+    return role===state.role && (ROLE_VIEWS[role]||[]).includes(v) ? v : null;
+  }
   function setView(v) {
     state.view = v;
+    rememberView(v);
     if(v==="book") renderWeek();
     if(v==="teacher"){ renderTeacherWeek(); renderRoster(); }
     if(v==="admin") renderAdmin();
     if(v==="lessons") renderLessonHistory();
+    if(v==="homework") renderHomework();
     if(v==="files") renderFiles();
     if(v==="errors") renderErrors();
     if(v==="session") renderSession();
@@ -6110,12 +6338,16 @@
   if (!DJ.isAuthenticated) {
     window.location.href = "/login/";
   } else {
+    // Deep link straight to a session page (#stunde-<pk>). Read first: the
+    // start view below drops the #stunde-… address.
+    const deep = location.hash.match(/^#stunde-(\d+)$/);
     if (DJ.role === "admin") applyAdmin();
     else if (DJ.role === "tutor") applyTutor();
     else applyStudent(DJ.currentUserId);
-    // Deep link straight to a session page (#stunde-<pk>).
-    const deep = location.hash.match(/^#stunde-(\d+)$/);
-    if (deep && bookingByPk(+deep[1])) { state.sessionReturn = state.view; state.sessionPk = +deep[1]; setView("session"); }
+    // Back on the tab that was open before a reload (a Stripe return picks its own).
+    const back = !new URLSearchParams(location.search).get("checkout") && rememberedView();
+    if (back && back !== state.view) setView(back);
+    if (deep && bookingByPk(+deep[1])) { state.sessionReturn = state.view; state.sessionPk = +deep[1]; history.replaceState(null, "", "#stunde-"+deep[1]); setView("session"); }
   }
 })();
 </script>

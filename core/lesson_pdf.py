@@ -365,7 +365,7 @@ def render_lesson_pdf(booking, sheet_bytes=None):
     labels = {c.pk: f"{_t('W')}{i}" for i, c in enumerate(vocab, 1)}
     labels.update({c.pk: f"{_t('F')}{i}" for i, c in enumerate(errors, 1)})
 
-    sheets = list(booking.files.filter(kind="worksheet").defer("data"))
+    sheets = list(booking.files.filter(kind__in=("worksheet", "assignment")).defer("data"))
     appended = []  # (session file, kind, bytes) for the pages after the overview
     for f in sheets:
         kind = _sheet_kind(f.name)

@@ -110,8 +110,8 @@ def build_ics(booking, lang="de"):
     ]
     # The video-call link (auto-created via the tutor's Zoom/Teams account, or
     # hand-pasted) belongs where calendars actually show it: LOCATION + URL.
-    if booking.call_link:
-        lines += [f"LOCATION:{ics_escape(booking.call_link)}", f"URL:{booking.call_link}"]
+    if booking.join_link:
+        lines += [f"LOCATION:{ics_escape(booking.join_link)}", f"URL:{booking.join_link}"]
     lines += [
         "STATUS:CONFIRMED",
         "END:VEVENT",
@@ -169,9 +169,10 @@ def _ctx(booking, lang="de"):
         # The guest's public level-check result, when they took it first.
         "level_check": booking.notes if booking.is_intro else "",
         # Join link for the video call — auto-created on the tutor's connected
-        # Zoom/Teams account when the booking came in. Empty when the tutor has
-        # no connection; the templates then fall back to "we'll be in touch".
-        "call_link": booking.call_link,
+        # Zoom/Teams account when the booking came in, or the fixed
+        # LESSON_CALL_LINK. Empty when neither exists; the templates then fall
+        # back to "we'll be in touch".
+        "call_link": booking.join_link,
     }
 
 

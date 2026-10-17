@@ -149,6 +149,13 @@ class Booking(models.Model):
             self._charge_credit()
 
     @property
+    def join_link(self):
+        """The link to join this lesson: its own, else the studio's fixed one
+        (settings.LESSON_CALL_LINK)."""
+        from django.conf import settings
+        return self.call_link or settings.LESSON_CALL_LINK
+
+    @property
     def minutes(self):
         # A Schnupperstunde runs 15 minutes; a paid lesson is one 45-minute Einheit.
         return 15 if self.is_intro else 45
@@ -523,12 +530,18 @@ class SessionExercise(models.Model):
 
 
 class SessionFile(models.Model):
-    """A file attached to one lesson: a worksheet the tutor uploads, or homework
-    the student hands in. Stored in the database (not on the web server's disk,
-    which Render wipes on every deploy), so keep uploads small."""
+    """A file attached to one lesson: a worksheet the tutor uploads (worked
+    through together in the lesson), a Hausübung the tutor sets (homework until
+    next time, on the student's start page), or homework the student hands in.
+    Stored in the database (not on the web server's disk, which Render wipes on
+    every deploy), so keep uploads small."""
     KIND_WORKSHEET = 'worksheet'
+    KIND_ASSIGNMENT = 'assignment'
     KIND_HOMEWORK = 'homework'
-    KIND_CHOICES = [(KIND_WORKSHEET, 'Arbeitsblatt'), (KIND_HOMEWORK, 'Hausaufgabe')]
+    KIND_CHOICES = [(KIND_WORKSHEET, 'Arbeitsblatt'), (KIND_ASSIGNMENT, 'Hausübung'),
+                    (KIND_HOMEWORK, 'Hausaufgabe')]
+    # The kinds shown in the lesson's PDF viewer, where both sides can write on them.
+    SHEET_KINDS = (KIND_WORKSHEET, KIND_ASSIGNMENT)
 
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='files')
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)

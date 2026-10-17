@@ -38,6 +38,7 @@ import tempfile
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 
 from unittest import mock
+from urllib.parse import unquote
 
 from django.conf import settings as dj_settings
 from django.core.cache import cache
@@ -1258,7 +1259,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
 
 class DomRoleTests(_DomProbeBase):
     EXPECTED = {
-        "maya":  ("Maya Karlsson", {"book", "account", "lessons", "files", "errors"}),
+        "maya":  ("Maya Karlsson", {"book", "account", "lessons", "homework", "files", "errors"}),
         "davit": ("Davit Petrosyan", {"teacher", "students", "materials", "methods"}),
         "admin": ("Studio Admin", {"admin"}),
     }
@@ -2082,6 +2083,30 @@ class BookingSlotValidationTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json()["error"], "slot_closed")
 
+    def test_tutor_can_book_and_move_into_closed_slot(self):
+        # Closed only means students can't book it; the tutor may put anyone in.
+        for t in ("11:00", "12:00"):
+            AvailabilityOverride.objects.create(
+                tutor=self.davit, date=date(2026, 7, 3), time=t, is_open=False)
+        resp = self._post(self.davit, "maya", "2026-07-03", "11:00")
+        self.assertEqual(resp.status_code, 200)
+        b = Booking.objects.get(student=self.maya, date=date(2026, 7, 3), time="11:00")
+        resp = self.client.put(f"/api/bookings/{b.pk}/", data=json.dumps({"time": "12:00"}),
+                               content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual(b.time, "12:00")
+
+    def test_tutor_moves_lesson_to_another_day(self):
+        self._post(self.davit, "maya", "2026-07-03", "09:00")
+        b = Booking.objects.get(student=self.maya, date=date(2026, 7, 3), time="09:00")
+        resp = self.client.put(f"/api/bookings/{b.pk}/",
+                               data=json.dumps({"date": "2026-07-06", "time": "15:00"}),
+                               content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual((b.date, b.time), (date(2026, 7, 6), "15:00"))
+
     def test_cannot_reschedule_onto_taken_slot(self):
         self._post(self.maya, "maya", "2026-07-04", "09:00")
         self._post(self.ines, "ines", "2026-07-04", "10:00")
@@ -2323,30 +2348,17 @@ class SecurityHardeningTests(FluentDataMixin, TestCase):
 # Buy-credits modal: tutor choice by e-mail (DOM)
 # --------------------------------------------------------------------------- #
 class DomBuyModalTests(_DomProbeBase):
-    def test_single_tutor_mail_targets_that_tutor(self):
-        # Only davit exists: no picker, and the e-mail link targets his address.
+    @override_settings(TUTOR_WHATSAPP="436763975535")
+    def test_write_to_tutor_opens_whatsapp(self):
+        # "Tutor schreiben" opens a WhatsApp chat with the request typed in,
+        # not an e-mail.
         r = self.run_probe(self.maya, buy=True)
         self.assertEqual(r["initErrors"], [])
         b = r["buy"]
-        self.assertFalse(b["hasTutorSelect"], "one tutor needs no picker")
-        self.assertTrue(b["mailHref"].startswith("mailto:davit@fluent.at"),
-                        f"mail link must target the tutor: {b['mailHref']}")
-        self.assertEqual(b["contactEmail"], "davit@fluent.at")
-
-    def test_multiple_tutors_offer_choice_by_email(self):
-        # A second tutor in the system must appear in the picker, listed by e-mail,
-        # and the contact e-mail must be a real tutor address (not a hard-coded one).
-        make_user("berta", "tutor", first_name="Berta", last_name="Klein", initials="BK")
-        r = self.run_probe(self.maya, buy=True)
-        self.assertEqual(r["initErrors"], [])
-        b = r["buy"]
-        self.assertTrue(b["hasTutorSelect"], "two tutors must produce a picker")
-        joined = " ".join(b["selectOptions"])
-        self.assertIn("davit@fluent.at", joined)
-        self.assertIn("berta@fluent.at", joined)
-        self.assertIn(b["contactEmail"], {"davit@fluent.at", "berta@fluent.at"})
-        self.assertTrue(b["mailHref"].startswith("mailto:"))
-        self.assertIn(b["contactEmail"], b["mailHref"])
+        self.assertFalse(b["hasTutorSelect"])
+        self.assertTrue(b["mailHref"].startswith("https://wa.me/436763975535?text="),
+                        f"must open WhatsApp: {b['mailHref']}")
+        self.assertIn("Davit", unquote(b["mailHref"]))
 
 
 # --------------------------------------------------------------------------- #
@@ -3037,6 +3049,45 @@ class VideoConnectionTests(FluentDataMixin, TestCase):
 # --------------------------------------------------------------------------- #
 # Tutor iCal subscription feed
 # --------------------------------------------------------------------------- #
+class FixedCallLinkTests(FluentDataMixin, TestCase):
+    """LESSON_CALL_LINK: one fixed meeting link for every lesson."""
+
+    def _payload_booking(self, b):
+        self.client.force_login(self.davit)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        return payload, [x for x in payload["bookings"] if x.get("pk") == b.pk][0]
+
+    @override_settings(LESSON_CALL_LINK="https://zoom.us/j/1112223334")
+    def test_lessons_use_fixed_link_unless_they_have_their_own(self):
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        payload, x = self._payload_booking(b)
+        self.assertEqual(payload["lessonCallLink"], "https://zoom.us/j/1112223334")
+        self.assertEqual((x["callLink"], x["callLinkOwn"]), ("https://zoom.us/j/1112223334", ""))
+        b.call_link = "https://meet.example.com/own"
+        b.save()
+        _, x = self._payload_booking(b)
+        self.assertEqual((x["callLink"], x["callLinkOwn"]),
+                         ("https://meet.example.com/own", "https://meet.example.com/own"))
+
+    @override_settings(LESSON_CALL_LINK="https://zoom.us/j/1112223334")
+    def test_no_meeting_created_with_fixed_link(self):
+        from . import video
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        with mock.patch("core.video.create_meeting") as create:
+            video.attach_call_link(b.pk)
+        create.assert_not_called()
+        b.refresh_from_db()
+        self.assertEqual(b.call_link, "")
+        self.assertEqual(b.join_link, "https://zoom.us/j/1112223334")
+
+    def test_without_fixed_link_nothing_changes(self):
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        self.assertEqual(b.join_link, "")
+
+
 class CalendarFeedTests(FluentDataMixin, TestCase):
     def _mint_link(self, as_user=None, body=None):
         self.client.force_login(as_user or self.davit)
@@ -3301,6 +3352,31 @@ class PasswordLifecycleTests(FluentDataMixin, TestCase):
         self.assertTrue(self.maya.check_password("brand-new-pass"))
         # Same session keeps working (update_session_auth_hash) — no re-login.
         self.assertEqual(self.client.get(reverse("app")).status_code, 200)
+
+    def test_forced_change_can_set_own_email(self):
+        self.maya.must_change_password = True
+        self.maya.save()
+        self._login("maya@fluent.at", "password")
+        page = self.client.get(reverse("login"))
+        self.assertContains(page, 'id="newEmail"')
+        resp = self._json_post("/api/password/change/",
+                               {"password": "brand-new-pass", "email": " Maya.K@Example.com "})
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.email, "maya.k@example.com")
+        self.assertFalse(self.maya.must_change_password)
+        # The new address is now the login.
+        self.client.logout()
+        self.assertEqual(self._login("maya.k@example.com", "brand-new-pass").status_code, 200)
+
+    def test_forced_change_rejects_bad_or_taken_email(self):
+        self.client.force_login(self.maya)
+        for bad in ("not-an-email", "davit@fluent.at"):
+            resp = self._json_post("/api/password/change/", {"password": "brand-new-pass", "email": bad})
+            self.assertEqual(resp.status_code, 400)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.email, "maya@fluent.at")
+        self.assertTrue(self.maya.check_password("password"))
 
     def test_change_password_validation(self):
         self.client.force_login(self.maya)
@@ -3981,6 +4057,32 @@ class SessionPageTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         lf = self._material()
         r = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}, actor=self.maya)
         self.assertEqual(r.status_code, 403)
+
+    def test_tutor_sets_assignment_file(self):
+        self.client.force_login(self.davit)
+        r = self.client.post(f"/api/bookings/{self.b.pk}/files/",
+                             {"file": SimpleUploadedFile("hu.pdf", b"%PDF-1.4 hu"), "kind": "assignment"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["file"]["kind"], "assignment")
+        fid = r.json()["file"]["id"]
+        # Students write on it like on a worksheet.
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.get(f"/api/session-files/{fid}/annotations/").status_code, 200)
+        # A student's own upload stays their homework, whatever kind they send.
+        r = self.client.post(f"/api/bookings/{self.b.pk}/files/",
+                             {"file": SimpleUploadedFile("mine.pdf", b"%PDF-1.4 m"), "kind": "assignment"})
+        self.assertEqual(r.json()["file"]["kind"], "homework")
+
+    def test_material_imported_as_assignment_and_worksheet(self):
+        lf = self._material()
+        ws = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}).json()["file"]
+        hu = self._json("post", f"/api/bookings/{self.b.pk}/files/import/",
+                        {"materialId": lf.pk, "kind": "assignment"}).json()["file"]
+        self.assertEqual((ws["kind"], hu["kind"]), ("worksheet", "assignment"))
+        self.assertNotEqual(ws["id"], hu["id"])
+        again = self._json("post", f"/api/bookings/{self.b.pk}/files/import/",
+                           {"materialId": lf.pk, "kind": "assignment"}).json()["file"]
+        self.assertEqual(again["id"], hu["id"])
 
     def test_homework_set_by_tutor_ticked_by_student(self):
         self._json("put", f"/api/bookings/{self.b.pk}/", {"homework": "Workbook p. 34"})

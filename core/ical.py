@@ -58,8 +58,8 @@ def _event_lines(booking, stamp):
             desc_parts.append(f"Gast: {contact}")
     if booking.notes:
         desc_parts.append(booking.notes)
-    if booking.call_link:
-        desc_parts.append(f"Call-Link: {booking.call_link}")
+    if booking.join_link:
+        desc_parts.append(f"Call-Link: {booking.join_link}")
 
     lines = [
         "BEGIN:VEVENT",
@@ -71,9 +71,9 @@ def _event_lines(booking, stamp):
     ]
     if desc_parts:
         lines.append(f"DESCRIPTION:{ics_escape(chr(10).join(desc_parts))}")
-    if booking.call_link:
-        lines.append(f"LOCATION:{ics_escape(booking.call_link)}")
-        lines.append(f"URL:{booking.call_link}")  # a URI value, not TEXT: no escaping
+    if booking.join_link:
+        lines.append(f"LOCATION:{ics_escape(booking.join_link)}")
+        lines.append(f"URL:{booking.join_link}")  # a URI value, not TEXT: no escaping
     lines += ["STATUS:TENTATIVE" if booking.is_requested else "STATUS:CONFIRMED", "END:VEVENT"]
     return lines
 

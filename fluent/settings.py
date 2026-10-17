@@ -130,6 +130,15 @@ TEAMS_CLIENT_SECRET = os.environ.get('TEAMS_CLIENT_SECRET', '')
 # Entra tenant the app lives in; 'common' allows any Microsoft account.
 TEAMS_TENANT = os.environ.get('TEAMS_TENANT', 'common')
 
+# The one call link every lesson uses (the tutor's personal Zoom room). When
+# set, a lesson without its own link shows this one in the app, the e-mails and
+# the calendars, and no per-lesson meetings are created on a connected account.
+LESSON_CALL_LINK = os.environ.get('LESSON_CALL_LINK', '').strip()
+
+# WhatsApp number students write to from the app ("Tutor schreiben"),
+# international format without + or spaces.
+TUTOR_WHATSAPP = os.environ.get('TUTOR_WHATSAPP', '436763975535').strip().lstrip('+').replace(' ', '')
+
 # --- Transactional email (Resend via django-anymail) ------------------------
 # Set RESEND_API_KEY to send real mail (booking confirmations, tutor alerts).
 # When unset, mail is printed to the console so the flow stays visible in dev —

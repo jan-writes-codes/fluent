@@ -178,7 +178,10 @@
         <div class="wordmark">the green <span>pencil</span><span class="sub">Englisch-Nachhilfe</span></div>
       </a>
       <h2 class="auth-h">Neues Passwort festlegen</h2>
-      <p class="auth-sub" id="setpassSub">{% if mode == 'reset' %}Wähle ein neues Passwort für dein Konto.{% else %}Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes.{% endif %}</p>
+      <p class="auth-sub" id="setpassSub">{% if mode == 'reset' %}Wähle ein neues Passwort für dein Konto.{% else %}Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes, und trag deine eigene E-Mail-Adresse ein.{% endif %}</p>
+      {% if mode == 'force' %}<label class="field-label" style="text-align:left;">Deine E-Mail-Adresse</label>
+      <input class="t-select auth-input" id="newEmail" type="email" autocomplete="email" placeholder="name@beispiel.at" value="{{ current_email }}" />
+      <div class="micro" style="text-align:left;margin:-4px 0 10px;font-size:12px;color:var(--muted);">Damit meldest du dich an, und dorthin gehen deine Belege.</div>{% endif %}
       <label class="field-label" style="text-align:left;">Neues Passwort</label>
       <input class="t-select auth-input" id="newPass" type="password" autocomplete="new-password" placeholder="Mindestens 8 Zeichen" value="" />
       <label class="field-label" style="text-align:left;">Passwort wiederholen</label>
@@ -293,7 +296,10 @@
     if (p1 !== p2) { setpassErr("Die Passwörter stimmen nicht überein."); return; }
     setpassErr("");
     if (forceChange) {
-      const r = await post('/api/password/change/', { password: p1 });
+      const emailEl = $("#newEmail");
+      const email = emailEl ? (emailEl.value || "").trim().toLowerCase() : "";
+      if (emailEl && !email) { setpassErr("Bitte gib deine E-Mail-Adresse ein."); return; }
+      const r = await post('/api/password/change/', email ? { password: p1, email } : { password: p1 });
       if (!r) { setpassErr("Speichern fehlgeschlagen. Prüfe deine Verbindung."); return; }
       if (r.error) { setpassErr(r.error); return; }
       window.location.href = "/app/";
@@ -324,7 +330,8 @@
     window.location.href = "{% url 'login' %}";
   });
 
-  if (MODE === "force" || MODE === "reset") $("#newPass").focus();
+  if (MODE === "force" && $("#newEmail") && !$("#newEmail").value) $("#newEmail").focus();
+  else if (MODE === "force" || MODE === "reset") $("#newPass").focus();
   else if (MODE === "login" || !MODE) $("#authEmail").focus();
 })();
 </script>

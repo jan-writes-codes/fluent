@@ -49,10 +49,18 @@ dashboard — `.env` files are gitignored):
 | `TEAMS_CLIENT_ID` | to let tutors connect Teams | Entra ID application (client) id |
 | `TEAMS_CLIENT_SECRET` | with Teams | Entra ID client secret |
 | `TEAMS_TENANT` | optional | `common` (default; or your tenant id) |
+| `LESSON_CALL_LINK` | recommended | `https://zoom.us/j/…` — the one call link every lesson uses (app, e-mails, calendars) |
+| `TUTOR_WHATSAPP` | optional | `436763975535` (default) — where „Tutor schreiben" opens a WhatsApp chat |
 | `SENTRY_DSN` | to report errors | `https://…@o….ingest.de.sentry.io/…` (EU region) |
 | `SENTRY_ENVIRONMENT` | with Sentry | `production` on prod, `test` on the test service |
 
 ### Video calls: Zoom / Microsoft Teams (optional)
+
+Lessons normally all use the same call link: set `LESSON_CALL_LINK` to the
+tutor's personal meeting room. Every lesson without a link of its own then
+shows it (the student's "Zum Call" button, e-mails, `.ics`, calendar feed), and
+no per-lesson meetings are created even with an account connected. A link
+pasted into one lesson in the tutor portal still overrides it for that lesson.
 
 Tutors can connect their own Zoom or Teams account (Tutor-Portal → „Video-Call
 verbinden"). Every new Schnupperstunde then gets a meeting created on the
