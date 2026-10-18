@@ -3,6 +3,10 @@
  * See README.md in this folder for how to add strings. */
 window.TGP_I18N = {
   exact: {
+    // Labels saved on older transactions, before the gender-inclusive wording.
+    "Einheiten vom Tutor": "Credits from tutor",
+    "Stunde vom Tutor gebucht": "Lesson booked by tutor",
+    "Buchung vom Tutor entfernt": "Booking removed by tutor",
     "Schüler*in": "Student",
     "Schüler*innen": "Students",
     "Tutor*in": "Tutor",

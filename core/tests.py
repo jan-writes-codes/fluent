@@ -3526,7 +3526,7 @@ class CustomTopUpTests(FluentDataMixin, TestCase):
         self.assertIsNone(receipt.total_cents)
         self.assertEqual(r["total"], 5 * receipt.unit_price_cents)
         txn = CreditTransaction.objects.get(receipt_no=r["no"])
-        self.assertEqual((txn.label, txn.sub), ("Einheiten vom Tutor", "Heute · bar bezahlt"))
+        self.assertEqual((txn.label, txn.sub), ("Einheiten von Tutor*in", "Heute · bar bezahlt"))
 
     def test_zero_total_allowed(self):
         r = self._post({"n": 2, "total": "0"}).json()["receipt"]
