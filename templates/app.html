@@ -475,6 +475,12 @@
   .sx.wide .sx-main { grid-template-columns: minmax(0, 1fr); }
   .sx.wide .sx-side { display: none; }
   .sx-wrap:has(.sx.wide) { max-width: none; }
+  /* Ganze Seite: a focus mode over the whole window, app header included. */
+  .sx.wide { position: fixed; inset: 0; z-index: 45; background: var(--bg); padding: 10px; display: flex; flex-direction: column; }
+  .sx.wide .sx-bar { display: none; }
+  .sx.wide .sx-main { flex: 1; height: auto; min-height: 0; }
+  .sx.wide .sx-doc { height: auto; min-height: 0; }
+  body.sx-focus { overflow: hidden; }
   .sx-widebtn[aria-pressed="true"] { color: var(--c1); font-weight: 600; }
   .sx-bar { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; margin-bottom: 12px; }
   .sx-back { flex: 0 0 100%; width: auto; margin: 0 0 -8px; padding: 2px 0; text-align: left; font-size: 12.5px; }
@@ -4675,7 +4681,7 @@
     renderInkBar(b, sx, f);
     const dl = f ? `<a class="sx-tool" href="${esc(f.url)}">Herunterladen</a>` : "";
     // Full width: the sheet takes the whole page and the side panel steps aside.
-    const wide = f ? `<button class="sx-tool sx-widebtn" id="sxWide" aria-pressed="${!!state.sxWide}" title="${state.sxWide ? "Wortschatz, Fehler und Notizen wieder zeigen" : "Arbeitsblatt über die ganze Seite"}">${state.sxWide ? "⤡ Seitenleiste" : "⤢ Ganze Seite"}</button>` : "";
+    const wide = f ? `<button class="sx-tool sx-widebtn" id="sxWide" aria-pressed="${!!state.sxWide}" title="${state.sxWide ? "Wortschatz, Fehler und Notizen wieder zeigen" : "Arbeitsblatt über die ganze Seite"}">${state.sxWide ? "⤡ Ganze Seite verlassen" : "⤢ Ganze Seite"}</button>` : "";
     const del = f && tutor ? `<button class="sx-tool danger" id="sxDelSheet">Entfernen</button>` : "";
     if(!f){
       tools.innerHTML=`<span class="sx-tname">Arbeitsblatt</span>`;
@@ -4753,7 +4759,17 @@
     const btn=$("#sxWide"); if(!btn) return;
     btn.onclick=()=>{ state.sxWide=!state.sxWide; applyWide(); closeSxPop(); renderSheet(b, sx); };
   }
-  function applyWide(){ const x=document.querySelector("#sessionContent .sx"); if(x) x.classList.toggle("wide", !!state.sxWide); }
+  function applyWide(){
+    const x=document.querySelector("#sessionContent .sx"); if(x) x.classList.toggle("wide", !!state.sxWide);
+    document.body.classList.toggle("sx-focus", !!state.sxWide && state.view==="session");
+  }
+  // Esc leaves Ganze Seite (unless a note or the mark form is open).
+  document.addEventListener("keydown", e=>{
+    if(e.key!=="Escape" || !state.sxWide || state.view!=="session" || noteEditor) return;
+    const pop=$("#sxPop"); if(pop && !pop.hidden){ closeSxPop(); return; }
+    state.sxWide=false; applyWide();
+    const sx=state.sx, b=sx && bookingByPk(sx.pk); if(b){ renderSheet(b, sx); }
+  });
   function currentSheetPage(){
     const pages=$("#sxPages"); if(!pages) return 1;
     const mid=pages.scrollTop + pages.clientHeight/3;
@@ -4840,6 +4856,25 @@
     placeSxPop(pop, p.anchor);
     pop.querySelectorAll("[data-mark]").forEach(btn=> btn.onclick=()=>showMarkForm(b, sx, btn.dataset.mark));
   }
+  // A text note written on the sheet, marked like printed text: its box on the
+  // page becomes the highlight of the new card.
+  function showNoteMarkMenu(b, sx, noteEl, it){
+    const pop=$("#sxPop"), page=noteEl.closest(".sx-page"); if(!pop || !page) return;
+    const box=page.getBoundingClientRect(), r=noteEl.getBoundingClientRect();
+    const rd=n=>Math.round(n*10000)/10000;
+    sx.selection={ text: it.text.replace(/\s+/g, " ").trim(), page: +page.dataset.page,
+      rects: [[rd((r.left-box.left)/box.width), rd((r.top-box.top)/box.height), rd(r.width/box.width), rd(r.height/box.height)]],
+      anchor: { x: r.left, y: r.bottom } };
+    pop.dataset.mode="notemenu";
+    pop.innerHTML=`<button class="v" data-mark="vocab">+ Wortschatz</button><button class="e" data-mark="error">+ Fehler</button><button data-note-edit>Bearbeiten</button>`;
+    placeSxPop(pop, sx.selection.anchor);
+    pop.querySelectorAll("[data-mark]").forEach(btn=> btn.onclick=()=>showMarkForm(b, sx, btn.dataset.mark));
+    pop.querySelector("[data-note-edit]").onclick=()=>{
+      closeSxPop();
+      inkPrefs.tool="text"; $("#sxPages").dataset.tool="text";
+      openNoteEditor(b, sx, page, it, null);
+    };
+  }
   function showMarkForm(b, sx, kind){
     const pop=$("#sxPop"), p=sx.selection; if(!pop || !p) return;
     sx.pending=p; drawHighlights(b, sx);
@@ -4865,6 +4900,7 @@
       state.errorCards.push(r.data.card);
       sx.tab=kind; sx.flash=r.data.card.id; sx.pending=null;
       closeSxPop(); renderSidePanel(b, sx); drawHighlights(b, sx);
+      if(state.sxWide) toast(vocab ? "Zum Wortschatz hinzugefügt" : "Als Fehler gespeichert");
     };
     pop.onkeydown=(e)=>{ if(e.key==="Escape") closeSxPop(); };
   }
@@ -4881,7 +4917,7 @@
   function bindSheetEvents(b, sx){
     if(state.role==="student") return;
     const pages=$("#sxPages"), doc=$("#sxDoc"), pop=$("#sxPop");
-    pages.addEventListener("pointerdown", ()=>{ sxDown=true; if(pop.dataset.mode==="menu") closeSxPop(); });
+    pages.addEventListener("pointerdown", ()=>{ sxDown=true; if(pop.dataset.mode==="menu" || pop.dataset.mode==="notemenu") closeSxPop(); });
     // Keep the selection when tapping the menu.
     pop.addEventListener("pointerdown", (e)=>{ if(pop.dataset.mode==="menu") e.preventDefault(); });
     // Drop a file onto the sheet area to upload it.
@@ -5125,10 +5161,17 @@
     const repaintLive=div=>{ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{ rafPending=false; paintInkPage(div, sx.fileId); }); };
     pages.addEventListener("pointerdown", e=>{
       let tool=inkPrefs.tool;
-      // Tapping a note in Auswahl opens it, like the Text tool does.
+      // Tapping a note in Auswahl: the tutor gets + Wortschatz / + Fehler for
+      // what the student wrote (and Bearbeiten); a student opens their own
+      // note, like the Text tool does.
       if(tool==="select"){
         const note=e.target.closest && e.target.closest(".sx-note");
         if(!note || e.button>0) return;
+        const it=inkFile(sx.fileId).items.find(i=>i.id===note.dataset.note);
+        if(!it) return;
+        e.preventDefault();
+        if(state.role!=="student"){ showNoteMarkMenu(b, sx, note, it); return; }
+        if(!inkCanErase(it)){ toast("Diese Notiz ist vom Tutor."); return; }
         inkPrefs.tool=tool="text"; pages.dataset.tool="text";
       }
       const div=pageOf(e); if(!div || e.target.closest(".sx-note-in")) return;
@@ -6138,6 +6181,7 @@
     if(v==="files") renderFiles();
     if(v==="errors") renderErrors();
     if(v==="session") renderSession();
+    document.body.classList.toggle("sx-focus", v==="session" && !!state.sxWide);
     // Leaving a session page drops its #stunde-… address.
     if(v!=="session" && location.hash.startsWith("#stunde-")) history.replaceState(null, "", location.pathname + location.search);
     if(v==="students") renderRoster();

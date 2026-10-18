@@ -1804,7 +1804,7 @@ def api_error_cards(request):
         source_file, page, rects = None, None, []
         if data.get("fileId"):
             source_file = SessionFile.objects.defer("data").filter(
-                pk=data["fileId"], booking=booking, kind=SessionFile.KIND_WORKSHEET).first() if booking else None
+                pk=data["fileId"], booking=booking, kind__in=SessionFile.SHEET_KINDS).first() if booking else None
             if source_file is None:
                 raise ValueError("unknown worksheet")
             page = data.get("page")

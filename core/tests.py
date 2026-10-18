@@ -4072,6 +4072,14 @@ class SessionPageTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         r = self.client.post(f"/api/bookings/{self.b.pk}/files/",
                              {"file": SimpleUploadedFile("mine.pdf", b"%PDF-1.4 m"), "kind": "assignment"})
         self.assertEqual(r.json()["file"]["kind"], "homework")
+        # The tutor marks words and mistakes in a Hausübung too.
+        self.client.force_login(self.davit)
+        r = self.client.post("/api/error-cards/", data=json.dumps({
+            "kind": "error", "studentSlug": self.maya.slug, "bookingPk": self.b.pk,
+            "front": "I goed", "back": "I went", "fileId": fid, "page": 1,
+            "rects": [[0.1, 0.2, 0.3, 0.03]]}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["card"]["fileId"], fid)
 
     def test_material_imported_as_assignment_and_worksheet(self):
         lf = self._material()
