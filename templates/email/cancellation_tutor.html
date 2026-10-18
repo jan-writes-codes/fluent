@@ -21,7 +21,7 @@
               <span style="font-size:15.5px;font-weight:600;color:#c2552f;text-decoration:line-through;">{{ when }}</span>
             </td></tr>
             <tr><td style="padding:16px 18px;{% if person_email %}border-bottom:1px solid rgba(36,53,40,0.07);{% endif %}">
-              <span style="font-size:12px;color:#6e7d6e;">Schüler</span><br>
+              <span style="font-size:12px;color:#6e7d6e;">Schüler*in</span><br>
               <span style="font-size:15.5px;font-weight:600;">{{ person_name }}</span>
             </td></tr>
             {% if person_email %}
@@ -35,7 +35,7 @@
         {% if not is_intro %}
         <tr><td style="padding:18px 32px 4px;">
           {% if refunded %}
-          <p style="font-size:15px;line-height:1.6;color:#4a5a4c;margin:0;">Dem Schüler wurde die Einheit wieder gutgeschrieben.</p>
+          <p style="font-size:15px;line-height:1.6;color:#4a5a4c;margin:0;">Der*dem Schüler*in wurde die Einheit wieder gutgeschrieben.</p>
           {% else %}
           <p style="font-size:15px;line-height:1.6;color:#4a5a4c;margin:0;">Stornierung innerhalb von 24 Stunden. Die Einheit wurde nicht erstattet.</p>
           {% endif %}

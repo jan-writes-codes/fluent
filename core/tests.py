@@ -1355,7 +1355,7 @@ class DomAdminTests(_DomProbeBase):
         # A newly added student must open in the *student* editor — not the tutor
         # mask (the bug: the locally-mirrored account had no role, so it rendered
         # as a tutor with no credits/billing fields).
-        self.assertEqual(s["editorRole"], "Schüler")
+        self.assertEqual(s["editorRole"], "Schüler*in")
         self.assertTrue(s["hasOpeningField"], "student editor must show the opening-balance control")
         self.assertTrue(s["hasRemoveStudent"], "student editor must offer 'Schüler entfernen'")
 
@@ -4628,6 +4628,28 @@ class WeeklyLessonsTests(FluentDataMixin, TestCase):
             self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
         self.assertEqual(self._set(self.davit, "nobody", 1).status_code, 404)
         self.assertEqual(self._set(self.maya, "maya", 3).status_code, 403)
+
+
+class RosterGroupTests(FluentDataMixin, TestCase):
+    def _set(self, actor, slug, value):
+        self.client.force_login(actor)
+        return self.client.post(f"/api/students/{slug}/roster-group/", data=json.dumps({"rosterGroup": value}),
+                                content_type="application/json")
+
+    def test_tutor_moves_student_between_groups(self):
+        self.assertEqual(self.maya.roster_group, "active")
+        r = self._set(self.davit, "maya", "exam")
+        self.assertEqual((r.status_code, r.json()["rosterGroup"]), (200, "exam"))
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.roster_group, "exam")
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual({s["slug"]: s["rosterGroup"] for s in payload["students"]}["maya"], "exam")
+
+    def test_validation_and_roles(self):
+        for bad in ("weekly", "", None, 1):
+            self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
+        self.assertEqual(self._set(self.davit, "nobody", "done").status_code, 404)
+        self.assertEqual(self._set(self.maya, "maya", "done").status_code, 403)
 
 
 from django.core import mail  # noqa: E402

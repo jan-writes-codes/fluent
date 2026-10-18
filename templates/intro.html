@@ -188,7 +188,7 @@
         <div class="wrap">
           <div class="eyebrow"><span class="dot"></span>{% translate "Live-Verfügbarkeit · kostenlose Schnupperstunde" %}</div>
           <h1 class="hero-h">{% translate "Buche dein <em>kostenloses Kennenlerngespräch</em>." %}</h1>
-          <p class="hero-sub">{% translate "Wähle einen Tutor und ein freies Zeitfenster. Die erste Einheit ist ein <b>unverbindliches Kennenlernen</b>: kostenlos, ohne Konto und ohne Zahlungsdaten." %}</p>
+          <p class="hero-sub">{% translate "Wähle eine*n Tutor*in und ein freies Zeitfenster. Die erste Einheit ist ein <b>unverbindliches Kennenlernen</b>: kostenlos, ohne Konto und ohne Zahlungsdaten." %}</p>
           <div class="hero-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6L9 17l-5-5"></path></svg>
             {% translate "15-Minuten-Einheit · ganz ohne Einheiten · einmal pro Person" %}
@@ -202,7 +202,7 @@
 
       <section class="wrap">
         <div class="panel booker">
-          <div class="section-lbl">{% translate "Tutor wählen" %}</div>
+          <div class="section-lbl">{% translate "Tutor*in wählen" %}</div>
           <div class="tutor-row" id="tutorRow"></div>
 
           <div class="cal-head">
@@ -251,7 +251,7 @@
   })();
   if(LEVEL_CHECK && /^(A1|A2|B1|B2|C1|pre-A1)$/.test(LEVEL_CHECK.level)){
     const lv = LEVEL_CHECK.level === "pre-A1" ? "Einstieg" : LEVEL_CHECK.level;
-    document.getElementById("lcText").textContent = `Dein Level-Check (${lv}) wird mit der Buchung an deinen Tutor geschickt.`;
+    document.getElementById("lcText").textContent = `Dein Level-Check (${lv}) wird mit der Buchung an deine*n Tutor*in geschickt.`;
     document.getElementById("lcNote").hidden = false;
   }
 
@@ -302,7 +302,7 @@
   // ---- render ----
   function renderTutors(){
     const row=$("#tutorRow"); row.innerHTML="";
-    if(!TUTORS.length){ row.innerHTML=`<div class="no-slot">{{ _("Zurzeit ist kein Tutor verfügbar. Bitte versuche es später erneut.")|escapejs }}</div>`; return; }
+    if(!TUTORS.length){ row.innerHTML=`<div class="no-slot">{{ _("Zurzeit ist keine*r unserer Tutor*innen verfügbar. Bitte versuche es später erneut.")|escapejs }}</div>`; return; }
     TUTORS.forEach(t=>{
       const d=document.createElement("div");
       d.className="tutor-chip"+(t.slug===state.tutor?" sel":"");

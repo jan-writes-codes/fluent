@@ -101,6 +101,7 @@ def serialize_user(u):
         "avatarEmoji": u.avatar_emoji,
         "avatarBg": u.avatar_bg,
         "weeklyLessons": float(u.weekly_lessons),
+        "rosterGroup": u.roster_group,
         "role": u.role,
         "billing": {
             "name": u.billing_name,
@@ -986,7 +987,7 @@ def api_intro_booking(request):
 
     tutor = User.objects.filter(role="tutor", slug=tutor_slug).first()
     if tutor is None:
-        return _intro_error(gettext("Tutor nicht gefunden."), 400)
+        return _intro_error(gettext("Tutor*in nicht gefunden."), 400)
     try:
         booking_date = date.fromisoformat(date_key)
     except (ValueError, AttributeError, TypeError):
@@ -1001,7 +1002,7 @@ def api_intro_booking(request):
         is_intro=True, tutor=tutor, guest_email__iexact=email
     ).exists():
         return _intro_error(
-            gettext("Für diese E-Mail wurde bei diesem Tutor bereits eine Schnupperstunde gebucht."),
+            gettext("Für diese E-Mail wurde bei dieser*diesem Tutor*in bereits eine Schnupperstunde gebucht."),
             409,
         )
     # Slot must be free and not explicitly closed by the tutor.
@@ -1060,7 +1061,7 @@ def booking_cancel_view(request, token):
             "state": "done", "when": when, "is_intro": booking.is_intro,
             "refunded": refund_txn is not None,
         })
-    ctx = emails._booking_ctx(booking, gettext("deinem Tutor"), lang=get_language())
+    ctx = emails._booking_ctx(booking, gettext("deiner*m Tutor*in"), lang=get_language())
     return render(request, "intro_cancel.html", {
         "state": "confirm",
         "is_intro": booking.is_intro,
@@ -2202,7 +2203,7 @@ def api_credits(request, slug):
 
     receipt = grant_credits(
         student, n, get_settings(),
-        label=note or "Einheiten vom Tutor",
+        label=note or "Einheiten von Tutor*in",
         sub=f"Heute · {TOPUP_METHODS[method]}",
         total_cents=total_cents,
     )
@@ -2530,6 +2531,22 @@ def api_weekly_lessons(request, slug):
     student.weekly_lessons = Decimal(str(value))
     student.save(update_fields=["weekly_lessons"])
     return JsonResponse({"weeklyLessons": float(student.weekly_lessons)})
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_roster_group(request, slug):
+    """Tutor moves a student between the sections of the student list:
+    Aktiv, Prüfungsvorbereitung (now and then, not weekly) or Abgeschlossen."""
+    student = User.objects.filter(slug=slug, role="student").first()
+    if student is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    value = parse_body(request).get("rosterGroup")
+    if not isinstance(value, str) or value not in dict(User.ROSTER_GROUPS):
+        return JsonResponse({"error": "Unbekannte Gruppe."}, status=400)
+    student.roster_group = value
+    student.save(update_fields=["roster_group"])
+    return JsonResponse({"rosterGroup": student.roster_group})
 
 
 @require_http_methods(["POST"])

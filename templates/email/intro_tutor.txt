@@ -3,7 +3,7 @@ Neue Schnupperstunde gebucht.
 {{ guest_name }} hat eine kostenlose Intro gebucht.
 
 Termin:   {{ when }}
-Tutor:    {{ tutor_name }}
+Tutor*in:  {{ tutor_name }}
 Kontakt:  {{ guest_name }} <{{ guest_email }}>
 Telefon:  {{ guest_phone }} (WhatsApp / Rückruf für Rückfragen)
 {% if level_check %}Niveau:   {{ level_check }}

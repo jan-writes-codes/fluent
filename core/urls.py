@@ -69,6 +69,7 @@ urlpatterns = [
     path('api/settle/', views.api_settle),
     path('api/students/<str:slug>/settle-link/', views.api_settle_link),
     path('api/students/<str:slug>/weekly-lessons/', views.api_weekly_lessons),
+    path('api/students/<str:slug>/roster-group/', views.api_roster_group),
     path('api/students/<str:slug>/opening-credit/', views.api_opening_credit),
     path('settle/<str:token>/', views.settle_page, name='settle'),
     path('settle/<str:token>/checkout/', views.api_settle_token_checkout),

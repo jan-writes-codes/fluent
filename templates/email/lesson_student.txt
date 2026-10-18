@@ -4,7 +4,7 @@ Deine Englischstunde mit {{ tutor_first }} ist gebucht. Eine Einheit wurde
 dafür von deinem Guthaben abgezogen.
 
 Termin: {{ when }}
-Tutor:  {{ tutor_first }}
+Tutor*in: {{ tutor_first }}
 
 Du findest die Stunde jederzeit in deinem Konto. Kostenlos umbuchen oder
 stornieren kannst du bis 24 Stunden vorher.

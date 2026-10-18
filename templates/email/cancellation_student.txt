@@ -5,7 +5,7 @@ Hallo {{ person_first }},
 deine {% if is_intro %}Schnupperstunde{% else %}Englischstunde{% endif %} mit {{ tutor_first }} wurde storniert.
 
 Termin: {{ when }}
-Tutor:  {{ tutor_first }}
+Tutor*in: {{ tutor_first }}
 {% if not is_intro %}{% if refunded %}
 Die Einheit wurde dir wieder gutgeschrieben.{% else %}
 Da die Stornierung innerhalb von 24 Stunden vor dem Termin erfolgt ist,

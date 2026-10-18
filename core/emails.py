@@ -161,7 +161,7 @@ def _booking_ctx(booking, tutor_fallback, lang="de"):
 def _ctx(booking, lang="de"):
     en = lang == "en"
     return {
-        **_booking_ctx(booking, "your tutor" if en else "deinem Tutor", lang),
+        **_booking_ctx(booking, "your tutor" if en else "deiner*m Tutor*in", lang),
         "guest_name": booking.guest_name,
         "guest_first": _first(booking.guest_name, "there" if en else "du"),
         "guest_email": booking.guest_email,
@@ -244,11 +244,11 @@ def send_intro_tutor_notification(booking_id):
 def _lesson_ctx(booking, lang="de"):
     en = lang == "en"
     name, email = _student_contact(booking)
-    name = name or ("A student" if en else "Ein Schüler")
+    name = name or ("A student" if en else "Ein*e Schüler*in")
     return {
         **_booking_ctx(booking, "Tutor", lang),
         "student_name": name,
-        "student_first": _first(name, "your student" if en else "dein Schüler"),
+        "student_first": _first(name, "your student" if en else "dein*e Schüler*in"),
         "student_email": email,
         "title": booking.title,
     }
@@ -342,7 +342,7 @@ def send_lesson_request_student(booking_id):
         f"Anfrage gesendet · {ctx['date_long']} {ctx['time_range']}", ctx["student_email"], {
             **ctx, "badge": "Anfrage gesendet", "tone": "ok",
             "heading": f"Deine Anfrage ist bei {ctx['tutor_first']}.",
-            "who_label": "Tutor", "who": ctx["tutor_name"],
+            "who_label": "Tutor*in", "who": ctx["tutor_name"],
             "body": [
                 f"Der Termin ist für dich reserviert und eine Einheit vorgemerkt. Sobald "
                 f"{ctx['tutor_first']} bestätigt, bekommst du die Buchungsbestätigung.",
@@ -385,7 +385,7 @@ def send_lesson_request_tutor(booking_id):
         f"Bitte bestätigen: {ctx['student_name']} · {ctx['date_long']} {ctx['time_range']}", to, {
             **ctx, "badge": "Neue Anfrage", "tone": "ok",
             "heading": f"{ctx['student_name']} möchte eine Stunde buchen.",
-            "who_label": "Schüler", "who": ctx["student_name"],
+            "who_label": "Schüler*in", "who": ctx["student_name"],
             "body": [
                 "Bitte bestätige oder lehne die Anfrage im Tutor-Portal ab. Bis dahin ist "
                 "der Termin für niemand anderen buchbar.",
@@ -423,7 +423,7 @@ def send_lesson_request_declined(snapshot, reason):
             **snapshot, "badge": "Abgelehnt" if declined else "Nicht bestätigt", "tone": "warn",
             "heading": ("Dieser Termin passt leider nicht." if declined
                         else "Deine Anfrage wurde nicht rechtzeitig bestätigt."),
-            "who_label": "Tutor", "who": snapshot["tutor_name"],
+            "who_label": "Tutor*in", "who": snapshot["tutor_name"],
             "body": [
                 "Die Einheit ist wieder auf deinem Konto. Such dir gern einen anderen Termin aus.",
             ],
@@ -452,7 +452,7 @@ def _cancel_snapshot(booking, *, refunded=False):
         tutor_email = settings.TUTOR_NOTIFY_EMAIL or ""
     else:
         person_name, person_email = _student_contact(booking)
-        person_name = person_name or ("Student" if lang == "en" else "Schüler")
+        person_name = person_name or ("Student" if lang == "en" else "Schüler*in")
         # Paid lessons go to that lesson's own tutor, not the studio inbox.
         tutor_email = (booking.tutor.email if booking.tutor_id and booking.tutor else "") or ""
     return {

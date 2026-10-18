@@ -5,7 +5,7 @@ Sie ist unverbindlich. Wir schauen gemeinsam, wo du stehst und wohin du willst.
 
 Termin:  {{ date_long }}
 Uhrzeit: {{ time_range }} (15 Minuten)
-Tutor:   {{ tutor_first }}
+Tutor*in: {{ tutor_first }}
 {% if call_link %}Video:   {{ call_link }}
 {% endif %}
 Im Anhang findest du eine Kalender-Datei (.ics), mit der du den Termin

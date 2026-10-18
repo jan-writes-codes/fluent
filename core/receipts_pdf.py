@@ -174,7 +174,7 @@ def render_receipt_pdf(receipt):
         return yy
 
     label(M, y, "Leistungserbringer · From")
-    label(col2, y, "Empfänger · Billed to")
+    label(col2, y, "Empfänger*in · Billed to")
     y2 = y - 14
     recipient = [
         receipt.billing_name or receipt.student_name,

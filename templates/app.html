@@ -1032,6 +1032,13 @@
   .t-legend .lg-booked { background: color-mix(in oklch, var(--good) 22%, transparent); border-color: transparent; }
   .t-legend .lg-req { background: color-mix(in oklch, #c2782f 16%, transparent); border: 1px dashed color-mix(in oklch, #c2782f 55%, transparent); }
   .slot.t-open.t-past:hover { opacity: 1; }
+  /* Free, published availability: a touch lighter than bookings so the week reads at a glance. */
+  .slot.t-open:not(.t-closed):not(.t-past):not(.sel) { background: color-mix(in oklch, var(--accent) 5%, transparent);
+    border-color: color-mix(in oklch, var(--accent) 26%, transparent); }
+  .slot.t-open:not(.t-closed):not(.t-past):not(.sel) .ts-time { color: var(--muted); font-weight: 500; }
+  .hours-toggle { display: block; margin: 0 auto 14px; border: 1px dashed var(--line); background: transparent; color: var(--muted);
+    font-family: var(--font-body); font-size: 12.5px; padding: 7px 14px; border-radius: 100px; cursor: pointer; }
+  .hours-toggle:hover { color: var(--ink); border-style: solid; }
   /* Stunden nachtragen: one row per lesson */
   .bd-card { width: min(560px, 100%); }
   .bd-head, .bd-row { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(0,1.25fr) minmax(0,0.75fr) 28px; gap: 8px; text-align: left; }
@@ -1108,6 +1115,14 @@
   .rc-actions { display: flex; gap: 6px; flex-shrink: 0; }
   @media (max-width: 600px) { .rc-actions { display: none; } }
   .rost:hover { background: rgba(36,53,40,0.035); }
+  .roster-group-h { display: flex; align-items: baseline; gap: 10px; margin: 18px 4px 4px; font-size: 11px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .roster-group-h:first-child { margin-top: 10px; }
+  .roster-group-h span { letter-spacing: 0; text-transform: none; font-weight: 400; }
+  .roster-group-h + .rost { border-top: 0; }
+  .roster-group.done .rost { opacity: 0.7; }
+  .rg-select { margin-top: 6px; font-family: var(--font-body); font-size: 11.5px; color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 3px 6px; cursor: pointer; }
 
   /* ---------- Student history modal ---------- */
   .modal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(20,40,24,0.55); backdrop-filter: blur(7px);
@@ -1194,7 +1209,7 @@
     display: grid; place-items: center; font-size: 11px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); }
   .av-edit:hover .avatar { box-shadow: 0 0 0 3px rgba(48,144,80,0.35); }
   .av-preview { display: flex; justify-content: center; margin: 6px 0 16px; }
-  .av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 16px; }
+  .av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 16px; max-height: 260px; overflow-y: auto; padding: 2px; }
   .av-grid button { aspect-ratio: 1; font-size: 22px; line-height: 1; border-radius: 10px; border: 1px solid var(--line);
     background: transparent; cursor: pointer; padding: 0; display: grid; place-items: center; }
   .av-grid button.on { border-color: var(--ink); background: rgba(36,53,40,0.08); }
@@ -1445,7 +1460,7 @@
         </button>
         <button class="tab" data-view="students">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6.2a3 3 0 0 1 0 5.6M18 19c0-2.3-1-4-2.6-4.6"/></svg>
-          Schüler
+          Schüler*innen
         </button>
         <button class="tab" data-view="materials">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5h6a2 2 0 0 1 2 2v13a1.5 1.5 0 0 0-1.5-1.5H4z"/><path d="M20 4.5h-6a2 2 0 0 0-2 2v13a1.5 1.5 0 0 1 1.5-1.5H20z"/></svg>
@@ -1486,7 +1501,7 @@
           <div id="nextLessons"></div>
           <div class="eyebrow">Live-Verfügbarkeit · 45-Minuten-Stunden</div>
           <h1 class="title">Buch deine nächste Englischstunde.</h1>
-          <p class="sub">Wähle einen Tutor, ein freies Zeitfenster und buche es. Jede Stunde dauert 45 Minuten und kostet eine Einheit.</p>
+          <p class="sub">Wähle eine*n Tutor*in, ein freies Zeitfenster und buche es. Jede Stunde dauert 45 Minuten und kostet eine Einheit.</p>
 
           <div class="book-grid">
             <div class="panel" style="grid-column: 1;">
@@ -1573,7 +1588,7 @@
                 <label class="bf-lab">Stadt<input class="bf-input" id="bfCity" /></label>
               </div>
               <label class="bf-lab">Land<input class="bf-input" id="bfCountry" /></label>
-              <div class="micro" style="text-align:left; margin-top:4px;">Wird als Rechnungsadresse auf den Belegen deines Tutors verwendet. Die E-Mail-Adresse ist auch dein Login und bekommt deine Belege. Für Kartenzahlungen sind beide nötig.</div>
+              <div class="micro" style="text-align:left; margin-top:4px;">Wird als Rechnungsadresse auf deinen Belegen verwendet. Die E-Mail-Adresse ist auch dein Login und bekommt deine Belege. Für Kartenzahlungen sind beide nötig.</div>
             </div>
           </div>
         </div>
@@ -1598,7 +1613,7 @@
         <div class="wrap">
           <div class="eyebrow">Lernen · Hausübungen</div>
           <h1 class="title">Deine Hausübungen.</h1>
-          <p class="sub">Was dein Tutor dir bis zur nächsten Stunde aufgegeben hat. Öffne ein Blatt, um direkt darauf zu schreiben, oder lade es zum Ausdrucken herunter.</p>
+          <p class="sub">Was dir dein*e Tutor*in bis zur nächsten Stunde aufgegeben hat. Öffne ein Blatt, um direkt darauf zu schreiben, oder lade es zum Ausdrucken herunter.</p>
           <div id="homeworkContent"></div>
         </div>
       </section>
@@ -1608,7 +1623,7 @@
         <div class="wrap">
           <div class="eyebrow">Lernen · Training</div>
           <h1 class="title">Wiederholen, bis es sitzt.</h1>
-          <p class="sub">Deine Fehler und neuen Wörter aus den Stunden als Lernkarten. Übe sie jederzeit. In der nächsten Stunde geht ihr sie gemeinsam durch, und was sitzt, hakt dein Tutor als gemeistert ab.</p>
+          <p class="sub">Deine Fehler und neuen Wörter aus den Stunden als Lernkarten. Übe sie jederzeit. In der nächsten Stunde geht ihr sie gemeinsam durch, und was sitzt, hakt dein*e Tutor*in als gemeistert ab.</p>
           <div id="errorsContent"></div>
         </div>
       </section>
@@ -1623,7 +1638,7 @@
         <div class="wrap">
           <div class="eyebrow">Lernen · Materialien</div>
           <h1 class="title">Deine Materialien.</h1>
-          <p class="sub">Arbeitsblätter und Materialien, die dein Tutor für dich freigeschaltet hat, nach Niveau geordnet. Gesperrte Lektionen öffnen sich, sobald du weiterkommst.</p>
+          <p class="sub">Arbeitsblätter und Materialien, die dein*e Tutor*in für dich freigeschaltet hat, nach Niveau geordnet. Gesperrte Lektionen öffnen sich, sobald du weiterkommst.</p>
           <div id="filesContent"></div>
         </div>
       </section>
@@ -1634,7 +1649,7 @@
           <div class="hello" data-hello></div>
           <div class="eyebrow">Tutor-Portal · Davit</div>
           <h1 class="title">Dein Studio.</h1>
-          <p class="sub">Trage Schüler in freie Zeiten in deinem Kalender ein und verwalte deine Stunden. Einheiten und Notizen findest du im Tab <b>Schüler</b>, Themen und Dateien unter <b>Lernmaterialien</b>.</p>
+          <p class="sub">Trage Schüler*innen in freie Zeiten in deinem Kalender ein und verwalte deine Stunden. Einheiten und Notizen findest du im Tab <b>Schüler*innen</b>, Themen und Dateien unter <b>Lernmaterialien</b>.</p>
 
           <div class="teach-grid">
             <div class="panel">
@@ -1648,8 +1663,9 @@
                   <button id="tNextWeek" aria-label="Nächste Woche"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
                 </div>
               </div>
-              <div class="t-legend"><span><i class="lg-open"></i>Verfügbar · Schüler können buchen</span><span><i class="lg-closed"></i>Nicht freigegeben · nur du trägst ein</span><span><i class="lg-booked"></i>Gebucht</span><span><i class="lg-req"></i>Anfrage</span></div>
+              <div class="t-legend"><span><i class="lg-open"></i>Verfügbar · Schüler*innen können buchen</span><span><i class="lg-closed"></i>Nicht freigegeben · nur du trägst ein</span><span><i class="lg-booked"></i>Gebucht</span><span><i class="lg-req"></i>Anfrage</span></div>
               <div class="cal-scroll"><div class="days-row" id="tDaysRow"></div></div>
+              <button class="hours-toggle" id="tHoursToggle" type="button"></button>
             </div>
 
             <aside class="summary">
@@ -1666,7 +1682,7 @@
 
           <div class="section-h" style="margin-top:34px;"><h2>Abgeschlossene Stunden</h2></div>
           <div class="panel" style="padding: 8px 22px;"><div class="list" id="tutorCompleted"></div></div>
-          <div class="fineprint">Einen Schüler einzutragen zieht eine Einheit ab (oder bucht eine Gratis-Stunde, wenn keine vorhanden ist). Eine Buchung zu entfernen gibt die Einheit zurück.</div>
+          <div class="fineprint">Eine*n Schüler*in einzutragen zieht eine Einheit ab (oder bucht eine Gratis-Stunde, wenn keine vorhanden ist). Eine Buchung zu entfernen gibt die Einheit zurück.</div>
         </div>
       </section>
 
@@ -1675,7 +1691,7 @@
         <div class="wrap">
           <div class="eyebrow">Tutor-Portal · Lernmaterialien</div>
           <h1 class="title">Lernmaterialien.</h1>
-          <p class="sub">Alle Themen nach Niveau und Bereich. Lege neue Themen an und lade Dateien hoch. Freigeschaltet werden sie pro Schüler im Tab <b>Schüler</b>.</p>
+          <p class="sub">Alle Themen nach Niveau und Bereich. Lege neue Themen an und lade Dateien hoch. Freigeschaltet werden sie pro Schüler*in im Tab <b>Schüler*innen</b>.</p>
           <div id="materialsContent"></div>
         </div>
       </section>
@@ -1693,13 +1709,13 @@
       <!-- ===================== STUDENTS (tutor) ===================== -->
       <section class="view" id="view-students" data-screen-label="Students">
         <div class="wrap">
-          <div class="eyebrow">Tutor-Portal · deine Schüler</div>
-          <h1 class="title">Deine Schüler.</h1>
-          <p class="sub">Tippe einen Schüler an, um Einheiten, Notizen, Lernmaterialien und Verlauf zu verwalten.</p>
+          <div class="eyebrow">Tutor-Portal · deine Schüler*innen</div>
+          <h1 class="title">Deine Schüler*innen.</h1>
+          <p class="sub">Tippe eine*n Schüler*in an, um Einheiten, Notizen, Lernmaterialien und Verlauf zu verwalten.</p>
           <div class="students-bar">
             <div class="search-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-              <input id="studentSearch" class="search-input" type="search" placeholder="Schüler suchen…" autocomplete="off">
+              <input id="studentSearch" class="search-input" type="search" placeholder="Schüler*innen suchen…" autocomplete="off">
             </div>
             <div class="students-count" id="studentsCount"></div>
           </div>
@@ -1713,29 +1729,29 @@
         <div class="wrap">
           <div class="hello" data-hello></div>
           <div class="eyebrow">Admin · Benutzerverwaltung</div>
-          <h1 class="title">Benutzer verwalten.</h1>
-          <p class="sub">Wähle einen Tutor oder Schüler, um Name, Foto, Adresse und Login zu bearbeiten, oder öffne das Konto, um genau ihre Ansicht zu sehen.</p>
+          <h1 class="title">Nutzer*innen verwalten.</h1>
+          <p class="sub">Wähle eine*n Tutor*in oder Schüler*in, um Name, Foto, Adresse und Login zu bearbeiten, oder öffne das Konto, um genau ihre Ansicht zu sehen.</p>
 
           <div class="admin-grid">
             <div class="panel" style="padding: 8px;">
               <div class="admin-list" id="adminList"></div>
-              <button class="btn ghost" id="adminAddBtn" style="margin:8px 8px 0; width:calc(100% - 16px);">+ Schüler hinzufügen</button>
-              <button class="btn ghost" id="adminAddTutorBtn" style="margin:8px; width:calc(100% - 16px);">+ Tutor hinzufügen</button>
+              <button class="btn ghost" id="adminAddBtn" style="margin:8px 8px 0; width:calc(100% - 16px);">+ Schüler*in hinzufügen</button>
+              <button class="btn ghost" id="adminAddTutorBtn" style="margin:8px; width:calc(100% - 16px);">+ Tutor*in hinzufügen</button>
             </div>
             <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
           </div>
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
             <div class="section-h"><h2>Preise</h2></div>
-            <div class="ed-sub">Einheiten-Pakete für Schüler</div>
+            <div class="ed-sub">Einheiten-Pakete für Schüler*innen</div>
             <div class="admin-packs" id="adminPacks"></div>
             <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Preise speichern</button>
-            <div class="micro" style="text-align:left; margin-top:10px;">Pakete sehen die Schüler unter „Einheiten aufladen“.</div>
+            <div class="micro" style="text-align:left; margin-top:10px;">Pakete sehen die Schüler*innen unter „Einheiten aufladen“.</div>
           </div>
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
             <div class="section-h"><h2>Transaktionen</h2></div>
-            <div class="ed-sub">Gesamter Einheiten-Verlauf aller Schüler</div>
+            <div class="ed-sub">Gesamter Einheiten-Verlauf aller Schüler*innen</div>
             <div class="txn-cols">
               <div class="txn-col">
                 <div class="txn-col-h">Käufe &amp; Stornos</div>
@@ -1752,8 +1768,8 @@
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
             <div class="section-h"><h2>Auszahlungen</h2></div>
-            <div class="ed-sub">Gehaltene Stunden je Tutor</div>
-            <div class="micro" style="text-align:left; margin:2px 2px 12px;">Grundlage für die Auszahlung: abgeschlossene Stunden pro Tutor. Schnupperstunden zählen nicht.</div>
+            <div class="ed-sub">Gehaltene Stunden je Tutor*in</div>
+            <div class="micro" style="text-align:left; margin:2px 2px 12px;">Grundlage für die Auszahlung: abgeschlossene Stunden pro Tutor*in. Schnupperstunden zählen nicht.</div>
             <div id="adminPayouts"></div>
           </div>
         </div>
@@ -1891,6 +1907,7 @@
     managing: null,
     rescheduling: null,
     tWeekOffset: 0,
+    tAllHours: false,  // tutor calendar: only 13:00–19:00 unless expanded
     teacherSel: null,
     teacherManage: null,
     teacherStudent: null,
@@ -2050,7 +2067,7 @@
       ${stornoNote}
       <div class="r-parties">
         <div><div class="r-lbl">Leistungserbringer · From</div>${SUPPLIER.name}<br/>${SUPPLIER.line2}<br/>${SUPPLIER.addr}<br/>${SUPPLIER.city}<br/>${SUPPLIER.email}</div>
-        <div><div class="r-lbl">Empfänger · Billed to</div>${esc(r.studentName)}${r.billing?'<br/>'+esc(r.billing.line1)+'<br/>'+esc(r.billing.postcode)+' '+esc(r.billing.city)+'<br/>'+esc(r.billing.country):''}</div>
+        <div><div class="r-lbl">Empfänger*in · Billed to</div>${esc(r.studentName)}${r.billing?'<br/>'+esc(r.billing.line1)+'<br/>'+esc(r.billing.postcode)+' '+esc(r.billing.city)+'<br/>'+esc(r.billing.country):''}</div>
       </div>
       <table class="r-table">
         <thead><tr><th>Menge</th><th>Beschreibung</th><th>Einzel</th><th>Betrag</th></tr></thead>
@@ -2223,7 +2240,7 @@
           const t=tutorById(b.tutorId)||{ name:"Tutor" }, req=b.status==="requested";
           return `<div class="li next-li" data-next="${i}">
             <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
-            <div class="info"><div class="t">${esc(b.title)}${req?'<span class="req-chip" title="Wartet auf Bestätigung durch deinen Tutor">Angefragt</span>':""}</div><div class="s">${fmtLong(b.date)} · ${b.time}–${endTime(b.time, lessonMins(b))} · ${esc(t.name)}</div></div>
+            <div class="info"><div class="t">${esc(b.title)}${req?'<span class="req-chip" title="Wartet auf Bestätigung durch deine*n Tutor*in">Angefragt</span>':""}</div><div class="s">${fmtLong(b.date)} · ${b.time}–${endTime(b.time, lessonMins(b))} · ${esc(t.name)}</div></div>
             <div class="tail">${!req && b.callLink ? `<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener" data-stop>Zum Call</a>` : ""}${!req && b._pk && !b.isIntro ? `<button class="mini-btn" data-open-lesson="${b._pk}">Stunde öffnen</button>` : ""}</div>
           </div>`; }).join("")}</div></div>` : ""}
       ${hw ? homeworkCardHtml(hw) : ""}
@@ -2388,7 +2405,7 @@
         <p class="buy-p">Verbunden mit <b>${VIDEO_NAMES[conn.provider]||conn.provider}</b>${conn.account?` als <b>${esc(conn.account)}</b>`:""}. Jede neue Schnupperstunde bekommt automatisch einen Meeting-Link zur gebuchten Zeit. Er steht in der Bestätigungs-Mail und im Kalender.</p>
         <button class="btn ghost" id="videoDisconnect">Konto trennen</button>`;
     } else if (DJ.role !== "tutor") {
-      body = `<p class="buy-p">Nur der Tutor selbst kann sein Zoom- oder Teams-Konto verbinden, denn die Freigabe gehört zu seinem Login.</p>`;
+      body = `<p class="buy-p">Nur die*der Tutor*in selbst kann das eigene Zoom- oder Teams-Konto verbinden, denn die Freigabe gehört zum eigenen Login.</p>`;
     } else {
       body = `
         <p class="buy-p">Verbinde dein Konto einmal. Jede neue Schnupperstunde bekommt dann automatisch einen Meeting-Link zur gebuchten Zeit, direkt in der Bestätigungs-Mail des Gasts.</p>
@@ -2498,13 +2515,13 @@
         ${b.status==="requested" ? `<div class="micro" style="text-align:left;margin:2px 0 0;">Wartet auf Bestätigung. Danach kannst du hier in deine Stunde einsteigen.</div>` : `
         <div class="join-box">
           <div class="join-h">Steig hier in deine Stunde ein</div>
-          ${b.callLink?`<a class="btn join-btn" href="${esc(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:6px 0 0;">Dein Tutor stellt den Call-Link vor der Stunde hier ein.</div>`}
+          ${b.callLink?`<a class="btn join-btn" href="${esc(b.callLink)}" target="_blank" rel="noopener"><span class="grainbtn"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px"><path d="M15 10l5-3v10l-5-3v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/></svg>Zum Call</a>`:`<div class="micro" style="text-align:left;margin:6px 0 0;">Dein*e Tutor*in stellt den Call-Link vor der Stunde hier ein.</div>`}
           ${b._pk && !b.isIntro ? `<a class="btn ghost" id="openLessonNow" href="#stunde-${b._pk}" style="margin-top:8px;">Stunde öffnen · Arbeitsblätter &amp; Notizen</a>` : ""}
         </div>`}
         <div class="notes-block">
           <label class="field-label">Themen für die Stunde</label>
           <textarea class="notes-ta" id="noteTA" placeholder="Themen, Fragen oder Ziele für diese Stunde…">${esc(b.notes)}</textarea>
-          <div class="micro" style="text-align:left;margin:6px 0 0;">Für deinen Tutor sichtbar.</div>
+          <div class="micro" style="text-align:left;margin:6px 0 0;">Für deine*n Tutor*in sichtbar.</div>
         </div>
         ${mod ? `
           <div class="manage-actions">
@@ -2697,7 +2714,7 @@
     // "Tutor schreiben" opens a WhatsApp chat (TUTOR_WHATSAPP) with the
     // request already typed, addressed to the student's tutor.
     const t0 = TUTORS[0] || { name:"" };
-    const tutorFirst = (t0.name||"").split(" ")[0] || "dein Tutor";
+    const tutorFirst = (t0.name||"").split(" ")[0] || "dein*e Tutor*in";
     const mailHref = ()=> `https://wa.me/${encodeURIComponent(DJ.whatsapp||"")}?text=${encodeURIComponent('Hallo '+tutorFirst+', ich möchte gern das '+p.n+'er-Paket ('+p.price+') kaufen. Danke!')}`;
     const waNum = DJ.whatsapp ? "+"+String(DJ.whatsapp).replace(/^(\d{2})(\d{3})(\d+)$/, "$1 $2 $3") : "";
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
@@ -2711,10 +2728,10 @@
       <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) sicher per Karte. Deine <b>${p.n} Einheiten</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       <label class="buy-consent"><input type="checkbox" id="buyConsent"><span>Ich stimme den <a href="/agb/" target="_blank" rel="noopener">AGB</a> zu und habe die <a href="/widerruf/" target="_blank" rel="noopener">Widerrufsbelehrung</a> zur Kenntnis genommen. Löse ich eine Einheit vor Ablauf der Widerrufsfrist ein, wünsche ich die vorzeitige Leistungserbringung ausdrücklich und nehme zur Kenntnis, dass mein Widerrufsrecht bei vollständiger Erbringung erlischt.</span></label>
       <button class="btn" id="buyStripe" disabled><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
-      <a class="btn ghost" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener">Lieber Tutor auf WhatsApp schreiben</a>
+      <a class="btn ghost" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener">Lieber per WhatsApp schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
       <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
-      : `<h3 class="buy-h">Einheiten fügt dein Tutor hinzu</h3>
+      : `<h3 class="buy-h">Einheiten fügt dein*e Tutor*in hinzu</h3>
       <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die Einheiten werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       ${billingComplete(studentById(state.currentUser)) ? "" : `<div class="credit-warn" role="alert">⚠ Deine Rechnungsadresse ist noch unvollständig. Ergänze sie vorher in deinem Konto, sonst steht sie nicht auf deinem Beleg.</div>`}
       ${waNum ? `<div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg><span>WhatsApp ${esc(waNum)}</span></div>` : ""}
@@ -2740,7 +2757,7 @@
       if(btn){ btn.disabled=false; btn.style.opacity=""; }
       // Server guard fallback: account incomplete → route to the account form.
       if (res.data && res.data.error === "setup_required") { goToAccountSetup(res.data.missing); return; }
-      toast("Zahlung konnte nicht gestartet werden. Bitte schreib deinem Tutor.");
+      toast("Zahlung konnte nicht gestartet werden. Bitte schreib deiner*m Tutor*in.");
     });
   }
   // After returning from Stripe Checkout, confirm the session so credits + receipt
@@ -2793,7 +2810,7 @@
       row.innerHTML = `
         <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
         <div class="avatar" style="${avatarStyle(t)};width:38px;height:38px;font-size:13px;">${avatarText(t)}</div>
-        <div class="info"><div class="t">${esc(b.title)}${b.status==="requested"?'<span class="req-chip" title="Wartet auf Bestätigung durch deinen Tutor">Angefragt</span>':""}</div><div class="s">${esc(t.name)} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${esc(b.notes)}</div>`:""}</div>
+        <div class="info"><div class="t">${esc(b.title)}${b.status==="requested"?'<span class="req-chip" title="Wartet auf Bestätigung durch deine*n Tutor*in">Angefragt</span>':""}</div><div class="s">${esc(t.name)} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${esc(b.notes)}</div>`:""}</div>
         <div class="tail">
           ${b.callLink?`<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener" title="Zum Call">Call</a>`:""}
           <button class="ics-mini" title="Zum Kalender (.ics)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></button>
@@ -2937,6 +2954,8 @@
       dayTimes(date, state.myTutor).forEach(time=>{
         const dk=ymd(date);
         const bk=state.bookings.find(b=>b.tutorId===state.myTutor&&sameDay(b.date,date)&&b.time===time);
+        // Outside the usual hours only booked or open times show, unless the tutor expands the calendar.
+        if(!state.tAllHours && !inCoreHours(time) && !bk && !slotOpen(date,time,state.myTutor)) return;
         const conflict = bookingConflict(date,time,null,state.myTutor);
         const open = !isPast && slotOpen(date,time,state.myTutor) && !conflict;
         // A free slot on a past day (within the 30-day look-back) can be tapped
@@ -2975,7 +2994,7 @@
           const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
           el.className="slot t-open t-closed"+(isSel?" sel":"");
           el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">nicht freigegeben</span>`;
-          el.title="Für Schüler nicht buchbar. Tippen, um selbst einen Schüler einzutragen";
+          el.title="Für Schüler*innen nicht buchbar. Tippen, um selbst eine*n Schüler*in einzutragen";
           el.onclick=()=>teacherSelectSlot(date,time,true);
         } else if(loggable){
           el.className="slot t-open t-past";
@@ -2989,7 +3008,7 @@
         } else {
           const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
           el.className="slot t-open"+(isSel?" sel":"");
-          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Schüler</span>`;
+          el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Schüler*in</span>`;
           el.onclick=()=>teacherSelectSlot(date,time);
         }
         slots.appendChild(el);
@@ -3004,6 +3023,15 @@
       if(!any){ const n=document.createElement("div"); n.className="no-slot"; n.textContent="\u00b7"; slots.appendChild(n); }
       col.appendChild(slots); row.appendChild(col);
     }
+    renderHoursToggle();
+  }
+
+  // The tutor's usual teaching hours: start times from 13:00 to 19:00.
+  const CORE_FROM=13*60, CORE_TO=19*60;
+  function inCoreHours(time){ const m=toMin(time); return m>=CORE_FROM && m<=CORE_TO; }
+  function renderHoursToggle(){
+    const b=$("#tHoursToggle"); if(!b) return;
+    b.textContent = state.tAllHours ? "Nur 13–19 Uhr zeigen" : "Frühere und spätere Zeiten zeigen";
   }
 
   function teacherSelectSlot(date,time,closed){ state.teacherManage=null; state.teacherSel={ dateKey:ymd(date), date:new Date(date), time, closed:!!closed }; renderTeacherWeek(); renderTeacherSummary(); }
@@ -3040,7 +3068,7 @@
       const r = res.data;
       state.bookings.push({ studentId, tutorId:state.myTutor, date:new Date(date), time, title:"Englischstunde", _pk:r.pk, status:r.status||"confirmed", callLink:DEFAULT_CALL, callLinkOwn:"" });
       if (typeof r.credits === 'number') setStudentCredits(studentId, r.credits);
-      s.log.unshift({ type:"book", label:"Stunde vom Tutor gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt:"-1" });
+      s.log.unshift({ type:"book", label:"Stunde von Tutor*in gebucht", sub: MONTHS_S[date.getMonth()]+" "+date.getDate()+" · "+time, amt:"-1" });
       state.teacherSel=null; state.teacherManage=null;
       renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderAccount(); renderWeek();
       toast(`${s.name.split(" ")[0]} eingetragen · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
@@ -3068,7 +3096,7 @@
     const days=bdDays();
     const times=BD_TIMES.includes(row.time) ? BD_TIMES : BD_TIMES.concat(row.time).sort();
     return `<div class="bd-row" data-row>
-      <select class="bf-input bd-student" aria-label="Schüler"><option value="">Schüler wählen</option>${list.map(s=>`<option value="${esc(s.id)}"${s.id===row.studentId?" selected":""}>${esc(s.name)}</option>`).join("")}</select>
+      <select class="bf-input bd-student" aria-label="Schüler*in"><option value="">Schüler*in wählen</option>${list.map(s=>`<option value="${esc(s.id)}"${s.id===row.studentId?" selected":""}>${esc(s.name)}</option>`).join("")}</select>
       <select class="bf-input bd-day" aria-label="Tag">${days.map(d=>`<option value="${d.key}"${d.key===row.date?" selected":""}>${d.label}</option>`).join("")}</select>
       <select class="bf-input bd-time" aria-label="Uhrzeit">${times.map(t=>`<option${t===row.time?" selected":""}>${t}</option>`).join("")}</select>
       <button type="button" class="bd-x" aria-label="Zeile entfernen" title="Zeile entfernen">×</button>
@@ -3096,15 +3124,15 @@
   }
   function openBackdate(pre){
     const m=$("#backdateModal");
-    if(!state.students.length){ toast("Noch keine Schüler vorhanden"); return; }
+    if(!state.students.length){ toast("Noch keine Schüler*innen vorhanden"); return; }
     const yest=new Date(NOW); yest.setDate(yest.getDate()-1);
     const first = pre && pre.date ? { studentId:"", date:ymd(pre.date), time:pre.time||"16:00" } : { studentId:"", date:ymd(yest), time:"16:00" };
     m.innerHTML=`<div class="modal-card buy-card bd-card" id="bdCard">
       <button class="modal-x" id="bdX" aria-label="Close">×</button>
       <div class="buy-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg></div>
       <h3 class="buy-h">Stunden nachtragen</h3>
-      <p class="buy-p">Trage bereits gehaltene Stunden nach, bis zu <b>30 Tage</b> zurück. Pro Stunde wird <b>1 Einheit</b> abgezogen. Schüler bekommen dafür keine E-Mail.</p>
-      <div class="bd-head"><span>Schüler</span><span>Tag</span><span>Uhrzeit</span></div>
+      <p class="buy-p">Trage bereits gehaltene Stunden nach, bis zu <b>30 Tage</b> zurück. Pro Stunde wird <b>1 Einheit</b> abgezogen. Schüler*innen bekommen dafür keine E-Mail.</p>
+      <div class="bd-head"><span>Schüler*in</span><span>Tag</span><span>Uhrzeit</span></div>
       <div id="bdRows"></div>
       <button type="button" class="bd-more" id="bdMore">+ Weitere Stunde</button>
       <button class="btn" id="bdConfirm" style="margin-top:8px;"><span class="grainbtn"></span>Nachtragen</button>
@@ -3128,7 +3156,7 @@
   function bdRowError(row, msg){ row.el.classList.add("bad"); const e=row.el.querySelector(".bd-err"); e.textContent=msg; e.hidden=false; }
   async function confirmBackdate(){
     const rows=bdReadRows(); let missing=false;
-    rows.forEach(r=>{ if(!r.studentId){ bdRowError(r,"Bitte einen Schüler wählen"); missing=true; } });
+    rows.forEach(r=>{ if(!r.studentId){ bdRowError(r,"Bitte eine*n Schüler*in wählen"); missing=true; } });
     if(missing || !rows.length) return;
     const btn=$("#bdConfirm"); if(btn) btn.disabled=true;
     const tut=tutorById(state.myTutor); const tf=tut?tut.name.split(" ")[0]:"";
@@ -3165,7 +3193,7 @@
     // the refund and returns the authoritative balance.
     if (s) {
       addStudentCredits(bk.studentId, 1);
-      s.log.unshift({ type:"buy", label:"Buchung vom Tutor entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Einheit zurück", amt:"+1" });
+      s.log.unshift({ type:"buy", label:"Buchung von Tutor*in entfernt", sub: MONTHS_S[bk.date.getMonth()]+" "+bk.date.getDate()+" · Einheit zurück", amt:"+1" });
     }
     if (bk._pk) api('DELETE', '/api/bookings/' + bk._pk + '/').then(r => {
       if (s && r && typeof r.credits === 'number') { setStudentCredits(bk.studentId, r.credits); }
@@ -3206,7 +3234,7 @@
       const sel=state.teacherSel;
       const opts=state.students.map(s=>`<option value="${esc(s.id)}">${esc(s.name)} (${s.credits} Einheiten)</option>`).join("");
       card.innerHTML=`
-        <div class="manage-eyebrow">Schüler eintragen</div>
+        <div class="manage-eyebrow">Schüler*in eintragen</div>
         <div class="sum-rows" style="margin-bottom:12px;">
           <div class="sum-row"><span class="k">Datum</span><span class="v">${fmtLong(sel.date)}</span></div>
         </div>
@@ -3215,8 +3243,8 @@
           <input type="time" class="bf-input" id="assignTime" value="${sel.time}" step="300" min="07:00" max="21:00" aria-label="Startzeit">
           <span class="time-end" id="assignEnd">endet ${endTime(sel.time)}</span>
         </div>
-        ${sel.closed ? `<div class="micro" style="text-align:left;margin:-4px 0 12px;">Diese Zeit ist nicht als Verfügbarkeit freigegeben. Schüler können sie nicht buchen, nur du trägst hier jemanden ein.</div>` : ""}
-        <label class="field-label">Schüler</label>
+        ${sel.closed ? `<div class="micro" style="text-align:left;margin:-4px 0 12px;">Diese Zeit ist nicht als Verfügbarkeit freigegeben. Schüler*innen können sie nicht buchen, nur du trägst hier jemanden ein.</div>` : ""}
+        <label class="field-label">Schüler*in</label>
         <select class="t-select" id="assignSel">${opts}</select>
         <div class="assign-note" id="assignNote"></div>
         <button class="btn" id="assignBtn"><span class="grainbtn"></span>Eintragen</button>
@@ -3322,7 +3350,7 @@
     card.innerHTML=`<div class="sum-empty">
       <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M17 8h5M19.5 5.5v5" stroke="var(--c1)"/></svg></div>
       <h3>Plane deinen Kalender</h3>
-      <p>Tippe eine <b style="color:var(--c1)">freie</b> Zeit an, um einen Schüler einzutragen, oder eine gebuchte, um sie freizugeben.</p>
+      <p>Tippe eine <b style="color:var(--c1)">freie</b> Zeit an, um eine*n Schüler*in einzutragen, oder eine gebuchte, um sie freizugeben.</p>
     </div>`;
   }
 
@@ -3417,7 +3445,7 @@
       const r = res.receipt;
       state.receipts.push(r);
       const paid = opts.method === "transfer" ? "per Überweisung bezahlt" : "bar bezahlt";
-      s.log.unshift({ type:"buy", label: opts.note || "Einheiten vom Tutor", sub:"Heute · "+paid, amt:"+"+n, receiptNo: r.no });
+      s.log.unshift({ type:"buy", label: opts.note || "Einheiten von Tutor*in", sub:"Heute · "+paid, amt:"+"+n, receiptNo: r.no });
       addStudentCredits(s.id, n);
       renderRoster(); renderAccount();
       if(fromModal) renderStudentModal();
@@ -3509,7 +3537,7 @@
         }
         if (res && res.url) {
           if (out) { out.hidden = false; out.textContent = res.url; }
-          if (navigator.clipboard) navigator.clipboard.writeText(res.url).then(()=>toast("Link kopiert, jetzt an den Schüler senden")).catch(()=>{});
+          if (navigator.clipboard) navigator.clipboard.writeText(res.url).then(()=>toast("Link kopiert, jetzt an die*den Schüler*in senden")).catch(()=>{});
           else toast("Zahlungslink erstellt");
         } else { toast("Link konnte nicht erstellt werden"); }
       });
@@ -3537,27 +3565,51 @@
     const el=$("#rosterList"); el.innerHTML="";
     const q=(state.studentQuery||"").trim().toLowerCase();
     const list=state.students.filter(s=> !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
-    const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} von ${state.students.length}` : `${state.students.length} Schüler`;
+    const cnt=$("#studentsCount"); if(cnt) cnt.textContent = q ? `${list.length} von ${state.students.length}` : `${state.students.length} Schüler*innen`;
     renderRosterWeek();
-    if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">Keine Schüler passen zu „${esc(q)}“.</div>`; renderTutorLists(); return; }
-    list.forEach(s=>{
-      const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
-      const card=document.createElement("div"); card.className="rost";
-      card.innerHTML=`
-        <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${avatarText(s)}</div>
-        <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div></div>
-        <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
-        <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
-        <div class="rc-actions">
-          ${creditQuickAdds().map(n=>`<button class="mini-btn" data-add="${n}">+${n}</button>`).join("")}
-        </div>`;
-      card.querySelectorAll("[data-add]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); openSettleChooser(s, +btn.dataset.add, false); });
-      card.querySelector("[data-week]").onclick=(e)=>{ e.stopPropagation(); editWeekly(s, e.currentTarget); };
-      card.onclick=(e)=>{ if(e.target.closest("[data-add],[data-week],.rc-week-in")) return; openStudentModal(s); };
-      card.style.cursor="pointer";
-      el.appendChild(card);
+    if(!list.length){ el.innerHTML=`<div class="empty-list" style="padding:22px 0;">Keine Schüler*innen passen zu „${esc(q)}“.</div>`; renderTutorLists(); return; }
+    // Three sections: Aktiv (weekly), Prüfungsvorbereitung (now and then), Abgeschlossen.
+    ROSTER_GROUPS.forEach(g=>{
+      const members=list.filter(s=>(s.rosterGroup||"active")===g.id);
+      if(!members.length) return;
+      const sec=document.createElement("div"); sec.className="roster-group "+g.id;
+      sec.innerHTML=`<div class="roster-group-h">${g.label}<span>${members.length}</span></div>`;
+      members.forEach(s=> sec.appendChild(rosterCard(s)));
+      el.appendChild(sec);
     });
     renderTutorLists();
+  }
+  const ROSTER_GROUPS=[
+    { id:"active", label:"Aktiv" },
+    { id:"exam", label:"Prüfungsvorbereitung" },
+    { id:"done", label:"Abgeschlossen" },
+  ];
+  async function setRosterGroup(s, group){
+    const prev=s.rosterGroup||"active"; if(group===prev) return;
+    s.rosterGroup=group; renderRoster();
+    const r=await apiResult('POST', `/api/students/${s.id}/roster-group/`, { rosterGroup: group });
+    if(!r.ok){ s.rosterGroup=prev; renderRoster(); toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); }
+  }
+  function rosterCard(s){
+    const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
+    const card=document.createElement("div"); card.className="rost";
+    card.innerHTML=`
+      <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${avatarText(s)}</div>
+      <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div>
+        <select class="rg-select" data-group aria-label="Gruppe">${ROSTER_GROUPS.map(g=>`<option value="${g.id}"${(s.rosterGroup||"active")===g.id?" selected":""}>${g.label}</option>`).join("")}</select></div>
+      <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
+      <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
+      <div class="rc-actions">
+        ${creditQuickAdds().map(n=>`<button class="mini-btn" data-add="${n}">+${n}</button>`).join("")}
+      </div>`;
+    card.querySelectorAll("[data-add]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); openSettleChooser(s, +btn.dataset.add, false); });
+    card.querySelector("[data-week]").onclick=(e)=>{ e.stopPropagation(); editWeekly(s, e.currentTarget); };
+    const sel=card.querySelector("[data-group]");
+    sel.onclick=(e)=>e.stopPropagation();
+    sel.onchange=()=>setRosterGroup(s, sel.value);
+    card.onclick=(e)=>{ if(e.target.closest("[data-add],[data-week],[data-group],.rc-week-in")) return; openStudentModal(s); };
+    card.style.cursor="pointer";
+    return card;
   }
 
   function tutorRow(b, completed){
@@ -3570,7 +3622,7 @@
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${avatarText(s)}</div>
       <div class="info"><div class="t">${esc(b.title)}${b.status==="requested"?'<span class="req-chip">Anfrage</span>':""}</div><div class="s">${nameLine} · ${b.time}–${endTime(b.time, lessonMins(b))}</div>${b.notes?`<div class="note-line">${esc(b.notes)}</div>`:""}</div>
-      <div class="tail">${(!b.isIntro && b.status!=="requested" && b._pk)?`<button class="mini-btn" data-session="${b._pk}" title="Zusammenfassung, Übungen, Wortschatz, Fehler, Arbeitsblätter">Stunde öffnen</button>`:""}${(!completed && b.status==="requested" && b._pk)?`<button class="mini-btn" data-confirm="${b._pk}">Bestätigen</button><button class="mini-btn danger" data-decline="${b._pk}">Ablehnen</button>`:""}${(!completed&&b.callLink)?`<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?`${(DJ.role==="admin"&&b._pk)?`<button class="mini-btn" data-undo="${b._pk}" title="Rückwirkend stornieren — Einheit zurück an den Schüler">Stornieren</button>`:""}<span class="pill2 done">Abgeschlossen</span>`:`<span class="pill2">${lessonMins(b)} Min.</span>`}</div>
+      <div class="tail">${(!b.isIntro && b.status!=="requested" && b._pk)?`<button class="mini-btn" data-session="${b._pk}" title="Zusammenfassung, Übungen, Wortschatz, Fehler, Arbeitsblätter">Stunde öffnen</button>`:""}${(!completed && b.status==="requested" && b._pk)?`<button class="mini-btn" data-confirm="${b._pk}">Bestätigen</button><button class="mini-btn danger" data-decline="${b._pk}">Ablehnen</button>`:""}${(!completed&&b.callLink)?`<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener">Call</a>`:""}${completed?`${(DJ.role==="admin"&&b._pk)?`<button class="mini-btn" data-undo="${b._pk}" title="Rückwirkend stornieren — Einheit zurück an die*den Schüler*in">Stornieren</button>`:""}<span class="pill2 done">Abgeschlossen</span>`:`<span class="pill2">${lessonMins(b)} Min.</span>`}</div>
     </div>`;
   }
   function updateRequestBadge(n){
@@ -3638,7 +3690,7 @@
       <p class="buy-p"><b>${esc(s.name)}</b>${isGuest?" · Intro":""} · ${fmtLong(b.date)} · ${b.time}</p>
       <p class="buy-p">${isGuest
         ? "Eine Schnupperstunde kostet keine Einheit. Sie wird nur aus der Liste entfernt."
-        : "Die Stunde wird entfernt und die Einheit dem Schüler zurückgebucht. Der Vorgang wird mit deinem Namen im Einheiten-Verlauf protokolliert."}</p>
+        : "Die Stunde wird entfernt und die Einheit der*dem Schüler*in zurückgebucht. Der Vorgang wird mit deinem Namen im Einheiten-Verlauf protokolliert."}</p>
       <button class="btn" id="undoConfirm"><span class="grainbtn"></span>${isGuest?"Stunde entfernen":"Stornieren &amp; Einheit erstatten"}</button>
       <button class="btn ghost" id="undoCancel" style="margin-top:10px;">Abbrechen</button>
     </div>`;
@@ -3748,14 +3800,14 @@
         </select>
       </div>
       <div class="payout-table">
-        <div class="payout-row payout-hrow"><div>Tutor</div><div>Abgeschl.</div><div>Migriert</div><div>Vergütbar</div><div>Wert</div></div>
+        <div class="payout-row payout-hrow"><div>Tutor*in</div><div>Abgeschl.</div><div>Migriert</div><div>Vergütbar</div><div>Wert</div></div>
         ${rows.length ? rows.map(r=>`<div class="payout-row">
           <div class="payout-tutor"><span class="avatar" style="${avatarStyle(r.t)};width:28px;height:28px;font-size:11px;">${avatarText(r.t)}</span>${esc(r.t.name)}</div>
           <div>${r.comp}</div><div class="${r.migr?'payout-mig':''}">${r.migr||"0"}</div><div><b>${r.pay}</b></div><div>€ ${r.value}</div>
         </div>`).join("") : `<div class="empty-list" style="padding:16px 0;">Noch keine Stunden im Zeitraum.</div>`}
         ${rows.length>1?`<div class="payout-row payout-total"><div>Gesamt</div><div>${sum("comp")}</div><div>${sum("migr")||"0"}</div><div><b>${sum("pay")}</b></div><div>€ ${sum("value")}</div></div>`:""}
       </div>
-      <div class="micro" style="text-align:left;margin-top:10px;">Nur <b>vergütbare</b> Stunden zählen zum Wert (× €${state.creditPrice}/Einheit). ${anyMig?"<b>Migrierte</b> Stunden wurden mit Eröffnungsguthaben (extern bezahlt) gedeckt und sind nicht vergütbar (je Schüler die ältesten Stunden zuerst). ":""}Der tatsächliche Tutor-Anteil ist deine Vereinbarung.</div>`;
+      <div class="micro" style="text-align:left;margin-top:10px;">Nur <b>vergütbare</b> Stunden zählen zum Wert (× €${state.creditPrice}/Einheit). ${anyMig?"<b>Migrierte</b> Stunden wurden mit Eröffnungsguthaben (extern bezahlt) gedeckt und sind nicht vergütbar (je Schüler*in die ältesten Stunden zuerst). ":""}Der tatsächliche Tutor-Anteil ist deine Vereinbarung.</div>`;
     const ms=$("#payoutMonthSel"); if(ms) ms.onchange=()=>{ state.payoutMonth=ms.value; renderPayouts(); };
   }
   // Auto-derived "per session" label = total price ÷ credits. Blank (never a
@@ -3812,7 +3864,7 @@
       const item=document.createElement("button");
       item.className="admin-item"+(u.id===state.adminSel?" sel":"");
       item.innerHTML=`<div class="avatar" style="${avatarStyle(u)};width:36px;height:36px;font-size:12px;">${avatarText(u)}</div>
-        <div class="ai-info"><div class="ai-name">${esc(u.name)}</div><div class="ai-role">${u.role==="tutor"?"Tutor":"Schüler"} · ${esc(u.email)}</div></div>`;
+        <div class="ai-info"><div class="ai-name">${esc(u.name)}</div><div class="ai-role">${u.role==="tutor"?"Tutor*in":"Schüler*in"} · ${esc(u.email)}</div></div>`;
       item.onclick=()=>{ state.adminSel=u.id; renderAdmin(); };
       el.appendChild(item);
     });
@@ -3827,7 +3879,7 @@
       <div class="ed-head">
         <div class="avatar ed-avatar" style="${avatarStyle(u)};width:64px;height:64px;font-size:22px;">${avatarText(u)}</div>
         <div class="ed-photo-actions">
-          <div class="ed-who"><div class="ed-name">${esc(u.name)}</div><div class="ed-role">${isStudent?"Schüler":"Tutor"}</div></div>
+          <div class="ed-who"><div class="ed-name">${esc(u.name)}</div><div class="ed-role">${isStudent?"Schüler*in":"Tutor*in"}</div></div>
           <div class="ed-photo-btns">
             <label class="mini-btn">Foto hochladen<input type="file" id="edPhoto" accept="image/*" hidden></label>
             ${u.photo?'<button class="mini-btn" id="edPhotoClear">Entfernen</button>':''}
@@ -3853,7 +3905,7 @@
                  <input class="bf-input" id="edOpening" type="number" placeholder="z. B. 8" style="max-width:130px;">
                  <button class="mini-btn" id="edOpeningBtn">Eröffnungsguthaben buchen</button>
                </div>
-               <div class="micro" style="text-align:left;margin-top:6px;">Einmalig für Schüler, die mit bestehenden Einheiten migrieren. Wird als Transaktion <b>ohne Beleg</b> verbucht und ist für den Schüler sichtbar. Ein direktes Zurücksetzen der Einheiten ist nicht mehr möglich.</div>`}
+               <div class="micro" style="text-align:left;margin-top:6px;">Einmalig für Schüler*innen, die mit bestehenden Einheiten migrieren. Wird als Transaktion <b>ohne Beleg</b> verbucht und ist für die*den Schüler*in sichtbar. Ein direktes Zurücksetzen der Einheiten ist nicht mehr möglich.</div>`}
         </div>
         <div class="ed-sub">Rechnungsadresse</div>
         <label class="bf-lab">Straße &amp; Nr.<input class="bf-input" id="edLine1" value="${esc(b.line1)}"></label>
@@ -3862,14 +3914,14 @@
           <label class="bf-lab">Stadt<input class="bf-input" id="edCity" value="${esc(b.city)}"></label>
         </div>
         <label class="bf-lab">Land<input class="bf-input" id="edCountry" value="${esc(b.country||'Österreich')}"></label>
-        `:'<div class="micro" style="text-align:left;">Tutor-Konto: verwaltet den Kalender und die Einheiten der Schüler.</div>'}
+        `:'<div class="micro" style="text-align:left;">Tutor-Konto: verwaltet den Kalender und die Einheiten der Schüler*innen.</div>'}
       </div>
       <div class="ed-actions">
         <button class="btn" id="edSave"><span class="grainbtn"></span>Änderungen speichern</button>
         <button class="btn ghost" id="edViewAs">Ansehen als ${esc(u.name.split(" ")[0])}</button>
       </div>
-      ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Schüler entfernen</button>':''}
-      ${isTutor?'<button class="btn-text" id="edRemoveTutor" style="color:#b8492c;">Tutor entfernen</button>':''}
+      ${isStudent?'<button class="btn-text" id="edRemove" style="color:#b8492c;">Schüler*in entfernen</button>':''}
+      ${isTutor?'<button class="btn-text" id="edRemoveTutor" style="color:#b8492c;">Tutor*in entfernen</button>':''}
     `;
     $("#edPhoto").onchange=(e)=>pickPhoto(e,u);
     if($("#edPhotoClear")) $("#edPhotoClear").onclick=()=>{ u.photo=null; reflectUser(u); renderAdmin(); };
@@ -3895,7 +3947,7 @@
   function setOpeningCredit(u){
     const inp=$("#edOpening"); const n=parseInt(inp&&inp.value,10);
     if(isNaN(n)||n===0){ toast("Bitte eine Einheiten-Zahl eingeben"); return; }
-    if(!window.confirm(`Eröffnungsguthaben von ${n} Einheit${Math.abs(n)===1?"":"en"} für ${u.name} buchen?\n\nDas ist einmalig, wird als Transaktion ohne Beleg verbucht und ist für den Schüler sichtbar.`)) return;
+    if(!window.confirm(`Eröffnungsguthaben von ${n} Einheit${Math.abs(n)===1?"":"en"} für ${u.name} buchen?\n\nDas ist einmalig, wird als Transaktion ohne Beleg verbucht und ist für die*den Schüler*in sichtbar.`)) return;
     const btn=$("#edOpeningBtn"); if(btn) btn.disabled=true;
     apiResult('POST', '/api/students/'+u.id+'/opening-credit/', { n }).then(res=>{
       if(res.status===409){ toast("Eröffnungsguthaben wurde bereits verbucht"); renderAdmin(); return; }
@@ -3966,7 +4018,7 @@
     // Create the account on the server first so it has a real slug and can be
     // logged into; then mirror it into local state using the server's response.
     api('POST', '/api/users/').then(r=>{
-      if(!r || !r.slug){ toast("Schüler konnte nicht hinzugefügt werden. Bitte erneut versuchen"); return; }
+      if(!r || !r.slug){ toast("Schüler*in konnte nicht hinzugefügt werden. Bitte erneut versuchen"); return; }
       state.students.push({
         id:r.slug, slug:r.slug, role:"student", email:r.email, name:r.name, credits:r.credits||0,
         c:[r.color1, r.color2], i:r.initials||"NS", password:r.tempPassword||"", photo:r.photo||null,
@@ -3974,7 +4026,7 @@
         log:[], notesLog:[], activeLessons:[],
       });
       state.adminSel=r.slug; renderAdmin(); renderRoster();
-      toast("Schüler hinzugefügt. Passwort unter „Details“ ablesen und weitergeben");
+      toast("Schüler*in hinzugefügt. Passwort unter „Details“ ablesen und weitergeben");
     });
   }
   function removeAdminStudent(u){
@@ -3983,24 +4035,24 @@
     state.bookings=state.bookings.filter(b=>b.studentId!==u.id);
     if(state.currentUser===u.id) state.currentUser=(state.students[0]||{id:"maya"}).id;
     state.adminSel=(allAccounts()[0]||{id:"admin"}).id;
-    renderAdmin(); renderRoster(); toast("Schüler entfernt");
+    renderAdmin(); renderRoster(); toast("Schüler*in entfernt");
   }
   function addAdminTutor(){
     // Same pattern as students: create server-side first so the tutor has a real
     // slug, then mirror into the in-memory tutor lists (roster + bookable chips).
     api('POST', '/api/users/', { role: 'tutor' }).then(r=>{
-      if(!r || !r.slug){ toast("Tutor konnte nicht hinzugefügt werden. Bitte erneut versuchen"); return; }
+      if(!r || !r.slug){ toast("Tutor*in konnte nicht hinzugefügt werden. Bitte erneut versuchen"); return; }
       tutorAccounts.push({
         id:r.slug, role:"tutor", name:r.name, email:r.email,
         i:r.initials||"NT", c:[r.color1, r.color2], photo:r.photo||null, password:r.tempPassword||"",
       });
       TUTORS.push({ id:r.slug, name:(r.name||"Tutor").split(" ")[0], role:"Englisch-Tutor", c:[r.color1, r.color2], i:r.initials||"T", photo:r.photo||null });
       state.adminSel=r.slug; renderAdmin();
-      toast("Tutor hinzugefügt. Passwort unter „Details“ ablesen und weitergeben");
+      toast("Tutor*in hinzugefügt. Passwort unter „Details“ ablesen und weitergeben");
     });
   }
   function removeAdminTutor(u){
-    api('DELETE', '/api/users/'+u.id+'/').then(r=>{ if(!r) toast("Tutor konnte nicht entfernt werden"); });
+    api('DELETE', '/api/users/'+u.id+'/').then(r=>{ if(!r) toast("Tutor*in konnte nicht entfernt werden"); });
     const ti=tutorAccounts.findIndex(t=>t.id===u.id); if(ti>=0) tutorAccounts.splice(ti,1);
     const xi=TUTORS.findIndex(t=>t.id===u.id); if(xi>=0) TUTORS.splice(xi,1);
     state.bookings=state.bookings.filter(b=>b.tutorId!==u.id);
@@ -4008,7 +4060,7 @@
     if(state.tutor===u.id) state.tutor=(TUTORS[0]||{id:""}).id;
     if(state.myTutor===u.id) state.myTutor=(tutorAccounts[0]||{id:""}).id;
     state.adminSel=(allAccounts()[0]||{id:"admin"}).id;
-    renderAdmin(); renderRoster(); toast("Tutor entfernt");
+    renderAdmin(); renderRoster(); toast("Tutor*in entfernt");
   }
 
   // ---------- Toast ----------
@@ -4075,7 +4127,7 @@
   function renderFiles(){
     const el=$("#filesContent"); if(!el) return;
     const s=studentById(state.currentUser); if(!s) return;
-    if(activeSet(s).length===0){ el.innerHTML = `<div class="panel" style="padding:42px 30px; text-align:center;"><div class="empty-list" style="font-style:normal;">Noch keine Lektionen freigeschaltet. Dein Tutor schaltet Materialien frei, sobald du weiterkommst.</div></div>`; return; }
+    if(activeSet(s).length===0){ el.innerHTML = `<div class="panel" style="padding:42px 30px; text-align:center;"><div class="empty-list" style="font-style:normal;">Noch keine Lektionen freigeschaltet. Dein*e Tutor*in schaltet Materialien frei, sobald du weiterkommst.</div></div>`; return; }
     el.innerHTML = curriculum().filter(lvl=>lvl.lessons.length).map(lvl=>{
       const act = lvl.lessons.filter(l=>isActive(s,l.id)).length;
       return `<div class="lvl-sec">
@@ -4091,7 +4143,7 @@
     const files=lessonFilesFor(l.id);
     const filesHtml = files.length
       ? files.map(f=>`<a class="file-row" href="${esc(f.url)}" data-filemenu="${f.id}" title="Öffnen oder herunterladen"><span class="file-ic ${f.kind||'doc'}">${fileIcon(f.kind||'doc')}</span><span class="file-n">${esc(f.name)}</span><span class="file-ext">${esc(f.ext||'FILE')}</span></a>`).join("")
-      : `<div class="micro" style="text-align:left;padding:8px 4px;">Noch keine Materialien. Dein Tutor hat für diese Lektion noch keine Dateien hinzugefügt.</div>`;
+      : `<div class="micro" style="text-align:left;padding:8px 4px;">Noch keine Materialien. Dein*e Tutor*in hat für diese Lektion noch keine Dateien hinzugefügt.</div>`;
     return `<div class="lesson"><div class="les-head"><span class="les-ic dot"></span><span class="les-t">${esc(l.t)}</span><span class="les-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
       <div class="les-files">${filesHtml}</div></div>`;
   }
@@ -4211,7 +4263,7 @@
       <div class="mat-topic-h">
         <button class="mat-topic-tg" data-toggle-topic="${l.id}" aria-expanded="${open}"><span class="mat-chev">›</span><span class="mat-topic-t">${esc(l.t)}</span></button>
         <span class="mat-pill ${all.length?'':'zero'}">${all.length} ${all.length===1?"Datei":"Dateien"}</span>
-        <span class="mat-topic-u" title="Für so viele Schüler freigeschaltet">${u} Schüler</span>
+        <span class="mat-topic-u" title="Für so viele Schüler*innen freigeschaltet">${u} Schüler*in${u===1?"":"nen"}</span>
         <button class="mat-ic" data-rename="${l.id}" title="Umbenennen" aria-label="Thema umbenennen">✎</button>
         <button class="mat-ic danger" data-deltopic="${l.id}" title="Thema löschen" aria-label="Thema löschen">×</button>
       </div>
@@ -4327,7 +4379,7 @@
   function deleteTopic(id){
     const t=state.topics.find(x=>x.id===id); if(!t) return;
     const n=lessonFilesFor(id).length, u=unlockedCount(id);
-    const extra=[n?`${n} Datei${n===1?"":"en"}`:"", u?`die Freischaltung bei ${u} Schüler${u===1?"":"n"}`:""].filter(Boolean).join(" und ");
+    const extra=[n?`${n} Datei${n===1?"":"en"}`:"", u?`die Freischaltung bei ${u} Schüler*in${u===1?"":"nen"}`:""].filter(Boolean).join(" und ");
     if(!window.confirm(`Thema „${t.t}“ löschen?`+(extra?`\n\nDabei werden auch ${extra} entfernt.`:""))) return;
     apiResult('DELETE', '/api/topics/'+id+'/').then(r=>{
       if(!r.ok){ toast("Löschen fehlgeschlagen"); return; }
@@ -4616,7 +4668,7 @@
     m.innerHTML=`<div class="modal-card mp-card" id="mpCard">
       <button class="modal-x" id="mpX" aria-label="Schließen">×</button>
       <div class="nm">${hu ? "Hausübung aus Lernmaterialien" : "Arbeitsblatt aus Lernmaterialien"}</div>
-      <p class="micro" style="text-align:left;margin:6px 0 12px;">${hu ? "Die Datei erscheint bei deinem Schüler unter Hausübungen. Sie wird verknüpft, nicht kopiert." : "Die Datei wird mit der Stunde verknüpft, nicht kopiert."}</p>
+      <p class="micro" style="text-align:left;margin:6px 0 12px;">${hu ? "Die Datei erscheint bei deiner*m Schüler*in unter Hausübungen. Sie wird verknüpft, nicht kopiert." : "Die Datei wird mit der Stunde verknüpft, nicht kopiert."}</p>
       <input class="bf-input" id="mpSearch" placeholder="Datei oder Thema suchen…" autocomplete="off">
       <div class="mp-list" id="mpList">${listHtml()}</div>
     </div>`;
@@ -5183,7 +5235,7 @@
       if(tool==="text"){
         const note=e.target.closest(".sx-note");
         const it=note && inkFile(sx.fileId).items.find(i=>i.id===note.dataset.note);
-        if(it && !inkCanErase(it)){ toast("Diese Notiz ist vom Tutor."); return; }
+        if(it && !inkCanErase(it)){ toast("Diese Notiz ist von deiner*m Tutor*in."); return; }
         openNoteEditor(b, sx, div, it || null, inkPoint(e, div));
         return;
       }
@@ -5517,7 +5569,7 @@
         m.innerHTML=`<div class="modal-card" id="flashWrap"><div class="flash-card">${strip()}
           <div class="flash-lab">Geschafft</div>
           <div class="flash-front" style="color:var(--ink);">${mode==="review" ? `${known} gemeistert · ${again} ${again===1?"bleibt":"bleiben"} offen` : `${known} ${known===1?"Karte":"Karten"} geübt`}</div>
-          ${practice ? `<p class="micro" style="margin-top:14px;">Als gemeistert hakt dein Tutor die Karten in eurer nächsten Stunde ab.</p>` : ""}
+          ${practice ? `<p class="micro" style="margin-top:14px;">Als gemeistert hakt dein*e Tutor*in die Karten in eurer nächsten Stunde ab.</p>` : ""}
           <button class="btn" id="flashClose" style="margin-top:22px;"><span class="grainbtn"></span>Schließen</button></div></div>`;
         $("#flashWrap").onclick=e=>e.stopPropagation();
         $("#flashClose").onclick=finish;
@@ -5910,14 +5962,17 @@
     return `<div class="pf-charts">${way}${wins}</div>`;
   }
 
+  // The weekly income estimate counts every planned lesson at a flat 40 €.
+  const PLANNED_LESSON_PRICE=40;
   // Lessons per week: set by hand per student (not computed from bookings),
   // summed into the weekly hours / income line above the student list.
   function renderRosterWeek(){
     const rw=$("#rosterWeek"); if(!rw) return;
-    const total=state.students.reduce((a, s)=>a+(s.weeklyLessons||0), 0);
+    // Only the weekly (Aktiv) students count towards the planned week.
+    const total=state.students.filter(s=>(s.rosterGroup||"active")==="active").reduce((a, s)=>a+(s.weeklyLessons||0), 0);
     rw.innerHTML = total
-      ? `Geplant: <b>${fmtNum(total)} Stunden pro Woche</b> · ≈ <b>€ ${Math.round(total*state.creditPrice)}</b> pro Woche (€ ${state.creditPrice} pro Einheit)`
-      : `Tippe bei einem Schüler auf „pro Woche“, um festzulegen, wie oft ihr euch seht.`;
+      ? `Geplant: <b>${fmtNum(total)} Stunden pro Woche</b> · ≈ <b>€ ${Math.round(total*PLANNED_LESSON_PRICE)}</b> pro Woche (€ ${PLANNED_LESSON_PRICE} pro Stunde)`
+      : `Tippe bei einer*m Schüler*in auf „pro Woche“, um festzulegen, wie oft ihr euch seht.`;
   }
   function editWeekly(s, btn){
     const inp=document.createElement("input");
@@ -5977,17 +6032,17 @@
   const METHOD_GROUPS = [
     { id: 1, t: "Die sechs Grundstrategien", sub: "Gelten für jedes Fach und sind die am besten untersuchten Lernstrategien überhaupt." },
     { id: 2, t: "Speziell für Englisch", sub: "Was die Spracherwerbsforschung über Fehler, Wortschatz und Sprechen weiß." },
-    { id: 3, t: "Motivation und Selbststeuerung", sub: "Für Schüler mit wenig Lust, wenig Selbstvertrauen oder Prüfungsnerven." },
+    { id: 3, t: "Motivation und Selbststeuerung", sub: "Für Schüler*innen mit wenig Lust, wenig Selbstvertrauen oder Prüfungsnerven." },
   ];
   const METHODS = [
     { id: "abrufen", g: 1, ev: 3, tags: ["vokabeln", "grammatik", "pruefung"],
       name: "Abrufen statt Wiederlesen", en: "Retrieval Practice",
-      what: "Der Schüler holt Wissen aus dem Kopf, bevor du es zeigst oder erklärst.",
+      what: "Die*der Schüler*in holt Wissen aus dem Kopf, bevor du es zeigst oder erklärst.",
       why: "Jeder Abruf stärkt die Erinnerung deutlich mehr als nochmal lesen oder zuhören. Der Effekt ist in hunderten Studien belegt, auch für Vokabeln und Grammatik.",
-      steps: ["<b>Start:</b> 3 Minuten „Was weißt du noch von letzter Woche?“, ohne Unterlagen.", "<b>Mitte:</b> Neue Wörter auf dem Arbeitsblatt abdecken und abfragen, statt sie vorzulesen.", "<b>Ende:</b> Der Schüler fasst die Stunde in 3 Sätzen zusammen, erst danach ergänzt du."],
+      steps: ["<b>Start:</b> 3 Minuten „Was weißt du noch von letzter Woche?“, ohne Unterlagen.", "<b>Mitte:</b> Neue Wörter auf dem Arbeitsblatt abdecken und abfragen, statt sie vorzulesen.", "<b>Ende:</b> Die*der Schüler*in fasst die Stunde in 3 Sätzen zusammen, erst danach ergänzt du."],
       ex: "Without looking at your notes, tell me three things you did last weekend.",
       avoid: "Sofort einspringen, wenn es stockt. Gib 5 bis 10 Sekunden Zeit, auch Anstrengung beim Erinnern hilft dem Lernen.",
-      app: "Das Fehlertraining ist genau diese Methode: Der Schüler korrigiert alte Fehler selbst, bevor er die Lösung sieht.",
+      app: "Das Fehlertraining ist genau diese Methode: Die*der Schüler*in korrigiert alte Fehler selbst, bevor die Lösung kommt.",
       src: "Roediger & Karpicke 2006; Dunlosky et al. 2013" },
     { id: "verteilt", g: 1, ev: 3, tags: ["vokabeln", "pruefung"],
       name: "Verteilte Wiederholung", en: "Spaced Repetition",
@@ -5996,7 +6051,7 @@
       steps: ["<b>Nach 1 Tag:</b> Hausaufgabe mit den neuen Wörtern der Stunde.", "<b>Nach 1 Woche:</b> 5 Minuten am Stundenanfang mit Wörtern und Fehlern der letzten Stunde.", "<b>Nach etwa 1 Monat:</b> Alte Themen in neue Übungen einbauen, z. B. alte Vokabeln in einem neuen Text."],
       ex: "Before we start, let's see which words from two weeks ago you still remember.",
       avoid: "Vor einer Schularbeit alles am Vortag durchgehen. Lieber 3 kurze Termine in den 2 Wochen davor.",
-      app: "Wörter und Fehler aus früheren Stunden findest du im Verlauf des Schülers. Plane sie bewusst in spätere Stunden ein.",
+      app: "Wörter und Fehler aus früheren Stunden findest du im Verlauf der*des Schüler*in. Plane sie bewusst in spätere Stunden ein.",
       src: "Cepeda et al. 2006; Kang 2016" },
     { id: "mischen", g: 1, ev: 2, tags: ["grammatik", "pruefung"],
       name: "Mischen statt Blöcke", en: "Interleaving",
@@ -6008,43 +6063,43 @@
       src: "Rohrer & Taylor 2007; Nakata & Suzuki 2019" },
     { id: "warum", g: 1, ev: 2, tags: ["grammatik"],
       name: "Warum-Fragen stellen", en: "Elaborative Interrogation",
-      what: "Den Schüler erklären lassen, warum etwas so ist und wie es mit Bekanntem zusammenhängt.",
+      what: "Die*den Schüler*in erklären lassen, warum etwas so ist und wie es mit Bekanntem zusammenhängt.",
       why: "Neues Wissen wird mit vorhandenem verknüpft und dadurch besser verstanden und behalten. Wirkt am besten, wenn schon etwas Vorwissen da ist.",
       steps: ["Nach einer Regel nicht weitermachen, sondern fragen: „Warum, glaubst du, ist das so?“", "Vergleich mit Deutsch anstoßen: „Wie sagt man das auf Deutsch? Was ist anders?“", "Bei falschen Erklärungen nachfragen statt sofort korrigieren."],
       ex: "Why do you think we say \"I have lived here for five years\" and not \"I live here for five years\"?",
-      avoid: "Warum-Fragen zu ganz neuem Stoff, zu dem der Schüler noch nichts weiß. Dann zuerst erklären.",
+      avoid: "Warum-Fragen zu ganz neuem Stoff, zu dem die*der Schüler*in noch nichts weiß. Dann zuerst erklären.",
       src: "Pressley et al. 1987; Dunlosky et al. 2013" },
     { id: "bild", g: 1, ev: 2, tags: ["vokabeln"],
       name: "Wort und Bild verbinden", en: "Dual Coding",
       what: "Wörter und Erklärungen mit Bildern, Skizzen oder Zeitstrahlen kombinieren.",
       why: "Information, die sprachlich und bildlich gespeichert ist, hat zwei Wege zurück ins Gedächtnis. Hilft besonders bei konkreten Wörtern und bei Zeitformen.",
-      steps: ["Neue konkrete Wörter mit einem Bild zeigen statt mit der deutschen Übersetzung.", "Zeitformen als Zeitstrahl zeichnen: Wo liegt die Handlung, wo ist jetzt?", "Den Schüler selbst eine schnelle Skizze zu einem Wort machen lassen."],
+      steps: ["Neue konkrete Wörter mit einem Bild zeigen statt mit der deutschen Übersetzung.", "Zeitformen als Zeitstrahl zeichnen: Wo liegt die Handlung, wo ist jetzt?", "Die*den Schüler*in selbst eine schnelle Skizze zu einem Wort machen lassen."],
       ex: "Let me draw this on a timeline. Here is now. Where does \"I had already left\" go?",
       avoid: "Dekorative Bilder ohne Bezug zum Inhalt. Die lenken eher ab.",
       app: "Im Arbeitsblatt der Stunde kannst du Wörter markieren. Eine kurze Skizze dazu im Bildschirm teilen wirkt zusätzlich.",
       src: "Paivio 1986; Mayer 2009" },
     { id: "beispiele", g: 1, ev: 2, tags: ["grammatik", "sprechen"],
       name: "Konkrete Beispiele", en: "Concrete Examples",
-      what: "Abstrakte Regeln immer mit mehreren konkreten Beispielen aus dem Leben des Schülers zeigen.",
+      what: "Abstrakte Regeln immer mit mehreren konkreten Beispielen aus dem Leben der*des Schüler*in zeigen.",
       why: "Regeln allein bleiben abstrakt. Mehrere unterschiedliche Beispiele zeigen, was das Gemeinsame ist, und machen die Regel greifbar.",
-      steps: ["Regel kurz nennen, dann 2 bis 3 Beispiele aus dem Alltag des Schülers: Schule, Hobbys, Freunde.", "Den Schüler ein eigenes Beispiel bilden lassen.", "Gemeinsam prüfen: Passt das Beispiel zur Regel?"],
+      steps: ["Regel kurz nennen, dann 2 bis 3 Beispiele aus dem Alltag der*des Schüler*in: Schule, Hobbys, Freunde.", "Die*den Schüler*in ein eigenes Beispiel bilden lassen.", "Gemeinsam prüfen: Passt das Beispiel zur Regel?"],
       ex: "You play football, right? So: \"I have played football since I was six.\" Now give me one about your hobby.",
-      avoid: "Nur ein einziges Beispiel. Dann merkt sich der Schüler das Beispiel, aber nicht die Regel.",
+      avoid: "Nur ein einziges Beispiel. Dann merkt sich die*der Schüler*in das Beispiel, aber nicht die Regel.",
       src: "Rawson et al. 2015; Weinstein et al. 2018" },
     { id: "korrektur", g: 2, ev: 3, tags: ["sprechen", "grammatik"],
       name: "Fehler richtig korrigieren", en: "Corrective Feedback",
-      what: "Fehler gezielt korrigieren: kurz nebenbei (Recast) oder so, dass der Schüler die Lösung selbst findet (Prompt).",
-      why: "Korrektur wirkt nachweislich. Am stärksten, wenn der Schüler selbst korrigieren muss. Ein reines Nebenbei-Wiederholen wird oft überhört.",
+      what: "Fehler gezielt korrigieren: kurz nebenbei (Recast) oder so, dass die*der Schüler*in die Lösung selbst findet (Prompt).",
+      why: "Korrektur wirkt nachweislich. Am stärksten, wenn die*der Schüler*in selbst korrigieren muss. Ein reines Nebenbei-Wiederholen wird oft überhört.",
       steps: ["<b>Beim freien Sprechen:</b> Nicht unterbrechen, Fehler notieren, am Ende 2 bis 3 davon besprechen.", "<b>Bei geübtem Stoff:</b> Prompt statt Lösung: „Yesterday I go…?“ und warten.", "<b>Bei neuem Stoff:</b> Recast genügt, also die richtige Form kurz wiederholen und weitersprechen."],
       ex: "Student: \"Yesterday I go to the cinema.\" Tutor: \"Yesterday I…?\" Student: \"…went!\"",
       avoid: "Jeden Fehler sofort korrigieren. Das bremst den Redefluss und das Selbstvertrauen. Lieber wenige, wichtige Fehler.",
-      app: "Markierte Fehler landen im Fehlertraining des Schülers. Markiere vor allem wiederkehrende Fehler, nicht jeden Tippfehler.",
+      app: "Markierte Fehler landen im Fehlertraining der*des Schüler*in. Markiere vor allem wiederkehrende Fehler, nicht jeden Tippfehler.",
       src: "Lyster & Saito 2010; Li 2010" },
     { id: "chunks", g: 2, ev: 2, tags: ["vokabeln", "sprechen"],
       name: "In Wortgruppen lernen", en: "Chunks & Collocations",
       what: "Wörter mit ihren typischen Partnern lernen: „make a decision“ statt nur „decision“.",
       why: "Muttersprachler denken in festen Wendungen. Wer sie als Ganzes lernt, spricht flüssiger und macht weniger typische Fehler wie „do a decision“.",
-      steps: ["Neue Wörter immer mit Verb oder Adjektiv aufschreiben: „take a photo“, „heavy rain“.", "Typische Verwechslungen gezielt üben: make oder do, say oder tell.", "Den Schüler die Wendung sofort in einem eigenen Satz verwenden lassen."],
+      steps: ["Neue Wörter immer mit Verb oder Adjektiv aufschreiben: „take a photo“, „heavy rain“.", "Typische Verwechslungen gezielt üben: make oder do, say oder tell.", "Die*den Schüler*in die Wendung sofort in einem eigenen Satz verwenden lassen."],
       ex: "Not \"do a photo\" but \"take a photo\". What else can you take? A break, a bus, a test…",
       avoid: "Lange Listen einzelner Wörter mit deutscher Übersetzung ohne Zusammenhang.",
       app: "Beim Markieren von Wörtern im Arbeitsblatt lieber die ganze Wendung markieren als nur das einzelne Wort.",
@@ -6053,21 +6108,21 @@
       name: "Verständlicher Input", en: "Comprehensible Input",
       what: "Viel Englisch lesen und hören lassen, das knapp über dem aktuellen Niveau liegt.",
       why: "Sprache wird zu einem großen Teil durch verstandenen Input erworben. Wenn rund 95 % der Wörter bekannt sind, kann man neue aus dem Zusammenhang erschließen.",
-      steps: ["Texte oder Videos wählen, bei denen der Schüler fast alles versteht. Pro Seite höchstens eine Handvoll neuer Wörter.", "Vorher Interesse wecken: „What do you think this is about?“", "Danach kurz über den Inhalt sprechen, nicht nur Vokabeln abfragen."],
+      steps: ["Texte oder Videos wählen, bei denen die*der Schüler*in fast alles versteht. Pro Seite höchstens eine Handvoll neuer Wörter.", "Vorher Interesse wecken: „What do you think this is about?“", "Danach kurz über den Inhalt sprechen, nicht nur Vokabeln abfragen."],
       ex: "This article is about a skateboarder from Vienna. Read the first paragraph and tell me what surprised you.",
       avoid: "Zu schwere Originaltexte. Wer jedes dritte Wort nachschlagen muss, lernt wenig und verliert die Lust.",
       src: "Krashen 1985; Hu & Nation 2000" },
     { id: "output", g: 2, ev: 2, tags: ["sprechen"],
       name: "Zum Sprechen bringen", en: "Pushed Output",
-      what: "Den Schüler gezielt Sätze bilden lassen, die etwas über seinem bequemen Niveau liegen.",
+      what: "Die*den Schüler*in gezielt Sätze bilden lassen, die etwas über dem eigenen bequemen Niveau liegen.",
       why: "Erst beim eigenen Sprechen und Schreiben merkt man, was man noch nicht kann. Das lenkt die Aufmerksamkeit genau auf die Lücken.",
       steps: ["Offene Fragen statt Ja-Nein-Fragen: „What would you do if…?“", "Bei kurzen Antworten nachhaken: „Can you say more? Why?“", "Eine Antwort umformulieren lassen: „Now say it in a more formal way.“"],
       ex: "You said \"it was good\". Tell me what exactly was good and why, in three sentences.",
-      avoid: "Selbst den Großteil der Stunde sprechen. Als Faustregel sollte der Schüler mehr reden als du.",
+      avoid: "Selbst den Großteil der Stunde sprechen. Als Faustregel sollte die*der Schüler*in mehr reden als du.",
       src: "Swain 1985; Swain 1995" },
     { id: "shadowing", g: 2, ev: 1, tags: ["sprechen"],
       name: "Nachsprechen", en: "Shadowing",
-      what: "Der Schüler spricht einen gehörten Text fast gleichzeitig mit, wie ein Echo.",
+      what: "Die*der Schüler*in spricht einen gehörten Text fast gleichzeitig mit, wie ein Echo.",
       why: "Trainiert Aussprache, Betonung und Sprechrhythmus. Erste Studien zeigen auch besseres Hörverstehen. Die Studienlage ist noch klein.",
       steps: ["Kurze Audiodatei oder Video wählen, 30 bis 60 Sekunden.", "Erst einmal nur hören, dann mit Text mitlesen und mitsprechen.", "Zum Schluss ohne Text mitsprechen, nach Möglichkeit aufnehmen und vergleichen."],
       ex: "Listen once. Now we play it again and you speak along with her, like an echo.",
@@ -6080,7 +6135,7 @@
       steps: ["<b>Wohin:</b> Am Stundenanfang das Ziel nennen: „Heute schaffst du es, über dein Wochenende zu erzählen.“", "<b>Wo stehe ich:</b> Konkret zurückmelden, was schon gut klappt.", "<b>Nächster Schritt:</b> Genau eine Sache zum Weiterüben nennen."],
       ex: "Your past forms were almost all correct today. Next step: use \"because\" to give reasons.",
       avoid: "Allgemeines Lob wie „Super gemacht!“ ohne Inhalt, oder eine lange Liste an Fehlern.",
-      app: "Die Zusammenfassung und Hausaufgabe einer Stunde eignen sich gut für den nächsten Schritt. Der Schüler sieht beides in seinem Verlauf.",
+      app: "Die Zusammenfassung und Hausaufgabe einer Stunde eignen sich gut für den nächsten Schritt. Die*der Schüler*in sieht beides im eigenen Verlauf.",
       src: "Hattie & Timperley 2007" },
     { id: "woop", g: 3, ev: 2, tags: ["motivation", "pruefung"],
       name: "Ziel und Hindernis planen", en: "WOOP & Wenn-Dann-Pläne",
@@ -6088,24 +6143,24 @@
       why: "Nur positiv denken reicht nicht. Wer das Hindernis vorher benennt und einen Plan dafür hat, setzt Vorhaben deutlich häufiger um.",
       steps: ["<b>Wunsch:</b> „Was willst du bis zur Schularbeit schaffen?“", "<b>Ergebnis und Hindernis:</b> „Wie fühlt sich das an? Was hält dich davon ab?“", "<b>Plan:</b> „Wenn ich nach der Schule aufs Handy schauen will, dann mache ich zuerst 10 Minuten Vokabeln.“"],
       ex: "What usually stops you from doing your homework? Okay, so what's your plan when that happens?",
-      avoid: "Ziele vorgeben. Der Schüler muss sein eigenes Ziel und sein eigenes Hindernis finden.",
+      avoid: "Ziele vorgeben. Die*der Schüler*in muss das eigene Ziel und das eigene Hindernis finden.",
       src: "Oettingen 2014; Gollwitzer & Sheeran 2006" },
     { id: "erklaeren", g: 3, ev: 2, tags: ["grammatik", "motivation"],
       name: "Erklären lassen", en: "Learning by Teaching",
-      what: "Der Schüler erklärt dir eine Regel oder ein Thema, als wärst du der Lernende.",
-      why: "Wer erklärt, muss Wissen ordnen und merkt dabei, was er noch nicht verstanden hat. Rollentausch macht den meisten Schülern außerdem Spaß.",
-      steps: ["Rollentausch ankündigen: „Heute bin ich dein Schüler.“", "Der Schüler erklärt eine Regel mit eigenen Beispielen.", "Du stellst absichtlich naive Fragen oder machst einen typischen Fehler, den er korrigieren soll."],
+      what: "Die*der Schüler*in erklärt dir eine Regel oder ein Thema, als wärst du die lernende Person.",
+      why: "Wer erklärt, muss Wissen ordnen und merkt dabei, was noch nicht verstanden ist. Rollentausch macht den meisten Schüler*innen außerdem Spaß.",
+      steps: ["Rollentausch ankündigen: „Heute lerne ich von dir.“", "Die*der Schüler*in erklärt eine Regel mit eigenen Beispielen.", "Du stellst absichtlich naive Fragen oder machst einen typischen Fehler, den sie*er korrigieren soll."],
       ex: "Imagine I'm new in your class. Explain to me when we use \"some\" and when \"any\".",
-      avoid: "Den Schüler bei Unsicherheiten bloßstellen. Lücken gemeinsam und locker schließen.",
+      avoid: "Die*den Schüler*in bei Unsicherheiten bloßstellen. Lücken gemeinsam und locker schließen.",
       src: "Fiorella & Mayer 2013" },
     { id: "erfolge", g: 3, ev: 2, tags: ["motivation"],
       name: "Kleine Erfolge sichtbar machen", en: "Selbstwirksamkeit",
-      what: "Fortschritte konkret zeigen, damit der Schüler erlebt: Ich kann das.",
+      what: "Fortschritte konkret zeigen, damit die*der Schüler*in erlebt: Ich kann das.",
       why: "Eigene Erfolgserlebnisse sind die stärkste Quelle für Selbstvertrauen beim Lernen. Wer an sich glaubt, strengt sich mehr an und gibt seltener auf.",
-      steps: ["Aufgaben so wählen, dass der Schüler mit etwas Anstrengung Erfolg hat.", "Vorher und nachher vergleichen: einen Text von vor 2 Monaten mit einem von heute.", "Erfolge auf die eigene Anstrengung zurückführen: „Das hast du geschafft, weil du geübt hast.“"],
+      steps: ["Aufgaben so wählen, dass die*der Schüler*in mit etwas Anstrengung Erfolg hat.", "Vorher und nachher vergleichen: einen Text von vor 2 Monaten mit einem von heute.", "Erfolge auf die eigene Anstrengung zurückführen: „Das hast du geschafft, weil du geübt hast.“"],
       ex: "Look at this text from September. Now look at today's. Count the mistakes.",
-      avoid: "Zu leichte Aufgaben nur fürs Erfolgsgefühl. Schüler merken das und es zählt dann nicht.",
-      app: "Im Verlauf des Schülers siehst du, wie viele Fehler aus dem Training schon erledigt sind. Zeig ihm das ab und zu.",
+      avoid: "Zu leichte Aufgaben nur fürs Erfolgsgefühl. Schüler*innen merken das und es zählt dann nicht.",
+      app: "Im Verlauf der*des Schüler*in siehst du, wie viele Fehler aus dem Training schon erledigt sind. Zeig das ab und zu her.",
       src: "Bandura 1997; Schunk 1991" },
   ];
   function methodDots(n){ return `<span class="me-dots" title="Studienlage">${"●".repeat(n)}<span class="off">${"●".repeat(3-n)}</span></span>`; }
@@ -6120,7 +6175,7 @@
       const body = open ? `<div class="me-body" id="me-b-${m.id}">
           <div class="me-sec"><span class="me-lbl">Warum es wirkt</span><p>${m.why}</p></div>
           <div class="me-sec"><span class="me-lbl">So geht's in einer Stunde</span><ol>${m.steps.map(s=>`<li>${s}</li>`).join("")}</ol></div>
-          <div class="me-sec"><span class="me-lbl">Beispiel</span><div class="me-ex"><b>Tutor:</b> ${esc(m.ex)}</div></div>
+          <div class="me-sec"><span class="me-lbl">Beispiel</span><div class="me-ex"><b>Tutor*in:</b> ${esc(m.ex)}</div></div>
           <div class="me-sec"><span class="me-lbl">Vermeiden</span><p>${m.avoid}</p></div>
           ${m.app?`<div class="me-sec wide"><span class="me-lbl">In der App</span><div class="me-app">${m.app}</div></div>`:""}
           <div class="me-sec wide"><span class="me-src">Quelle: ${m.src}</span></div>
@@ -6203,7 +6258,12 @@
   // set it for a student from the student window.
   const AV_EMOJI = ["🦊","🐼","🐨","🐯","🦁","🐸","🐵","🐶","🐱","🐰","🐻","🐧","🦉","🐢","🐙","🦄",
     "🐳","🦋","🐝","🦖","🌻","🌵","🍀","🍉","🍕","🍩","⚽","🏀","🎸","🎨","🎮","📚",
-    "🚀","🌈","⭐","🔥","💎","👑","😎","🤓"];
+    "🚀","🌈","⭐","🔥","💎","👑","😎","🤓",
+    "🐮","🐷","🐹","🐭","🦒","🦓","🐘","🦔","🦦","🦥","🐿️","🦜","🦩","🐬","🦈","🐠",
+    "🐞","🐌","🦀","🐲","🌸","🌺","🌴","🍄","🌙","☀️","❄️","⚡","🍓","🍒","🍌","🥑",
+    "🍔","🍟","🌮","🍦","🧁","🍪","☕","🧋","🎾","🏐","🏈","🛹","🚲","🏊","🎧","🎹",
+    "🥁","🎤","🎬","📷","🎯","🧩","♟️","🎲","✈️","🏰","🗺️","🧸","🎈","🪁","🤖","👽",
+    "👻","🦸","🧙","🥷","😀","😊","🤩","🥳","😇","🤠","🙂","😺"];
   const AV_COLORS = ["#f6c945","#f4a259","#ef7a6a","#f2a7c3","#c3a6f0","#8fb8f2","#7fd1d8","#9ad79a","#d6e685","#e8dccb","#2f8a4d","#3b4a6b"];
   let avPick = null;  // { u, emoji, bg }
   function openAvatarPicker(u){
@@ -6340,6 +6400,7 @@
   $("#tPrevWeek").onclick = ()=>{ if(state.tWeekOffset>-52){state.tWeekOffset--; renderTeacherWeek();} };
   $("#tNextWeek").onclick = ()=>{ if(state.tWeekOffset<6){state.tWeekOffset++; renderTeacherWeek();} };
   $("#tTodayBtn").onclick = ()=>{ state.tWeekOffset=0; renderTeacherWeek(); };
+  $("#tHoursToggle").onclick = ()=>{ state.tAllHours=!state.tAllHours; renderTeacherWeek(); };
   if($("#backdateBtn")) $("#backdateBtn").onclick = ()=>openBackdate();
   $("#availToggle").onclick = ()=>{
     if(state.editAvail){ exitEditAvail(); return; }
