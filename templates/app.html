@@ -1209,7 +1209,12 @@
     display: grid; place-items: center; font-size: 11px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink); }
   .av-edit:hover .avatar { box-shadow: 0 0 0 3px rgba(48,144,80,0.35); }
   .av-preview { display: flex; justify-content: center; margin: 6px 0 16px; }
-  .av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 16px; max-height: 260px; overflow-y: auto; padding: 2px; }
+  .av-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 16px; max-height: 320px; overflow-y: auto; padding: 2px; }
+  .av-grp { grid-column: 1 / -1; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 8px 2px 0; text-align: left; }
+  .av-grp:first-child { margin-top: 0; }
+  .av-grid [hidden] { display: none; }
+  .av-none { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 14px 4px; }
+  .av-search { width: 100%; margin-bottom: 10px; }
   .av-grid button { aspect-ratio: 1; font-size: 22px; line-height: 1; border-radius: 10px; border: 1px solid var(--line);
     background: transparent; cursor: pointer; padding: 0; display: grid; place-items: center; }
   .av-grid button.on { border-color: var(--ink); background: rgba(36,53,40,0.08); }
@@ -1548,8 +1553,8 @@
               <div class="big" id="balanceBig">8</div>
               <div class="unit">Einheiten verfügbar · 1 Einheit = eine 45-Minuten-Stunde</div>
               <div class="meta">
-                <div class="m"><div class="mv" id="statBooked">3</div><div class="mk">Geplant</div></div>
-                <div class="m"><div class="mv" id="statDone">27</div><div class="mk">Abgeschlossen</div></div>
+                <div class="m"><div class="mv" id="statBooked">0</div><div class="mk">Geplant</div></div>
+                <div class="m"><div class="mv" id="statDone">0</div><div class="mk">Abgeschlossen</div></div>
               </div>
               <div id="settleBox" hidden style="margin-top:22px;padding:16px;border-radius:14px;background:rgba(194,85,47,0.10);border:1px solid rgba(194,85,47,0.25);">
                 <div style="font-weight:700;color:#c2552f;font-size:14px;" id="settleTitle"></div>
@@ -2623,8 +2628,18 @@
     if (state.students) { const _m = state.students.find(s=>s.id===state.currentUser); if (_m) _m.credits = state.credits; }
     $("#coinNum").textContent = state.credits;
     $("#balanceBig").textContent = state.credits;
-    $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length;
+    renderLessonStats();
     renderSettleBox();
+  }
+
+  // "Geplant" / "Abgeschlossen" on the student's balance card. Abgeschlossen
+  // counts only lessons that actually took place: the student's own confirmed
+  // (not merely requested) bookings whose day is over. Cancelled bookings are
+  // deleted server-side, so they never show up here.
+  function renderLessonStats() {
+    const mine = state.bookings.filter(b=>b.studentId===state.currentUser && !b.isIntro && b.tutorId && b.tutorId!=="__blocked__");
+    $("#statBooked").textContent = mine.filter(b=> b.date>=NOW||sameDay(b.date,NOW)).length;
+    $("#statDone").textContent = mine.filter(b=> b.status!=="requested" && b.date<NOW && !sameDay(b.date,NOW)).length;
   }
 
   // Show a "settle outstanding" CTA whenever the student's balance is negative
@@ -2936,7 +2951,7 @@
     if (state.currentUser===sid) renderAccount();
   }
 
-  function renderAccount() { updateCredits(); renderUpcoming(); renderActivity(); $("#statBooked").textContent = state.bookings.filter(b=>b.studentId===state.currentUser && (b.date>=NOW||sameDay(b.date,NOW))).length; }
+  function renderAccount() { updateCredits(); renderUpcoming(); renderActivity(); renderLessonStats(); }
 
   // ---------- Teacher portal ----------
   function renderTeacherWeek() {
@@ -6256,6 +6271,9 @@
   // ---------- Emoji avatar picker ----------
   // Students pick their own profile picture (an emoji on a colour); tutors can
   // set it for a student from the student window.
+  // A hand-picked "Beliebt" row comes first (AV_EMOJI[0] is the default);
+  // the full emoji set (static/js/avatar-emoji.js, ~1,900 emojis in the iOS
+  // keyboard's groups) loads the first time the picker opens.
   const AV_EMOJI = ["🦊","🐼","🐨","🐯","🦁","🐸","🐵","🐶","🐱","🐰","🐻","🐧","🦉","🐢","🐙","🦄",
     "🐳","🦋","🐝","🦖","🌻","🌵","🍀","🍉","🍕","🍩","⚽","🏀","🎸","🎨","🎮","📚",
     "🚀","🌈","⭐","🔥","💎","👑","😎","🤓",
@@ -6264,23 +6282,34 @@
     "🍔","🍟","🌮","🍦","🧁","🍪","☕","🧋","🎾","🏐","🏈","🛹","🚲","🏊","🎧","🎹",
     "🥁","🎤","🎬","📷","🎯","🧩","♟️","🎲","✈️","🏰","🗺️","🧸","🎈","🪁","🤖","👽",
     "👻","🦸","🧙","🥷","😀","😊","🤩","🥳","😇","🤠","🙂","😺"];
+  const AV_EMOJI_SRC = "{% static 'js/avatar-emoji.js' %}";
+  let avEmojiReady = null;
+  function loadAvatarEmoji(){
+    if(!avEmojiReady) avEmojiReady = new Promise((res, rej)=>{
+      const s=document.createElement("script"); s.src=AV_EMOJI_SRC;
+      s.onload=()=>res(window.TGP_AVATAR_EMOJI||[]); s.onerror=()=>{ avEmojiReady=null; rej(new Error("avatar-emoji")); };
+      document.head.appendChild(s);
+    });
+    return avEmojiReady;
+  }
   const AV_COLORS = ["#f6c945","#f4a259","#ef7a6a","#f2a7c3","#c3a6f0","#8fb8f2","#7fd1d8","#9ad79a","#d6e685","#e8dccb","#2f8a4d","#3b4a6b"];
   let avPick = null;  // { u, emoji, bg }
   function openAvatarPicker(u){
-    avPick = { u, emoji: u.avatarEmoji || AV_EMOJI[0], bg: u.avatarBg || AV_COLORS[0] };
+    avPick = { u, emoji: u.avatarEmoji || AV_EMOJI[0], bg: u.avatarBg || AV_COLORS[0], q: "" };
     renderAvatarPicker(); $("#avatarModal").hidden=false;
+    if(!window.TGP_AVATAR_EMOJI) loadAvatarEmoji().then(()=>{ if(avPick) renderAvatarGrid(); }).catch(()=>{});
   }
   function closeAvatarPicker(){ avPick=null; $("#avatarModal").hidden=true; }
   function renderAvatarPicker(){
     const p=avPick; if(!p) return;
     const self = p.u===meIdentity;
-    const prev={ avatarEmoji:p.emoji, avatarBg:p.bg };
     $("#avatarModal").innerHTML=`<div class="modal-card buy-card" id="avCard">
       <button class="modal-x" id="avX" aria-label="Close">×</button>
       <h3 class="buy-h">${self ? "Dein Profilbild" : "Profilbild für "+esc(p.u.name.split(" ")[0])}</h3>
-      <div class="av-preview"><div class="avatar" style="${avatarStyle(prev)};width:76px;height:76px;font-size:24px;">${avatarText(prev)}</div></div>
-      <div class="av-grid">${AV_EMOJI.map(e=>`<button type="button" data-av-e="${e}" class="${e===p.emoji?"on":""}">${e}</button>`).join("")}</div>
-      <div class="av-colors">${AV_COLORS.map(c=>`<button type="button" data-av-c="${c}" class="${c===p.bg?"on":""}" style="background:${c};" aria-label="Farbe ${c}"></button>`).join("")}</div>
+      <div class="av-preview"><div class="avatar" id="avPrev" style="width:76px;height:76px;font-size:24px;"></div></div>
+      <input class="bf-input av-search" id="avSearch" type="search" placeholder="Emoji suchen" autocomplete="off">
+      <div class="av-grid" id="avGrid"></div>
+      <div class="av-colors">${AV_COLORS.map(c=>`<button type="button" data-av-c="${c}" style="background:${c};" aria-label="Farbe ${c}"></button>`).join("")}</div>
       <div class="av-actions">
         ${p.u.avatarEmoji ? `<button class="btn-text" id="avReset">Zurücksetzen</button>` : `<span></span>`}
         <button class="btn" id="avSave">Speichern</button>
@@ -6289,10 +6318,44 @@
     </div>`;
     $("#avCard").onclick=(e)=>e.stopPropagation();
     $("#avX").onclick=closeAvatarPicker;
-    document.querySelectorAll("[data-av-e]").forEach(b=>b.onclick=()=>{ p.emoji=b.dataset.avE; renderAvatarPicker(); });
-    document.querySelectorAll("[data-av-c]").forEach(b=>b.onclick=()=>{ p.bg=b.dataset.avC; renderAvatarPicker(); });
+    // One delegated handler: picking only moves the highlight, so the grid
+    // (~1,900 buttons) keeps its scroll position.
+    $("#avGrid").onclick=(e)=>{ const b=e.target.closest("[data-av-e]"); if(b){ p.emoji=b.dataset.avE; syncAvatarPicker(); } };
+    document.querySelectorAll("[data-av-c]").forEach(b=>b.onclick=()=>{ p.bg=b.dataset.avC; syncAvatarPicker(); });
+    $("#avSearch").oninput=(e)=>{ p.q=e.target.value; filterAvatarGrid(); };
     $("#avSave").onclick=()=>saveAvatar(p.emoji, p.bg);
     if($("#avReset")) $("#avReset").onclick=()=>saveAvatar("", "");
+    renderAvatarGrid();
+  }
+  function renderAvatarGrid(){
+    const p=avPick, grid=$("#avGrid"); if(!p || !grid) return;
+    const groups=[["Beliebt", AV_EMOJI.map(e=>[e, ""])], ...(window.TGP_AVATAR_EMOJI||[])];
+    grid.innerHTML=groups.map(([g,list])=>`<div class="av-grp">${esc(g)}</div>`+list.map(([e,k])=>`<button type="button" data-av-e="${e}" data-k="${esc(k)}" data-no-i18n>${e}</button>`).join("")).join("")
+      + `<div class="av-none" hidden>Kein passendes Emoji gefunden.</div>`;
+    filterAvatarGrid(); syncAvatarPicker();
+  }
+  // Search matches the German and English emoji names; group headings with
+  // no match hide too.
+  function filterAvatarGrid(){
+    const grid=$("#avGrid"); if(!grid) return;
+    const q=(avPick.q||"").trim().toLowerCase();
+    let any=false, head=null, headHits=0;
+    const closeHead=()=>{ if(head) head.hidden=!headHits; };
+    [...grid.children].forEach(el=>{
+      if(el.classList.contains("av-grp")){ closeHead(); head=el; headHits=0; return; }
+      if(!el.dataset.avE) return;
+      const hit=!q || el.dataset.k.includes(q);
+      el.hidden=!hit; if(hit){ headHits++; any=true; }
+    });
+    closeHead();
+    grid.querySelector(".av-none").hidden=any;
+  }
+  function syncAvatarPicker(){
+    const p=avPick; if(!p) return;
+    const prev={ avatarEmoji:p.emoji, avatarBg:p.bg }, el=$("#avPrev");
+    if(el){ el.setAttribute("style", `${avatarStyle(prev)};width:76px;height:76px;font-size:24px;`); el.innerHTML=avatarText(prev); }
+    document.querySelectorAll("[data-av-e]").forEach(b=>b.classList.toggle("on", b.dataset.avE===p.emoji));
+    document.querySelectorAll("[data-av-c]").forEach(b=>b.classList.toggle("on", b.dataset.avC===p.bg));
   }
   // Show the new picture at once and save in the background: the test site's
   // server can take ~30 s to wake up, and a waiting dialog invites repeat clicks.

@@ -1209,7 +1209,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False, materials=False, methods=False, school_tests=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False, materials=False, methods=False, school_tests=False, avatar=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get(reverse("app")).content.decode()
@@ -1245,6 +1245,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--methods")
             if school_tests:
                 cmd.append("--school-tests")
+            if avatar:
+                cmd.append("--avatar")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -1329,6 +1331,66 @@ class XssTests(_DomProbeBase):
             r = self.client.put(f"/api/users/{self.maya.slug}/", data=json.dumps({"photo": bad}),
                                 content_type="application/json")
             self.assertEqual(r.status_code, 400, bad)
+
+
+class DomLessonStatsTests(_DomProbeBase):
+    def test_completed_counter_matches_lessons_actually_held(self):
+        # "Abgeschlossen" used to be a hardcoded 27. It must count only the
+        # student's own confirmed lessons whose day is over.
+        today = timezone.localdate()
+        past = [today - timedelta(days=d) for d in (3, 10, 20)]
+        for d in past:
+            Booking.objects.create(student=self.maya, tutor=self.davit, date=d, time="10:00")
+        # Not held: a never-confirmed request in the past, a lesson later
+        # today, an upcoming one, and another student's past lesson.
+        Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=5),
+                               time="11:00", status=Booking.STATUS_REQUESTED)
+        Booking.objects.create(student=self.maya, tutor=self.davit, date=today, time="23:00")
+        Booking.objects.create(student=self.maya, tutor=self.davit, date=today + timedelta(days=4), time="10:00")
+        Booking.objects.create(student=self.ines, tutor=self.davit, date=today - timedelta(days=2), time="10:00")
+        r = self.run_probe(self.maya)
+        self.assertEqual(r["initErrors"], [])
+        self.assertEqual(r["lessonStats"]["done"], "3")
+        self.assertEqual(r["lessonStats"]["booked"], "2")
+
+    def test_new_student_has_no_completed_lessons(self):
+        r = self.run_probe(self.maya)
+        self.assertEqual(r["lessonStats"]["done"], "0")
+
+
+class DomAvatarPickerTests(_DomProbeBase):
+    def test_picker_offers_full_emoji_set_grouped_and_searchable(self):
+        r = self.run_probe(self.maya, avatar=True)
+        self.assertEqual(r["initErrors"], [])
+        a = r["avatar"]
+        self.assertEqual(a["groups"], [
+            "Beliebt", "Smileys & Emotionen", "Menschen & Körper", "Tiere & Natur", "Essen & Trinken",
+            "Reisen & Orte", "Aktivitäten", "Gegenstände", "Symbole", "Flaggen",
+        ])
+        self.assertGreater(a["total"], 1900)
+        # Picking moves the highlight (in "Beliebt" and its own group) and the preview.
+        self.assertEqual(a["on"], ["🦖", "🦖"])
+        self.assertEqual(a["preview"], "🦖")
+        # German search words; only the groups with a hit stay visible.
+        self.assertIn("🐈", a["found"])
+        self.assertIn("😺", a["found"])
+        self.assertNotIn("🦖", a["found"])
+        self.assertNotIn("Beliebt", a["visibleGroups"])
+
+    def test_every_picker_emoji_passes_the_avatar_api(self):
+        # The server only accepts non-ASCII values of at most 16 characters.
+        path = os.path.join(os.path.dirname(__file__), "..", "static", "js", "avatar-emoji.js")
+        src = open(path, encoding="utf-8").read()
+        groups = json.loads(src[src.index("= [") + 2:src.rindex("]") + 1])
+        emojis = [e for _, items in groups for e, _ in items]
+        self.assertGreater(len(emojis), 1800)
+        bad = [e for e in emojis if len(e) > 16 or any(ord(c) < 128 for c in e)]
+        self.assertEqual(bad, [])
+        self.client.force_login(self.maya)
+        for e in ("🫠", "🧑‍🚀", "🏳️‍🌈", "🇦🇹"):
+            resp = self.client.put("/api/users/maya/avatar/", json.dumps({"emoji": e, "bg": "#f6c945"}),
+                                   content_type="application/json")
+            self.assertEqual(resp.status_code, 200, e)
 
 
 class DomAdminTests(_DomProbeBase):

@@ -33,6 +33,7 @@ const doQuickAdds = process.argv.includes("--quick-adds");
 const doMaterials = process.argv.includes("--materials");
 const doMethods = process.argv.includes("--methods");
 const doSchoolTests = process.argv.includes("--school-tests");
+const doAvatar = process.argv.includes("--avatar");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -56,6 +57,10 @@ const dom = new JSDOM(html, {
   virtualConsole: vc,
   url: "http://localhost/",
   beforeParse(w) {
+    // jsdom doesn't fetch the lazily-loaded emoji data; provide it up front.
+    if (doAvatar) {
+      w.eval(fs.readFileSync(require("path").join(__dirname, "..", "..", "static", "js", "avatar-emoji.js"), "utf8"));
+    }
     w.fetch = (url, opts) => {
       const method = (opts && opts.method) || "GET";
       const u = String(url);
@@ -116,6 +121,11 @@ function finish(extra) {
         initials: $("#meAvatar") ? $("#meAvatar").textContent : null,
       },
       tabs: tabDisplays(),
+      // The student balance card's "Geplant" / "Abgeschlossen" counters.
+      lessonStats: {
+        booked: $("#statBooked") ? $("#statBooked").textContent : null,
+        done: $("#statDone") ? $("#statDone").textContent : null,
+      },
       // Elements injected through user-supplied text (tests plant <i/data-xss>).
       xss: document.querySelectorAll("[data-xss]").length,
     },
@@ -242,6 +252,24 @@ setTimeout(() => {
     if (priceEl) priceEl.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     result.eachAfterZeroCredits = eachEl ? eachEl.value : null;
     return finish({ adminPricing: result });
+  }
+
+  if (doAvatar) {
+    // Student: open the profile-picture picker, pick an emoji, then search.
+    $("#avatarPickBtn").click();
+    const q = (sel) => [...document.querySelectorAll(sel)];
+    const groups = q("#avGrid .av-grp").map((h) => h.textContent);
+    const total = q("#avGrid [data-av-e]").length;
+    const pick = document.querySelector('#avGrid [data-av-e="🦖"]');
+    if (pick) pick.click();
+    const on = q("#avGrid [data-av-e].on").map((b) => b.dataset.avE);
+    const preview = $("#avPrev") ? $("#avPrev").textContent : null;
+    const search = $("#avSearch");
+    search.value = "katze";
+    search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    const found = q("#avGrid [data-av-e]").filter((b) => !b.hidden).map((b) => b.dataset.avE);
+    const visibleGroups = q("#avGrid .av-grp").filter((h) => !h.hidden).map((h) => h.textContent);
+    return finish({ avatar: { groups, total, on, preview, found, visibleGroups } });
   }
 
   if (doQuickAdds) {
