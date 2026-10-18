@@ -53,6 +53,7 @@ dashboard — `.env` files are gitignored):
 | `TUTOR_WHATSAPP` | optional | `436763975535` (default) — where „Tutor schreiben" opens a WhatsApp chat |
 | `SENTRY_DSN` | to report errors | `https://…@o….ingest.de.sentry.io/…` (EU region) |
 | `SENTRY_ENVIRONMENT` | with Sentry | `production` on prod, `test` on the test service |
+| `EMAIL_SUBJECT_PREFIX` | optional | defaults to `[TEST] ` when `SENTRY_ENVIRONMENT=test`, empty otherwise; prepended to every e-mail subject |
 
 ### Video calls: Zoom / Microsoft Teams (optional)
 

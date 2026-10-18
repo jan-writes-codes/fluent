@@ -181,7 +181,7 @@ def _message(subject, to, text_body, html_body, reply_to=None):
         [settings.EMAIL_REPLY_TO] if settings.EMAIL_REPLY_TO else None
     )
     msg = EmailMultiAlternatives(
-        subject=subject,
+        subject=f"{settings.EMAIL_SUBJECT_PREFIX}{subject}",
         body=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=to if isinstance(to, (list, tuple)) else [to],

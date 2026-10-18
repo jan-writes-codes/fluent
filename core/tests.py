@@ -2658,6 +2658,19 @@ class IntroEmailTests(FluentDataMixin, TestCase):
         self.assertIn("BEGIN:VEVENT", ics[0][1])
         self.assertIn("text/calendar", ics[0][2])
 
+    @override_settings(EMAIL_SUBJECT_PREFIX="[TEST] ")
+    def test_subject_prefix_on_test_system(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        self.assertTrue(mail.outbox)
+        for msg in mail.outbox:
+            self.assertTrue(msg.subject.startswith("[TEST] "), msg.subject)
+
+    def test_no_subject_prefix_by_default(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        self.assertFalse(any(m.subject.startswith("[") for m in mail.outbox))
+
     @override_settings(TUTOR_NOTIFY_EMAIL="studio@thegreenpencil.at")
     def test_tutor_is_notified_when_configured(self):
         from django.core import mail

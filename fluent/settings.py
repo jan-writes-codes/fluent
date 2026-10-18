@@ -158,6 +158,13 @@ TUTOR_NOTIFY_EMAIL = os.environ.get('TUTOR_NOTIFY_EMAIL', '')
 # Send in a background thread so a booking request never blocks on the ESP.
 # Set EMAIL_ASYNC=false to send inline (tests do this for determinism).
 EMAIL_ASYNC = os.environ.get('EMAIL_ASYNC', 'true').lower() in ('1', 'true', 'yes', 'on')
+# Prepended to every outgoing subject so test-system mail is recognisable.
+# Defaults to "[TEST] " on the test service (SENTRY_ENVIRONMENT=test), empty on
+# production; set EMAIL_SUBJECT_PREFIX explicitly to override either way.
+EMAIL_SUBJECT_PREFIX = os.environ.get(
+    'EMAIL_SUBJECT_PREFIX',
+    '[TEST] ' if os.environ.get('SENTRY_ENVIRONMENT', '').lower() == 'test' else '',
+)
 
 try:
     import anymail  # noqa: F401
