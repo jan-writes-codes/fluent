@@ -12,6 +12,10 @@ class User(AbstractUser):
     initials = models.CharField(max_length=4, default='')
     credits = models.IntegerField(default=0)
     photo = models.TextField(blank=True, null=True)  # base64 data URL
+    # Self-chosen profile picture: an emoji on a solid background colour. Shown
+    # when there's no photo; empty means the initials avatar.
+    avatar_emoji = models.CharField(max_length=16, blank=True, default='')
+    avatar_bg = models.CharField(max_length=7, blank=True, default='')
     color1 = models.CharField(max_length=20, default='#c2714d')
     color2 = models.CharField(max_length=20, default='#a85535')
     billing_name = models.CharField(max_length=200, blank=True)
@@ -33,6 +37,17 @@ class User(AbstractUser):
     # The login flow forces the user to pick their own password before they can
     # reach the app; self-set passwords (forced change, e-mail reset) clear it.
     must_change_password = models.BooleanField(default=False)
+    # Students only: how many lessons a week the tutor plans with this student,
+    # set by hand in the student list. Drives the weekly hours / income line.
+    weekly_lessons = models.DecimalField(max_digits=3, decimal_places=1, default=0)
+    # Students only: which section of the tutor's student list they sit in.
+    # "exam" is for students the tutor sees now and then (exam prep), not weekly.
+    ROSTER_GROUPS = [('active', 'Aktiv'), ('exam', 'Prüfungsvorbereitung'), ('done', 'Abgeschlossen')]
+    roster_group = models.CharField(max_length=10, choices=ROSTER_GROUPS, default='active')
+    # Language of the app and of the e-mails and PDFs this user receives.
+    # German unless they switch to English (DE/EN switch in the app header).
+    LANGUAGES = [('de', 'Deutsch'), ('en', 'English')]
+    language = models.CharField(max_length=5, choices=LANGUAGES, default='de')
 
     class Meta:
         db_table = 'core_user'
@@ -136,6 +151,13 @@ class Booking(models.Model):
         super().save(*args, **kwargs)
         if is_new:
             self._charge_credit()
+
+    @property
+    def join_link(self):
+        """The link to join this lesson: its own, else the studio's fixed one
+        (settings.LESSON_CALL_LINK)."""
+        from django.conf import settings
+        return self.call_link or settings.LESSON_CALL_LINK
 
     @property
     def minutes(self):
@@ -364,6 +386,33 @@ class ActiveLesson(models.Model):
         return f'{self.student.slug}: {self.lesson_id}'
 
 
+class CurriculumTopic(models.Model):
+    """A topic in the shared Lernmaterialien library: one level (A1–C1) and one
+    skill area. ``lesson_id`` is the key ActiveLesson and LessonFile point at,
+    so the original hard-coded lessons ('a1-1' …) keep their unlocks and files."""
+    LEVEL_CHOICES = [(l, l) for l in ('A1', 'A2', 'B1', 'B2', 'C1')]
+    SKILL_CHOICES = [
+        ('listening', 'Listening'),
+        ('reading', 'Reading'),
+        ('grammar', 'Grammar'),
+        ('liu', 'Language in Use'),
+        ('writing', 'Writing'),
+        ('speaking', 'Speaking'),
+    ]
+    lesson_id = models.CharField(max_length=20, unique=True)
+    level = models.CharField(max_length=2, choices=LEVEL_CHOICES)
+    skill = models.CharField(max_length=10, choices=SKILL_CHOICES)
+    title = models.CharField(max_length=200)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['level', 'position', 'id']
+
+    def __str__(self):
+        return f'{self.lesson_id}: {self.title}'
+
+
 def lesson_upload_path(instance, filename):
     return f'lessons/{instance.lesson_id}/{filename}'
 
@@ -470,6 +519,14 @@ class SessionExercise(models.Model):
     description = models.TextField(blank=True)
     link = models.URLField(max_length=500, blank=True)
     done = models.BooleanField(default=False)
+    # The result the tutor gives: ``score_right`` of ``score_total`` correct, on
+    # a CEFR sublevel (A1.1 … C1.2) and in one skill area. Feeds the student's
+    # level-adjusted progress charts. Empty until scored.
+    SUBLEVELS = ['A1.1', 'A1.2', 'A2.1', 'A2.2', 'B1.1', 'B1.2', 'B2.1', 'B2.2', 'C1.1', 'C1.2']
+    score_right = models.PositiveSmallIntegerField(null=True, blank=True)
+    score_total = models.PositiveSmallIntegerField(null=True, blank=True)
+    level = models.CharField(max_length=4, blank=True)
+    skill = models.CharField(max_length=10, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -477,22 +534,70 @@ class SessionExercise(models.Model):
 
 
 class SessionFile(models.Model):
-    """A file attached to one lesson: a worksheet the tutor uploads, or homework
-    the student hands in. Stored in the database (not on the web server's disk,
-    which Render wipes on every deploy), so keep uploads small."""
+    """A file attached to one lesson: a worksheet the tutor uploads (worked
+    through together in the lesson), a Hausübung the tutor sets (homework until
+    next time, on the student's start page), or homework the student hands in.
+    Stored in the database (not on the web server's disk, which Render wipes on
+    every deploy), so keep uploads small."""
     KIND_WORKSHEET = 'worksheet'
+    KIND_ASSIGNMENT = 'assignment'
     KIND_HOMEWORK = 'homework'
-    KIND_CHOICES = [(KIND_WORKSHEET, 'Arbeitsblatt'), (KIND_HOMEWORK, 'Hausaufgabe')]
+    KIND_CHOICES = [(KIND_WORKSHEET, 'Arbeitsblatt'), (KIND_ASSIGNMENT, 'Hausübung'),
+                    (KIND_HOMEWORK, 'Hausaufgabe')]
+    # The kinds shown in the lesson's PDF viewer, where both sides can write on them.
+    SHEET_KINDS = (KIND_WORKSHEET, KIND_ASSIGNMENT)
 
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='files')
     kind = models.CharField(max_length=10, choices=KIND_CHOICES)
     name = models.CharField(max_length=255)
     content_type = models.CharField(max_length=100, blank=True)
     size = models.PositiveIntegerField(default=0)
-    data = models.BinaryField(editable=False)
+    # Empty when the file is a Lernmaterialien file linked into the lesson:
+    # the bytes are then read from ``material`` instead of being stored twice.
+    data = models.BinaryField(editable=False, null=True)
+    material = models.ForeignKey('LessonFile', on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='session_links')
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='session_uploads')
     created_at = models.DateTimeField(auto_now_add=True)
+    # Pen, highlighter and text notes drawn onto a PDF worksheet in the lesson,
+    # by tutor and student: a list of items (see ``views._clean_ink_item``), with
+    # positions as fractions of the page. ``annotations_rev`` goes up on every
+    # change so open lesson pages can tell when to fetch them again.
+    annotations = models.JSONField(default=list, blank=True)
+    annotations_rev = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['created_at']
+
+
+class SchoolTest(models.Model):
+    """A Schularbeit, test or exam a student has coming up (or had). The
+    student or tutor enters the date; afterwards the grade and a short
+    reflection — what went well, what to work on — so the next lessons know
+    where to focus."""
+    KIND_SCHULARBEIT = 'sa'
+    KIND_TEST = 'test'
+    KIND_MATURA = 'matura'
+    KIND_OTHER = 'other'
+    KIND_CHOICES = [
+        (KIND_SCHULARBEIT, 'Schularbeit'), (KIND_TEST, 'Test'),
+        (KIND_MATURA, 'Matura'), (KIND_OTHER, 'Prüfung'),
+    ]
+
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='school_tests')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_SCHULARBEIT)
+    date = models.DateField()
+    topic = models.CharField(max_length=200, blank=True)   # what it covers
+    grade = models.PositiveSmallIntegerField(null=True, blank=True)  # Austrian 1–5
+    went_well = models.TextField(blank=True)
+    to_improve = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='school_tests_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['date', 'created_at']
+
+    def __str__(self):
+        return f'{self.student.slug}: {self.get_kind_display()} {self.date}'

@@ -58,3 +58,30 @@ The frontend builds date keys with JS `Date.getMonth()` (0-indexed). `views.py`
 translates between those keys and real Python dates (`date_to_jskey` /
 `jskey_to_date`) so stored dates stay semantically correct and the January edge
 case (`getMonth() === 0`) doesn't crash.
+
+### English version of the public pages
+
+German is the default; the public pages (landing, FAQ, intro booking, cancel
+page, legal pages) also exist in English under `/en/` (`i18n_patterns` in
+`fluent/urls.py`).
+
+- Short strings are wrapped in `{% translate %}` and translated in
+  `locale/en/LC_MESSAGES/django.po` (German is the msgid). After changing a
+  wrapped German string or a translation, run
+  `python manage.py makemessages -l en --no-location` and
+  `python manage.py compilemessages -l en` (needs GNU gettext), then commit the
+  `.po` **and** the `.mo` — the deploy doesn't compile them.
+- The prose pages have their own English templates in `templates/en/` (FAQ and
+  legal pages) and `templates/email/en/` (the guest's intro confirmation and
+  cancellation mail). Edit the German and English file together.
+- The English legal pages are courtesy translations and say the German text is
+  binding.
+
+### English in the app
+
+Students, tutors and admins can switch the app (and login and payment-link
+pages) between German and English: "English" / "Deutsch" in the user menu, or
+the EN/DE button on the login page. The choice is saved on the account
+(`User.language`), and their e-mails and lesson PDFs follow it. The app is
+translated in the browser from a dictionary: new German UI text needs an entry
+in `static/js/i18n/en.js`, see `static/js/i18n/README.md`.

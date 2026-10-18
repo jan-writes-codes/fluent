@@ -1,0 +1,19 @@
+You're all set, {{ student_first }}!
+
+Your English lesson with {{ tutor_first }} is booked. One credit has been
+deducted from your balance.
+
+Date:  {{ when }}
+Tutor: {{ tutor_first }}
+
+You can find the lesson in your account at any time. You can reschedule or
+cancel free of charge up to 24 hours in advance.
+{% if cancel_url %}
+Need to cancel? You can cancel the lesson here (if you cancel more than
+24 hours in advance, the credit will be returned to your balance):
+{{ cancel_url }}
+{% endif %}
+--
+The Green Pencil · English tutoring · Vienna, Austria
+Legal notice: {{ site_home }}/impressum/
+Privacy:      {{ site_home }}/datenschutz/

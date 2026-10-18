@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="de">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
 {% include "_consent.html" %}
 <meta charset="UTF-8" />
@@ -10,6 +10,7 @@
      declared #f5f2ea sat warm against the grain-tinted page and painted a
      permanent off-tone strip along the screen edges. -->
 <title>Offene Einheiten begleichen · The Green Pencil</title>
+{% include "_app_i18n.html" %}
 <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
 <meta name="robots" content="noindex, nofollow">
 <style>
@@ -45,6 +46,7 @@
 </style>
 </head>
 <body>
+{% include "_app_lang_switch.html" %}
   <div class="card">
   {% if invalid %}
     <span class="badge">the green pencil</span>
@@ -59,7 +61,7 @@
   {% elif outstanding == 0 %}
     <span class="badge">the green pencil</span>
     <h1>Alles beglichen ✓</h1>
-    <p class="sub">Hallo {{ first_name }} — du hast aktuell keine offenen Einheiten.
+    <p class="sub">Hallo {{ first_name }}, du hast aktuell keine offenen Einheiten.
     Es ist nichts zu bezahlen.</p>
   {% else %}
     <span class="badge">the green pencil</span>
@@ -85,7 +87,7 @@
       <p class="note" id="msg">Zahlung über Stripe · du wirst kurz weitergeleitet.</p>
     {% else %}
       <button disabled>Online-Zahlung nicht verfügbar</button>
-      <p class="note">Bitte wende dich an deinen Tutor, um offene Einheiten zu begleichen.</p>
+      <p class="note">Bitte wende dich an deine*n Tutor*in, um offene Einheiten zu begleichen.</p>
     {% endif %}
   {% endif %}
   </div>

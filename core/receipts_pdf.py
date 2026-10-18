@@ -19,7 +19,7 @@ SUPPLIER = {
     "email": "davit@thegreenpencil.at",
 }
 VAT_DE = "Steuerfrei gemäß § 6 Abs. 1 Z 11 UStG (Unterrichtsleistung eines Privatlehrers)."
-VAT_EN = "VAT-exempt educational service under Austrian law — no value-added tax is charged."
+VAT_EN = "VAT-exempt educational service under Austrian law. No value-added tax is charged."
 
 # Brand palette (matches the site's --c1 grass green and ink tones).
 _GREEN = (0.188, 0.565, 0.314)
@@ -174,7 +174,7 @@ def render_receipt_pdf(receipt):
         return yy
 
     label(M, y, "Leistungserbringer · From")
-    label(col2, y, "Empfänger · Billed to")
+    label(col2, y, "Empfänger*in · Billed to")
     y2 = y - 14
     recipient = [
         receipt.billing_name or receipt.student_name,
@@ -254,7 +254,7 @@ def render_receipt_pdf(receipt):
     # ---- Footer ------------------------------------------------------------
     c.setFillColorRGB(*_MUTE)
     c.setFont("Helvetica", 8.5)
-    pay = "Storniert — Betrag erstattet" if is_storno else "Externe Überweisung — bezahlt"
+    pay = "Storniert, Betrag erstattet" if is_storno else "Externe Überweisung, bezahlt"
     c.drawString(M, M, f"Zahlung · Payment: {pay}")
     c.drawRightString(right, M, "Automatisch ausgestellter Beleg")
 

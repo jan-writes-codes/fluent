@@ -30,6 +30,9 @@ const doLearning = process.argv.includes("--learning");
 const doPreview = process.argv.includes("--preview");
 const doBuy = process.argv.includes("--buy");
 const doQuickAdds = process.argv.includes("--quick-adds");
+const doMaterials = process.argv.includes("--materials");
+const doMethods = process.argv.includes("--methods");
+const doSchoolTests = process.argv.includes("--school-tests");
 if (!file) {
   console.error("usage: node dom_probe.js <app.html> [--book]");
   process.exit(2);
@@ -74,6 +77,12 @@ const dom = new JSDOM(html, {
           color1: "#9aa0a6", color2: "#6b7177", photo: null, tempPassword: "tmp-stu-pw",
           billing: { line1: "", postcode: "", city: "", country: "Österreich" },
         }) });
+      }
+      if (u.endsWith("/api/school-tests/") && method === "POST") {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ test: {
+          id: 777, studentId: body.studentSlug || "maya", kind: body.kind, date: body.date,
+          topic: body.topic, grade: body.grade, wentWell: body.wentWell, toImprove: body.toImprove,
+        } }) });
       }
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ pk: 999 }) });
     };
@@ -257,6 +266,100 @@ setTimeout(() => {
           .map((a) => a.getAttribute("href")).filter(Boolean);
         finish({ preview: { fileLinks: links } });
       }, 80);
+    }, 80);
+    return;
+  }
+
+  if (doSchoolTests) {
+    // Tutor: open Maya's profile; student: open "Deine Stunden". Read the
+    // Schularbeiten list and timeline, then add a test through the form.
+    const isStudent = !!document.querySelector('.tab[data-view="lessons"]') &&
+      getComputedStyle(document.querySelector('.tab[data-view="lessons"]')).display !== "none";
+    let root;
+    if (isStudent) {
+      document.querySelector('.tab[data-view="lessons"]').click();
+      root = () => $("#myTests");
+    } else {
+      const card = [...document.querySelectorAll("#rosterList .rost")].find((c) => /Maya/.test(c.textContent));
+      if (!card) return finish({ schoolTests: { error: "no roster card for Maya" } });
+      var rosterSub = card.querySelector(".rsub").textContent;
+      card.click();
+      root = () => $("#modalTests");
+    }
+    setTimeout(() => {
+      if (!root()) return finish({ schoolTests: { error: "no tests section" } });
+      const rows = [...root().querySelectorAll(".st-row")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
+      const timeline = [...document.querySelectorAll("#studentModal .lesson-hist .li")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
+      const stats = [...document.querySelectorAll(isStudent ? "#myProgress .pf-stat" : "#studentModal .pf-stat")].map((r) => r.textContent.replace(/\s+/g, " ").trim());
+      const charts = [...document.querySelectorAll(isStudent ? "#myProgress .pf-chart" : "#studentModal .pf-chart")].map((c) => ({
+        title: c.querySelector("h4").textContent, svg: !!c.querySelector("svg"),
+        tips: [...c.querySelectorAll("title")].map((t) => t.textContent) }));
+      const week = { total: $("#rosterWeek") ? $("#rosterWeek").textContent : "",
+        perStudent: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-week .rc-num") && r.querySelector(".rc-week .rc-num").textContent]) };
+      const way = isStudent ? [...document.querySelectorAll("#myProgress .stu-way, #myProgress .stu-wins")].map((x) => x.textContent.replace(/\s+/g, " ").trim()) : [];
+      let detail = null;
+      const opener = !isStudent && document.querySelector('#studentModal [data-pfopen="a"]');
+      if (opener) {
+        opener.click();
+        const m = $("#lessonModal");
+        detail = { hidden: m.hidden, title: m.querySelector("h2") && m.querySelector("h2").textContent,
+          kpis: [...m.querySelectorAll(".pd-kpi")].map((k) => k.textContent.replace(/\s+/g, " ").trim()),
+          table: [...m.querySelectorAll(".pd-tbl tbody tr")].map((t) => t.textContent.replace(/\s+/g, " ").trim()) };
+        const chip = m.querySelector('[data-s="grammar"]'); if (chip) chip.click();
+        detail.grammarRows = m.querySelectorAll(".pd-tbl tbody tr").length;
+        const kc = m.querySelector('[data-k="c"]'); if (kc) kc.click();
+        detail.skillTitle = m.querySelector("h2").textContent;
+        detail.skillBars = [...m.querySelectorAll("#pdBox path[data-k]")].length;
+        document.querySelector("#pdX").click();
+      }
+      root().querySelector("#testAdd").click();
+      setTimeout(() => {
+        const r = root();
+        r.querySelector("#tfDate").value = "2026-12-01";
+        r.querySelector("#tfTopic").value = "Past tenses";
+        r.querySelector("#tfGrade").value = "2";
+        r.querySelector("#testForm").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+        setTimeout(() => {
+          const post = apiCalls.find((c) => c.url.endsWith("/api/school-tests/") && c.method === "POST");
+          const after = [...root().querySelectorAll(".st-row")].map((x) => x.textContent.replace(/\s+/g, " ").trim());
+          finish({ schoolTests: { rows, timeline, stats, charts, week, way, detail, rosterSub: rosterSub || null, post: post ? post.body : null, after } });
+        }, 80);
+      }, 40);
+    }, 80);
+    return;
+  }
+
+  if (doMethods) {
+    // Tutor: open the Methoden tab, filter by a situation, open one method.
+    const tab = document.querySelector('.tab[data-view="methods"]');
+    if (tab) tab.click();
+    setTimeout(() => {
+      const q = (s) => [...document.querySelectorAll(s)];
+      const groups = q("#methodsContent .me-group-h h2").map((h) => h.textContent.trim());
+      const total = q("#methodsContent .me-card").length;
+      document.querySelector('#methodsContent [data-meth-f="sprechen"]').click();
+      const speaking = q("#methodsContent .me-name").map((n) => n.textContent.trim());
+      document.querySelector('#methodsContent [data-meth="korrektur"]').click();
+      const open = document.querySelector('#methodsContent .me-card.open');
+      const openName = open ? open.querySelector(".me-name").textContent.trim() : null;
+      const steps = open ? open.querySelectorAll(".me-body ol li").length : 0;
+      const search = document.querySelector("#methodSearch");
+      search.value = "Shadowing";
+      search.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+      const found = q("#methodsContent .me-name").map((n) => n.textContent.trim());
+      finish({ methods: { groups, total, speaking, openName, steps, found } });
+    }, 80);
+    return;
+  }
+
+  if (doMaterials) {
+    // Tutor: open the Lernmaterialien tab (A1 is shown first).
+    const tab = document.querySelector('.tab[data-view="materials"]');
+    if (tab) tab.click();
+    setTimeout(() => {
+      const skills = [...document.querySelectorAll("#materialsContent .mat-sec-h h3")].map((h) => h.textContent.trim());
+      const topics = [...document.querySelectorAll("#materialsContent .mat-topic-t")].map((t) => t.textContent.trim());
+      finish({ materials: { skills, topics } });
     }, 80);
     return;
   }

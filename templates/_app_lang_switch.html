@@ -1,0 +1,11 @@
+{% comment %}
+  Floating DE/EN switch for the login and payment-link pages (the app itself
+  has it in the user menu). Shows the language you can switch to.
+{% endcomment %}<button type="button" class="app-lang" data-no-i18n {% if LANGUAGE_CODE == "en" %}data-set-lang="de" lang="de" title="Auf Deutsch anzeigen">DE{% else %}data-set-lang="en" lang="en" title="Show in English">EN{% endif %}</button>
+<style>
+  .app-lang { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 14px; z-index: 100;
+    font: 600 13px/1 var(--font-body, ui-sans-serif, system-ui, sans-serif); letter-spacing: 0.05em;
+    color: var(--muted, #6e7d6e); padding: 8px 11px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line, rgba(36,53,40,0.16)); background: rgba(251,248,241,0.7); }
+  .app-lang:hover { color: var(--ink, #243528); background: rgba(251,248,241,0.95); }
+</style>

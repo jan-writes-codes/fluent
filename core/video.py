@@ -230,6 +230,9 @@ def attach_call_link(booking_id):
     no longer configured, or a link is already set (never overwrite a link a
     tutor pasted by hand). Any provider failure is logged and swallowed — the
     booking itself must never fail because a video provider is down."""
+    # One fixed link for every lesson (LESSON_CALL_LINK): no meetings to create.
+    if settings.LESSON_CALL_LINK:
+        return
     booking = Booking.objects.filter(pk=booking_id).select_related("tutor").first()
     if not booking or booking.call_link or not booking.tutor_id:
         return

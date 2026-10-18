@@ -1,0 +1,19 @@
+Cancelled: your {% if is_intro %}trial lesson{% else %}English lesson{% endif %}
+
+Hi {{ person_first }},
+
+your {% if is_intro %}trial lesson{% else %}English lesson{% endif %} with {{ tutor_first }} has been cancelled.
+
+Date:  {{ when }}
+Tutor: {{ tutor_first }}
+{% if not is_intro %}{% if refunded %}
+The credit has been returned to your balance.{% else %}
+Since the lesson was cancelled less than 24 hours in advance, the credit
+was not refunded.{% endif %}
+{% endif %}
+You can book a new time whenever you like:
+{{ site_home }}{% if is_intro %}/intro/{% endif %}
+--
+The Green Pencil · English tutoring · Vienna, Austria
+Legal notice: {{ site_home }}/impressum/
+Privacy:      {{ site_home }}/datenschutz/

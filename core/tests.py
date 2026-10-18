@@ -23,7 +23,9 @@ Map of bug -> guarding test:
   * identity always shows Maya ........... DomRoleTests.test_identity_*
 """
 import hashlib
+from decimal import Decimal
 import hmac
+import io
 import json
 import os
 import re
@@ -36,7 +38,9 @@ import tempfile
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 
 from unittest import mock
+from urllib.parse import unquote
 
+from django.conf import settings as dj_settings
 from django.core.cache import cache
 from django.test import TestCase as _DjangoTestCase, Client, override_settings
 from django.utils import timezone
@@ -45,7 +49,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from .models import (
     User, Booking, Receipt, CreditTransaction, ActiveLesson, LessonFile,
-    SiteSettings, AvailabilityOverride, ErrorCard, SessionExercise, SessionFile,
+    SiteSettings, AvailabilityOverride, ErrorCard, SessionExercise, SessionFile, CurriculumTopic,
+    SchoolTest,
 )
 
 
@@ -374,6 +379,54 @@ class ProfilePhotoPersistenceTests(FluentDataMixin, TestCase):
         self.assertIsNone(self.maya.photo)
 
 
+class EmojiAvatarTests(FluentDataMixin, TestCase):
+    def put_avatar(self, slug, body):
+        return self.client.put(f"/api/users/{slug}/avatar/", data=json.dumps(body),
+                               content_type="application/json")
+
+    def test_student_sets_own_avatar_and_it_replaces_photo(self):
+        self.maya.photo = "data:image/png;base64,iVBORw0KGgo="
+        self.maya.save()
+        self.client.force_login(self.maya)
+        resp = self.put_avatar("maya", {"emoji": "🦊", "bg": "#F6C945"})
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual((self.maya.avatar_emoji, self.maya.avatar_bg), ("🦊", "#f6c945"))
+        self.assertIsNone(self.maya.photo)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload["currentUser"]["avatarEmoji"], "🦊")
+        self.assertEqual(payload["currentUser"]["avatarBg"], "#f6c945")
+
+    def test_tutor_sets_student_avatar_and_can_reset(self):
+        self.client.force_login(self.davit)
+        self.assertEqual(self.put_avatar("ines", {"emoji": "🐼", "bg": "#8fb8f2"}).status_code, 200)
+        self.assertEqual(self.put_avatar("ines", {"emoji": ""}).status_code, 200)
+        self.ines.refresh_from_db()
+        self.assertEqual((self.ines.avatar_emoji, self.ines.avatar_bg), ("", ""))
+
+    def test_tutor_sets_own_avatar(self):
+        self.client.force_login(self.davit)
+        self.assertEqual(self.put_avatar("davit", {"emoji": "🦉", "bg": "#2f8a4d"}).status_code, 200)
+        self.davit.refresh_from_db()
+        self.assertEqual(self.davit.avatar_emoji, "🦉")
+
+    def test_student_cannot_set_someone_elses_avatar(self):
+        self.client.force_login(self.maya)
+        self.assertEqual(self.put_avatar("ines", {"emoji": "🐼", "bg": "#8fb8f2"}).status_code, 403)
+        self.assertEqual(self.put_avatar("davit", {"emoji": "🐼", "bg": "#8fb8f2"}).status_code, 403)
+
+    def test_tutor_cannot_set_another_tutors_avatar(self):
+        other = make_user("ana", "tutor", first_name="Ana", last_name="T")
+        self.client.force_login(self.davit)
+        self.assertEqual(self.put_avatar(other.slug, {"emoji": "🐼", "bg": "#8fb8f2"}).status_code, 403)
+
+    def test_rejects_text_and_bad_colours(self):
+        self.client.force_login(self.maya)
+        self.assertEqual(self.put_avatar("maya", {"emoji": "<b>", "bg": "#ffffff"}).status_code, 400)
+        self.assertEqual(self.put_avatar("maya", {"emoji": "🦊", "bg": "red;x:y"}).status_code, 400)
+        self.assertEqual(self.put_avatar("maya", {"emoji": "🦊" * 20, "bg": "#ffffff"}).status_code, 400)
+
+
 # --------------------------------------------------------------------------- #
 # Booking persistence + cross-user visibility  (Bug A, backend half)
 # --------------------------------------------------------------------------- #
@@ -417,6 +470,35 @@ class BookingPersistenceTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Booking.objects.filter(student=self.maya, time="15:00").exists())
+
+    def test_backdated_lesson_sends_no_emails(self):
+        # A "nachgetragene" lesson already happened: no booking confirmation with
+        # a cancel link for the student and no notice for the tutor.
+        from django.core import mail
+        from django.utils import timezone
+        self.maya.email = "maya@example.com"; self.maya.save()
+        self.davit.email = "davit@example.com"; self.davit.save()
+        self.client.force_login(self.davit)
+        mail.outbox.clear()
+        d = (timezone.localdate() - timedelta(days=2)).isoformat()
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 0)
+        # A future booking by the tutor still confirms to both.
+        d = (timezone.localdate() + timedelta(days=2)).isoformat()
+        resp = self.client.post(
+            "/api/bookings/",
+            data=json.dumps({"studentSlug": "maya", "tutorSlug": "davit",
+                             "date": d, "time": "15:00", "title": "English session"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
 
     def test_tutor_backdate_beyond_30_days_is_rejected(self):
         from django.utils import timezone
@@ -972,6 +1054,14 @@ class LessonFileTests(FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(LessonFile.objects.count(), 0)
 
+    def test_oversize_request_refused_before_body_is_read(self):
+        self.client.force_login(self.davit)
+        with mock.patch("core.middleware.MAX_UPLOAD_REQUEST_BYTES", 100):
+            resp = self._upload()
+        self.assertEqual(resp.status_code, 413)
+        self.assertIn("zu groß", resp.json()["error"])
+        self.assertEqual(LessonFile.objects.count(), 0)
+
     def test_student_cannot_upload_or_delete(self):
         self.client.force_login(self.davit)
         lf_id = self._upload().json()["id"]
@@ -1017,6 +1107,74 @@ class LessonFileTests(FluentDataMixin, TestCase):
         self.assertFalse(LessonFile.objects.filter(pk=lf_id).exists())
 
 
+class CurriculumTopicTests(FluentDataMixin, TestCase):
+    def test_existing_lessons_are_seeded_as_topics(self):
+        self.assertEqual(CurriculumTopic.objects.count(), 20)
+        t = CurriculumTopic.objects.get(lesson_id="a1-2")
+        self.assertEqual((t.level, t.skill, t.title), ("A1", "grammar", "The present simple"))
+
+    def test_payload_carries_topics(self):
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertIn({"id": "a1-2", "level": "A1", "skill": "grammar", "t": "The present simple"}, payload["topics"])
+
+    def test_tutor_adds_topic_and_can_unlock_and_upload(self):
+        self.client.force_login(self.davit)
+        r = self.client.post("/api/topics/", {"level": "B2", "skill": "liu", "title": "  Word formation  "},
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        t = r.json()
+        self.assertEqual((t["level"], t["skill"], t["t"]), ("B2", "liu", "Word formation"))
+        self.assertTrue(t["id"].startswith("b2-"))
+        self.assertEqual(self.client.post(f"/api/lessons/maya/", {"lessonId": t["id"], "on": True},
+                                          content_type="application/json").status_code, 200)
+        self.assertTrue(ActiveLesson.objects.filter(student=self.maya, lesson_id=t["id"]).exists())
+        up = self.client.post(f"/api/lesson-files/{t['id']}/",
+                              {"file": SimpleUploadedFile("wf.pdf", b"%PDF-1.4", content_type="application/pdf")})
+        self.assertEqual(up.status_code, 200)
+
+    def test_invalid_topic_rejected(self):
+        self.client.force_login(self.davit)
+        for body in ({"level": "C2", "skill": "liu", "title": "x"},
+                     {"level": "A1", "skill": "maths", "title": "x"},
+                     {"level": "A1", "skill": "reading", "title": "  "}):
+            r = self.client.post("/api/topics/", body, content_type="application/json")
+            self.assertEqual(r.status_code, 400, body)
+        self.assertEqual(CurriculumTopic.objects.count(), 20)
+
+    def test_upload_to_unknown_topic_rejected(self):
+        self.client.force_login(self.davit)
+        r = self.client.post("/api/lesson-files/zz-nope/",
+                             {"file": SimpleUploadedFile("a.pdf", b"%PDF-1.4", content_type="application/pdf")})
+        self.assertEqual(r.status_code, 404)
+
+    def test_rename_and_move_topic(self):
+        self.client.force_login(self.davit)
+        r = self.client.patch("/api/topics/a1-1/", {"title": "Hello!", "skill": "listening"},
+                              content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        t = CurriculumTopic.objects.get(lesson_id="a1-1")
+        self.assertEqual((t.title, t.skill, t.level), ("Hello!", "listening", "A1"))
+
+    def test_delete_topic_removes_files_and_unlocks(self):
+        ActiveLesson.objects.create(student=self.maya, lesson_id="a1-3")
+        LessonFile.objects.create(lesson_id="a1-3", original_name="n.pdf", data=b"%PDF", size=4)
+        self.client.force_login(self.davit)
+        self.assertEqual(self.client.delete("/api/topics/a1-3/").status_code, 200)
+        self.assertFalse(CurriculumTopic.objects.filter(lesson_id="a1-3").exists())
+        self.assertFalse(ActiveLesson.objects.filter(lesson_id="a1-3").exists())
+        self.assertFalse(LessonFile.objects.filter(lesson_id="a1-3").exists())
+
+    def test_student_cannot_manage_topics(self):
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.post("/api/topics/", {"level": "A1", "skill": "reading", "title": "x"},
+                                          content_type="application/json").status_code, 403)
+        self.assertEqual(self.client.patch("/api/topics/a1-1/", {"title": "x"},
+                                           content_type="application/json").status_code, 403)
+        self.assertEqual(self.client.delete("/api/topics/a1-1/").status_code, 403)
+        self.assertTrue(CurriculumTopic.objects.filter(lesson_id="a1-1").exists())
+
+
 # --------------------------------------------------------------------------- #
 # Frontend (jsdom) tests — run the real init script in a headless DOM
 # --------------------------------------------------------------------------- #
@@ -1051,7 +1209,7 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 "to enable frontend tests"
             )
 
-    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False):
+    def run_probe(self, user, book=False, tz=None, admin_rename=False, admin_save=False, admin_pricing=False, learning=False, preview=False, admin_add_tutor=False, buy=False, quick_adds=False, materials=False, methods=False, school_tests=False):
         self._skip_if_unavailable()
         self.client.force_login(user)
         html = self.client.get(reverse("app")).content.decode()
@@ -1081,6 +1239,12 @@ class _DomProbeBase(FluentDataMixin, TestCase):
                 cmd.append("--buy")
             if quick_adds:
                 cmd.append("--quick-adds")
+            if materials:
+                cmd.append("--materials")
+            if methods:
+                cmd.append("--methods")
+            if school_tests:
+                cmd.append("--school-tests")
             out = subprocess.run(
                 cmd, capture_output=True, text=True, env=env, timeout=60
             )
@@ -1095,8 +1259,8 @@ class _DomProbeBase(FluentDataMixin, TestCase):
 
 class DomRoleTests(_DomProbeBase):
     EXPECTED = {
-        "maya":  ("Maya Karlsson", {"book", "account", "lessons", "files", "errors"}),
-        "davit": ("Davit Petrosyan", {"teacher", "students"}),
+        "maya":  ("Maya Karlsson", {"book", "account", "lessons", "homework", "files", "errors"}),
+        "davit": ("Davit Petrosyan", {"teacher", "students", "materials", "methods"}),
         "admin": ("Studio Admin", {"admin"}),
     }
 
@@ -1191,7 +1355,7 @@ class DomAdminTests(_DomProbeBase):
         # A newly added student must open in the *student* editor — not the tutor
         # mask (the bug: the locally-mirrored account had no role, so it rendered
         # as a tutor with no credits/billing fields).
-        self.assertEqual(s["editorRole"], "Schüler")
+        self.assertEqual(s["editorRole"], "Schüler*in")
         self.assertTrue(s["hasOpeningField"], "student editor must show the opening-balance control")
         self.assertTrue(s["hasRemoveStudent"], "student editor must offer 'Schüler entfernen'")
 
@@ -1242,6 +1406,29 @@ class DomLessonTests(_DomProbeBase):
         r = self.run_probe(self.davit, preview=True)
         self.assertEqual(r["initErrors"], [])
         self.assertIn(f"/api/lesson-files/download/{lf.pk}/", r["preview"]["fileLinks"])
+
+    def test_tutor_materials_tab_lists_skill_sections(self):
+        CurriculumTopic.objects.create(lesson_id="a1-test", level="A1", skill="listening", title="Airport announcements")
+        r = self.run_probe(self.davit, materials=True)
+        self.assertEqual(r["initErrors"], [])
+        m = r["materials"]
+        self.assertEqual(m["skills"], ["Listening", "Reading", "Grammar", "Language in Use", "Writing", "Speaking"])
+        self.assertIn("Airport announcements", m["topics"])
+        self.assertIn("The present simple", m["topics"])
+
+
+class DomMethodsTests(_DomProbeBase):
+    def test_tutor_methods_tab_filters_and_opens(self):
+        r = self.run_probe(self.davit, methods=True)
+        self.assertEqual(r["initErrors"], [])
+        m = r["methods"]
+        self.assertEqual(m["groups"], ["Die sechs Grundstrategien", "Speziell für Englisch", "Motivation und Selbststeuerung"])
+        self.assertEqual(m["total"], 15)
+        self.assertIn("Fehler richtig korrigieren", m["speaking"])
+        self.assertNotIn("Verteilte Wiederholung", m["speaking"])
+        self.assertEqual(m["openName"], "Fehler richtig korrigieren")
+        self.assertEqual(m["steps"], 3)
+        self.assertEqual(m["found"], ["Nachsprechen"])
 
 
 class DomQuickAddTests(_DomProbeBase):
@@ -1896,6 +2083,30 @@ class BookingSlotValidationTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json()["error"], "slot_closed")
 
+    def test_tutor_can_book_and_move_into_closed_slot(self):
+        # Closed only means students can't book it; the tutor may put anyone in.
+        for t in ("11:00", "12:00"):
+            AvailabilityOverride.objects.create(
+                tutor=self.davit, date=date(2026, 7, 3), time=t, is_open=False)
+        resp = self._post(self.davit, "maya", "2026-07-03", "11:00")
+        self.assertEqual(resp.status_code, 200)
+        b = Booking.objects.get(student=self.maya, date=date(2026, 7, 3), time="11:00")
+        resp = self.client.put(f"/api/bookings/{b.pk}/", data=json.dumps({"time": "12:00"}),
+                               content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual(b.time, "12:00")
+
+    def test_tutor_moves_lesson_to_another_day(self):
+        self._post(self.davit, "maya", "2026-07-03", "09:00")
+        b = Booking.objects.get(student=self.maya, date=date(2026, 7, 3), time="09:00")
+        resp = self.client.put(f"/api/bookings/{b.pk}/",
+                               data=json.dumps({"date": "2026-07-06", "time": "15:00"}),
+                               content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual((b.date, b.time), (date(2026, 7, 6), "15:00"))
+
     def test_cannot_reschedule_onto_taken_slot(self):
         self._post(self.maya, "maya", "2026-07-04", "09:00")
         self._post(self.ines, "ines", "2026-07-04", "10:00")
@@ -2093,35 +2304,61 @@ class SecurityHardeningTests(FluentDataMixin, TestCase):
         env["DJANGO_SECRET_KEY"] = "k" * 50
         self.assertEqual(run().stdout.strip(), "False")   # DEBUG defaults off on Render
 
+    def test_call_link_must_be_a_web_link(self):
+        self.client.force_login(self.davit)
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=7), time="09:30")
+        put = lambda link: self.client.put(f"/api/bookings/{b.pk}/", data=json.dumps({"callLink": link}),
+                                           content_type="application/json")
+        for bad in ("javascript:alert(document.cookie)", "JavaScript:alert(1)", "data:text/html,x"):
+            self.assertEqual(put(bad).status_code, 400, bad)
+        b.refresh_from_db()
+        self.assertEqual(b.call_link, "")
+        self.assertEqual(put("zoom.us/j/123").status_code, 200)   # bare host gets https://
+        b.refresh_from_db()
+        self.assertEqual(b.call_link, "https://zoom.us/j/123")
+        self.assertEqual(put("").status_code, 200)
+        b.refresh_from_db()
+        self.assertEqual(b.call_link, "")
+
+    def test_pages_send_a_content_security_policy(self):
+        for url in ("/", "/login/"):
+            csp = self.client.get(url).headers.get("Content-Security-Policy", "")
+            self.assertIn("default-src 'self'", csp, url)
+            self.assertIn("object-src 'none'", csp, url)
+            self.assertIn("frame-ancestors 'none'", csp, url)
+            self.assertNotIn("'unsafe-eval'", csp, url)
+            self.assertIn("'wasm-unsafe-eval'", csp, url)   # in-browser OCR of scanned PDFs
+            self.assertIn("worker-src 'self'", csp, url)
+
+    def test_pdf_viewer_runs_with_eval_disabled(self):
+        # CVE-2024-4367: pdf.js 3.x compiles font glyphs with eval unless told not to.
+        self.client.force_login(self.maya)
+        html = self.client.get("/app/").content.decode()
+        self.assertIn("isEvalSupported: false", html)
+
+    def test_throttle_counts_are_shared_through_the_database(self):
+        from django.db import connection
+        self.assertEqual(dj_settings.CACHES["default"]["BACKEND"],
+                         "django.core.cache.backends.db.DatabaseCache")
+        self.assertIn("django_cache", connection.introspection.table_names())
+
 
 # --------------------------------------------------------------------------- #
 # Buy-credits modal: tutor choice by e-mail (DOM)
 # --------------------------------------------------------------------------- #
 class DomBuyModalTests(_DomProbeBase):
-    def test_single_tutor_mail_targets_that_tutor(self):
-        # Only davit exists: no picker, and the e-mail link targets his address.
+    @override_settings(TUTOR_WHATSAPP="436763975535")
+    def test_write_to_tutor_opens_whatsapp(self):
+        # "Tutor schreiben" opens a WhatsApp chat with the request typed in,
+        # not an e-mail.
         r = self.run_probe(self.maya, buy=True)
         self.assertEqual(r["initErrors"], [])
         b = r["buy"]
-        self.assertFalse(b["hasTutorSelect"], "one tutor needs no picker")
-        self.assertTrue(b["mailHref"].startswith("mailto:davit@fluent.at"),
-                        f"mail link must target the tutor: {b['mailHref']}")
-        self.assertEqual(b["contactEmail"], "davit@fluent.at")
-
-    def test_multiple_tutors_offer_choice_by_email(self):
-        # A second tutor in the system must appear in the picker, listed by e-mail,
-        # and the contact e-mail must be a real tutor address (not a hard-coded one).
-        make_user("berta", "tutor", first_name="Berta", last_name="Klein", initials="BK")
-        r = self.run_probe(self.maya, buy=True)
-        self.assertEqual(r["initErrors"], [])
-        b = r["buy"]
-        self.assertTrue(b["hasTutorSelect"], "two tutors must produce a picker")
-        joined = " ".join(b["selectOptions"])
-        self.assertIn("davit@fluent.at", joined)
-        self.assertIn("berta@fluent.at", joined)
-        self.assertIn(b["contactEmail"], {"davit@fluent.at", "berta@fluent.at"})
-        self.assertTrue(b["mailHref"].startswith("mailto:"))
-        self.assertIn(b["contactEmail"], b["mailHref"])
+        self.assertFalse(b["hasTutorSelect"])
+        self.assertTrue(b["mailHref"].startswith("https://wa.me/436763975535?text="),
+                        f"must open WhatsApp: {b['mailHref']}")
+        self.assertIn("Davit", unquote(b["mailHref"]))
 
 
 # --------------------------------------------------------------------------- #
@@ -2194,6 +2431,33 @@ class IntroBookingTests(FluentDataMixin, TestCase):
         # One per tutor: the same guest may still try a second tutor once.
         ok = self._post(tutorSlug=other.slug, time="14:00")
         self.assertEqual(ok.status_code, 200, ok.content)
+
+    def test_level_check_page_is_public_and_linked(self):
+        resp = self.client.get(reverse("level_check"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Level-Check")
+        self.assertIn('href="/einstufung/"', self.client.get(reverse("landing")).content.decode())
+        self.assertIn("/einstufung/", self.client.get("/sitemap.xml").content.decode())
+
+    def test_level_check_result_lands_on_intro_booking(self):
+        resp = self._post(levelCheck={
+            "level": "B1", "toward": "B2", "gv": "15-18", "rd": "3-4",
+            "speak": "B1", "write": "A2", "listen": "B2",
+        })
+        self.assertEqual(resp.status_code, 200, resp.content)
+        b = Booking.objects.latest("id")
+        self.assertEqual(
+            b.notes,
+            "Level-Check: B1, auf dem Weg zu B2 · Grammatik/Wortschatz 15/18 · Lesen 3/4"
+            " · Selbsteinschätzung: Sprechen B1, Schreiben A2, Hören B2",
+        )
+
+    def test_level_check_ignores_unknown_values(self):
+        self._post(levelCheck={"level": "<b>C2</b>", "gv": "99-1"})
+        self.assertEqual(Booking.objects.latest("id").notes, "")
+        self._post(email="other@example.at", time="15:00",
+                   levelCheck={"level": "A2", "gv": "x", "speak": "<script>"})
+        self.assertEqual(Booking.objects.latest("id").notes, "Level-Check: A2")
 
     def test_booking_error_carries_davit_contact(self):
         self._post(time="14:00")
@@ -2281,7 +2545,7 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
                     tutor=self.davit, date=date(2026, month, day), time=time, is_open=True
                 )
 
-    def _probe(self, iso_now):
+    def _probe(self, iso_now, url=None):
         if not self._node:
             self.skipTest("node not found on PATH — skipping jsdom frontend tests")
         if not self._has_jsdom:
@@ -2289,7 +2553,7 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
                 "jsdom not installed — run `cd tests/frontend && npm install` "
                 "to enable frontend tests"
             )
-        html = self.client.get(reverse("intro")).content.decode()
+        html = self.client.get(url or reverse("intro")).content.decode()
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as fh:
             fh.write(html)
             path = fh.name
@@ -2338,6 +2602,14 @@ class IntroCalendarFrontendTests(FluentDataMixin, TestCase):
         self.assertIn("29", r["dayNumbers"])
         self.assertNotIn("22", r["dayNumbers"])
 
+    def test_english_intro_page_runs(self):
+        # The English page swaps in translated strings (some inside the JS), so
+        # it must still boot and show the same slots as the German one.
+        self._open_davit((6, 24), (6, 25), (6, 26))
+        r = self._probe("2026-06-24T08:00:00", url="/en/intro/")
+        self.assertEqual(r["initErrors"], [], "init must not throw")
+        self.assertEqual(r["slotCount"], 6)
+
     def test_midweek_stays_on_current_week(self):
         # Wed 24 Jun 2026 morning: the current week still has bookable days, so
         # the calendar must not skip ahead and hide today's remaining slots.
@@ -2385,6 +2657,19 @@ class IntroEmailTests(FluentDataMixin, TestCase):
         self.assertEqual(len(ics), 1)
         self.assertIn("BEGIN:VEVENT", ics[0][1])
         self.assertIn("text/calendar", ics[0][2])
+
+    @override_settings(EMAIL_SUBJECT_PREFIX="[TEST] ")
+    def test_subject_prefix_on_test_system(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        self.assertTrue(mail.outbox)
+        for msg in mail.outbox:
+            self.assertTrue(msg.subject.startswith("[TEST] "), msg.subject)
+
+    def test_no_subject_prefix_by_default(self):
+        from django.core import mail
+        self.assertEqual(self._book().status_code, 200)
+        self.assertFalse(any(m.subject.startswith("[") for m in mail.outbox))
 
     @override_settings(TUTOR_NOTIFY_EMAIL="studio@thegreenpencil.at")
     def test_tutor_is_notified_when_configured(self):
@@ -2777,6 +3062,45 @@ class VideoConnectionTests(FluentDataMixin, TestCase):
 # --------------------------------------------------------------------------- #
 # Tutor iCal subscription feed
 # --------------------------------------------------------------------------- #
+class FixedCallLinkTests(FluentDataMixin, TestCase):
+    """LESSON_CALL_LINK: one fixed meeting link for every lesson."""
+
+    def _payload_booking(self, b):
+        self.client.force_login(self.davit)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        return payload, [x for x in payload["bookings"] if x.get("pk") == b.pk][0]
+
+    @override_settings(LESSON_CALL_LINK="https://zoom.us/j/1112223334")
+    def test_lessons_use_fixed_link_unless_they_have_their_own(self):
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        payload, x = self._payload_booking(b)
+        self.assertEqual(payload["lessonCallLink"], "https://zoom.us/j/1112223334")
+        self.assertEqual((x["callLink"], x["callLinkOwn"]), ("https://zoom.us/j/1112223334", ""))
+        b.call_link = "https://meet.example.com/own"
+        b.save()
+        _, x = self._payload_booking(b)
+        self.assertEqual((x["callLink"], x["callLinkOwn"]),
+                         ("https://meet.example.com/own", "https://meet.example.com/own"))
+
+    @override_settings(LESSON_CALL_LINK="https://zoom.us/j/1112223334")
+    def test_no_meeting_created_with_fixed_link(self):
+        from . import video
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        with mock.patch("core.video.create_meeting") as create:
+            video.attach_call_link(b.pk)
+        create.assert_not_called()
+        b.refresh_from_db()
+        self.assertEqual(b.call_link, "")
+        self.assertEqual(b.join_link, "https://zoom.us/j/1112223334")
+
+    def test_without_fixed_link_nothing_changes(self):
+        b = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                   date=date.today() + timedelta(days=3), time="10:00")
+        self.assertEqual(b.join_link, "")
+
+
 class CalendarFeedTests(FluentDataMixin, TestCase):
     def _mint_link(self, as_user=None, body=None):
         self.client.force_login(as_user or self.davit)
@@ -2863,6 +3187,25 @@ class CalendarFeedTests(FluentDataMixin, TestCase):
         resp = self.client.get(f"/calendar/{self.davit.calendar_token}.ics")
         self.assertEqual(resp.status_code, 200)
 
+    def test_feed_lines_are_folded_to_75_octets(self):
+        # RFC 5545 caps content lines at 75 octets; stricter clients (Outlook,
+        # Google) reject or truncate a feed whose long notes run past that.
+        Booking.objects.create(
+            tutor=self.davit, student=self.maya, date=date.today() + timedelta(days=2),
+            time="10:00", title="Englisch",
+            notes="Übung: " + "Präpositionen, Zeitformen; " * 8 + "\r\nZweite Zeile",
+            call_link="https://zoom.us/j/123456789?pwd=" + "x" * 60,
+        )
+        self._mint_link()
+        self.davit.refresh_from_db()
+        body = self.client.get(f"/calendar/{self.davit.calendar_token}.ics").content
+        self.assertTrue(body.endswith(b"\r\n"))
+        lines = body.split(b"\r\n")
+        self.assertTrue(all(len(l) <= 75 for l in lines))
+        unfolded = body.replace(b"\r\n ", b"").decode()
+        self.assertIn("\\nZweite Zeile", unfolded)  # CRLF in notes stays one escaped break
+        self.assertIn("URL:https://zoom.us/j/123456789?pwd=" + "x" * 60, unfolded)
+
 
 # --------------------------------------------------------------------------- #
 # Retroactive cancellation of completed ("Abgeschlossene") lessons
@@ -2899,7 +3242,7 @@ class RetroactiveCancelTests(FluentDataMixin, TestCase):
         self.maya.refresh_from_db()
         self.assertEqual(self.maya.credits, before + 1)
         txn = CreditTransaction.objects.filter(student=self.maya).latest("id")
-        self.assertEqual(txn.label, "Stunde rückwirkend storniert — Einheit erstattet")
+        self.assertEqual(txn.label, "Stunde rückwirkend storniert, Einheit erstattet")
         self.assertEqual(txn.amount, 1)
         # Full transparency: the entry names who undid it and which lesson.
         self.assertIn("von Studio Admin", txn.sub)
@@ -2923,7 +3266,7 @@ class RetroactiveCancelTests(FluentDataMixin, TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(resp.json()["retroactive"])
         txn = CreditTransaction.objects.filter(student=self.maya).latest("id")
-        self.assertEqual(txn.label, "Buchung storniert — Einheit erstattet")
+        self.assertEqual(txn.label, "Buchung storniert, Einheit erstattet")
         self.assertNotIn("von ", txn.sub)
         # A genuinely upcoming lesson still notifies both sides.
         self.assertGreater(len(mail.outbox), 0)
@@ -3022,6 +3365,31 @@ class PasswordLifecycleTests(FluentDataMixin, TestCase):
         self.assertTrue(self.maya.check_password("brand-new-pass"))
         # Same session keeps working (update_session_auth_hash) — no re-login.
         self.assertEqual(self.client.get(reverse("app")).status_code, 200)
+
+    def test_forced_change_can_set_own_email(self):
+        self.maya.must_change_password = True
+        self.maya.save()
+        self._login("maya@fluent.at", "password")
+        page = self.client.get(reverse("login"))
+        self.assertContains(page, 'id="newEmail"')
+        resp = self._json_post("/api/password/change/",
+                               {"password": "brand-new-pass", "email": " Maya.K@Example.com "})
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.email, "maya.k@example.com")
+        self.assertFalse(self.maya.must_change_password)
+        # The new address is now the login.
+        self.client.logout()
+        self.assertEqual(self._login("maya.k@example.com", "brand-new-pass").status_code, 200)
+
+    def test_forced_change_rejects_bad_or_taken_email(self):
+        self.client.force_login(self.maya)
+        for bad in ("not-an-email", "davit@fluent.at"):
+            resp = self._json_post("/api/password/change/", {"password": "brand-new-pass", "email": bad})
+            self.assertEqual(resp.status_code, 400)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.email, "maya@fluent.at")
+        self.assertTrue(self.maya.check_password("password"))
 
     def test_change_password_validation(self):
         self.client.force_login(self.maya)
@@ -3171,7 +3539,7 @@ class CustomTopUpTests(FluentDataMixin, TestCase):
         self.assertIsNone(receipt.total_cents)
         self.assertEqual(r["total"], 5 * receipt.unit_price_cents)
         txn = CreditTransaction.objects.get(receipt_no=r["no"])
-        self.assertEqual((txn.label, txn.sub), ("Einheiten vom Tutor", "Heute · bar bezahlt"))
+        self.assertEqual((txn.label, txn.sub), ("Einheiten von Tutor*in", "Heute · bar bezahlt"))
 
     def test_zero_total_allowed(self):
         r = self._post({"n": 2, "total": "0"}).json()["receipt"]
@@ -3366,7 +3734,7 @@ class BookingRequestTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(self.maya.credits, start)               # refunded
         self.assertTrue(any("Abgelehnt" in m.subject for m in mail.outbox))
         txn = CreditTransaction.objects.filter(student=self.maya).latest("id")
-        self.assertEqual((txn.amount, txn.label), (1, "Anfrage abgelehnt — Einheit erstattet"))
+        self.assertEqual((txn.amount, txn.label), (1, "Anfrage abgelehnt, Einheit erstattet"))
         self.assertEqual(self._book(actor=self.ines, student="ines").status_code, 200)
 
     def test_only_own_tutor_or_admin_may_answer(self):
@@ -3472,6 +3840,97 @@ class LessonSummaryTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(self.b.summary, "")
 
 
+class LessonPdfTests(FrozenTodayMixin, FluentDataMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.b = Booking.objects.create(
+            student=self.maya, tutor=self.davit, date=date(2026, 5, 28), time="09:00",
+            title="Past tenses", summary="We compared present perfect → past simple.",
+            homework="Workbook p. 12", tutor_notes="PRIVATE: tired today",
+        )
+        ErrorCard.objects.create(student=self.maya, booking=self.b, tutor=self.davit,
+                                 front="I have seen him yesterday.", back="I saw him yesterday.")
+        ErrorCard.objects.create(student=self.maya, booking=self.b, tutor=self.davit,
+                                 kind="vocab", front="reluctantly", back="widerwillig 🙂")
+        SessionExercise.objects.create(booking=self.b, title="Unit 7, Ex 2",
+                                       link="https://example.com/ex")
+
+    def _get(self, user, pk=None):
+        self.client.force_login(user)
+        return self.client.get(f"/api/bookings/{pk or self.b.pk}/pdf/")
+
+    def test_tutor_and_own_student_get_a_pdf(self):
+        for user in (self.davit, self.maya, self.admin):
+            resp = self._get(user)
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp["Content-Type"], "application/pdf")
+            self.assertTrue(resp.content.startswith(b"%PDF"))
+            self.assertIn("Stunde-2026-05-28-Maya.pdf", resp["Content-Disposition"])
+
+    def test_other_student_cannot_get_it(self):
+        self.assertEqual(self._get(self.ines).status_code, 404)
+
+    def test_requires_auth(self):
+        self.assertEqual(self.client.get(f"/api/bookings/{self.b.pk}/pdf/").status_code, 401)
+
+    def test_private_notes_stay_out(self):
+        from reportlab import rl_config
+        from core.lesson_pdf import render_lesson_pdf
+        with mock.patch.object(rl_config, "pageCompression", 0):  # readable page text
+            raw = render_lesson_pdf(self.b)
+        self.assertIn(b"reluctantly", raw)
+        self.assertIn(b"Workbook p. 12", raw)
+        self.assertNotIn(b"PRIVATE", raw)
+
+    def test_empty_lesson_still_renders(self):
+        empty = Booking.objects.create(student=self.maya, tutor=self.davit,
+                                       date=date(2026, 5, 29), time="09:00")
+        self.assertEqual(self._get(self.davit, empty.pk).status_code, 200)
+
+    @staticmethod
+    def _sheet(pages=2, rotate=0):
+        from reportlab.pdfgen import canvas
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf)
+        for n in range(pages):
+            c.setPageRotation(rotate)
+            c.drawString(72, 700, f"Worksheet page {n + 1}")
+            c.showPage()
+        c.save()
+        return buf.getvalue()
+
+    def _pages(self, resp):
+        from pypdf import PdfReader
+        return len(PdfReader(io.BytesIO(resp.content)).pages)
+
+    def test_worksheets_follow_the_overview_with_highlights(self):
+        overview = self._pages(self._get(self.davit))
+        sheet = SessionFile.objects.create(booking=self.b, kind="worksheet", name="Unit7.pdf",
+                                           data=self._sheet(rotate=90), size=1)
+        ErrorCard.objects.create(student=self.maya, booking=self.b, kind="vocab", front="bypass",
+                                 back="Umfahrung", source_file=sheet, page=2,
+                                 rects=[[0.1, 0.2, 0.15, 0.02], ["bad"]])
+        resp = self._get(self.maya)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._pages(resp), overview + 2)
+
+    def test_linked_material_and_broken_or_other_files(self):
+        overview = self._pages(self._get(self.davit))
+        lf = LessonFile.objects.create(lesson_id="a1-g-01", original_name="Lib.pdf",
+                                       data=self._sheet(pages=1), size=1)
+        SessionFile.objects.create(booking=self.b, kind="worksheet", name="Lib.pdf",
+                                   data=None, material=lf, size=1)
+        SessionFile.objects.create(booking=self.b, kind="worksheet", name="broken.pdf",
+                                   data=b"not a pdf", size=1)
+        SessionFile.objects.create(booking=self.b, kind="worksheet", name="list.docx",
+                                   data=b"x", size=1)
+        SessionFile.objects.create(booking=self.b, kind="homework", name="hw.pdf",
+                                   data=self._sheet(pages=1), size=1)
+        resp = self._get(self.davit)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self._pages(resp), overview + 1)  # only the library sheet
+
+
 class ErrorCardTests(FrozenTodayMixin, FluentDataMixin, TestCase):
     def setUp(self):
         super().setUp()
@@ -3568,6 +4027,83 @@ class SessionPageTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.client.force_login(actor)
         payload = extract_payload(self.client.get(reverse("app")).content.decode())
         return [x for x in payload["bookings"] if x.get("pk") == self.b.pk][0]
+
+    def _material(self, content=b"%PDF-1.4 library"):
+        return LessonFile.objects.create(lesson_id="a1-1", original_name="lib.pdf", data=content,
+                                         size=len(content), content_type="application/pdf")
+
+    def test_material_linked_into_lesson_without_copy(self):
+        lf = self._material()
+        r = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk})
+        self.assertEqual(r.status_code, 200)
+        f = r.json()["file"]
+        self.assertEqual((f["name"], f["kind"], f["materialId"]), ("lib.pdf", "worksheet", lf.pk))
+        sf = SessionFile.objects.get(pk=f["id"])
+        self.assertIsNone(sf.data)  # stored once, in the library
+        # Importing again doesn't add a second copy.
+        again = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk})
+        self.assertEqual(again.json()["file"]["id"], f["id"])
+        self.assertEqual(SessionFile.objects.filter(booking=self.b).count(), 1)
+        # The student downloads it from the lesson, even without the topic unlocked.
+        self.client.force_login(self.maya)
+        dl = self.client.get(f["url"])
+        self.assertEqual(dl.status_code, 200)
+        self.assertEqual(b"".join(dl.streaming_content) if dl.streaming else dl.content, b"%PDF-1.4 library")
+
+    def test_deleting_material_keeps_linked_lesson_file(self):
+        lf = self._material()
+        fid = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}).json()["file"]["id"]
+        self.client.force_login(self.davit)
+        self.assertEqual(self.client.delete(f"/api/lesson-files/{lf.pk}/").status_code, 200)
+        sf = SessionFile.objects.get(pk=fid)
+        self.assertIsNone(sf.material_id)
+        self.assertEqual(bytes(sf.data), b"%PDF-1.4 library")
+        self.assertEqual(self.client.get(f"/api/session-files/{fid}/").status_code, 200)
+
+    def test_removing_linked_file_from_lesson_keeps_material(self):
+        lf = self._material()
+        fid = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}).json()["file"]["id"]
+        self.assertEqual(self.client.delete(f"/api/session-files/{fid}/").status_code, 200)
+        self.assertTrue(LessonFile.objects.filter(pk=lf.pk).exists())
+
+    def test_student_cannot_import_material(self):
+        lf = self._material()
+        r = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}, actor=self.maya)
+        self.assertEqual(r.status_code, 403)
+
+    def test_tutor_sets_assignment_file(self):
+        self.client.force_login(self.davit)
+        r = self.client.post(f"/api/bookings/{self.b.pk}/files/",
+                             {"file": SimpleUploadedFile("hu.pdf", b"%PDF-1.4 hu"), "kind": "assignment"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["file"]["kind"], "assignment")
+        fid = r.json()["file"]["id"]
+        # Students write on it like on a worksheet.
+        self.client.force_login(self.maya)
+        self.assertEqual(self.client.get(f"/api/session-files/{fid}/annotations/").status_code, 200)
+        # A student's own upload stays their homework, whatever kind they send.
+        r = self.client.post(f"/api/bookings/{self.b.pk}/files/",
+                             {"file": SimpleUploadedFile("mine.pdf", b"%PDF-1.4 m"), "kind": "assignment"})
+        self.assertEqual(r.json()["file"]["kind"], "homework")
+        # The tutor marks words and mistakes in a Hausübung too.
+        self.client.force_login(self.davit)
+        r = self.client.post("/api/error-cards/", data=json.dumps({
+            "kind": "error", "studentSlug": self.maya.slug, "bookingPk": self.b.pk,
+            "front": "I goed", "back": "I went", "fileId": fid, "page": 1,
+            "rects": [[0.1, 0.2, 0.3, 0.03]]}), content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["card"]["fileId"], fid)
+
+    def test_material_imported_as_assignment_and_worksheet(self):
+        lf = self._material()
+        ws = self._json("post", f"/api/bookings/{self.b.pk}/files/import/", {"materialId": lf.pk}).json()["file"]
+        hu = self._json("post", f"/api/bookings/{self.b.pk}/files/import/",
+                        {"materialId": lf.pk, "kind": "assignment"}).json()["file"]
+        self.assertEqual((ws["kind"], hu["kind"]), ("worksheet", "assignment"))
+        self.assertNotEqual(ws["id"], hu["id"])
+        again = self._json("post", f"/api/bookings/{self.b.pk}/files/import/",
+                           {"materialId": lf.pk, "kind": "assignment"}).json()["file"]
+        self.assertEqual(again["id"], hu["id"])
 
     def test_homework_set_by_tutor_ticked_by_student(self):
         self._json("put", f"/api/bookings/{self.b.pk}/", {"homework": "Workbook p. 34"})
@@ -3681,10 +4217,86 @@ class SessionPageTests(FrozenTodayMixin, FluentDataMixin, TestCase):
         self.assertEqual(self.client.get(f"/api/lesson-files/download/{fid}/").content, b"%PDF unit1")
 
 
-class CreateAdminFromEnvTests(TestCase):
-    """`createadmin --from-env` (and its `bootstrap_admin` alias) runs in every Render build."""
+    # ----- pen / highlighter / text notes on a worksheet -----
+    PEN = {"id": "s1", "type": "pen", "page": 1, "color": "#2153A8", "w": 0.003,
+           "pts": [[0.1, 0.1], [0.2, 0.15], [0.3, 0.1]]}
+    NOTE = {"id": "t1", "type": "text", "page": 2, "color": "#c0392b", "x": 0.5, "y": 0.4,
+            "size": 0.022, "text": "Look again!"}
 
-    def _run(self, cmd="createadmin", **env):
+    def _ink(self, fid, body=None, actor=None):
+        url = f"/api/session-files/{fid}/annotations/"
+        if body is None:
+            self.client.force_login(actor or self.davit)
+            return self.client.get(url)
+        return self._json("post", url, body, actor=actor)
+
+    def test_annotations_saved_per_worksheet_and_shared(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        self.assertEqual(self._ink(fid).json(), {"rev": 0, "items": []})
+        r = self._ink(fid, {"add": [self.PEN]})
+        self.assertEqual(r.json()["rev"], 1)
+        item = r.json()["items"][0]
+        self.assertEqual((item["color"], item["role"], item["by"]), ("#2153a8", "tutor", self.davit.pk))
+        # The student adds a note at the same time: both survive.
+        r = self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        self.assertEqual([i["id"] for i in r.json()["items"]], ["s1", "t1"])
+        got = self._ink(fid, actor=self.maya).json()
+        self.assertEqual((got["rev"], len(got["items"])), (2, 2))
+        # Nothing new since rev 2: just the revision.
+        self.client.force_login(self.davit)
+        self.assertEqual(self.client.get(f"/api/session-files/{fid}/annotations/?rev=2").json(), {"rev": 2})
+        self.assertEqual(self._payload_booking(self.maya)["files"][0]["inkRev"], 2)
+        # Other students can't see or draw.
+        self.assertEqual(self._ink(fid, actor=self.ines).status_code, 404)
+        self.assertEqual(self._ink(fid, {"add": [self.PEN]}, actor=self.ines).status_code, 404)
+
+    def test_student_erases_only_own_and_tutor_clears(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        self._ink(fid, {"add": [self.PEN]})
+        self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        r = self._ink(fid, {"remove": ["s1", "t1"]}, actor=self.maya)
+        self.assertEqual([i["id"] for i in r.json()["items"]], ["s1"])
+        self.assertEqual(self._ink(fid, {"clear": True}, actor=self.maya).status_code, 403)
+        # Undo of an erase re-adds the item.
+        self._ink(fid, {"add": [self.NOTE]}, actor=self.maya)
+        self.assertEqual(len(self._ink(fid, {"clear": 2}).json()["items"]), 1)
+        self.assertEqual(self._ink(fid, {"clear": True}).json()["items"], [])
+
+    def test_bad_annotations_refused(self):
+        fid = self._upload(self.davit).json()["file"]["id"]
+        for bad in ({**self.PEN, "type": "circle"}, {**self.PEN, "color": "red"},
+                    {**self.PEN, "page": 0}, {**self.PEN, "pts": []}, {**self.PEN, "pts": [[0.1, "x"]]},
+                    {**self.PEN, "pts": [[0.1, 9]]}, {**self.PEN, "id": "<script>"},
+                    {**self.PEN, "pts": [[0.1, 0.1]] * 1501}, {**self.NOTE, "text": "  "}):
+            self.assertEqual(self._ink(fid, {"add": [bad]}).status_code, 400, bad)
+        self.assertEqual(SessionFile.objects.get(pk=fid).annotations_rev, 0)
+        hw = self._upload(self.maya, name="hw.pdf").json()["file"]["id"]
+        self.assertEqual(self._ink(hw, {"add": [self.PEN]}, actor=self.maya).status_code, 404)
+
+    def test_annotations_in_lesson_pdf(self):
+        from reportlab import rl_config
+        from core.lesson_pdf import render_lesson_pdf
+        sheet = SessionFile.objects.create(booking=self.b, kind="worksheet", name="Unit7.pdf",
+                                           data=LessonPdfTests._sheet(), size=1)
+        sheet.annotations = [
+            {**self.PEN, "by": self.davit.pk},
+            {**self.PEN, "id": "h1", "type": "hl", "color": "#ffe14d", "w": 0.02, "pts": [[0.5, 0.5]]},
+            {**self.NOTE, "by": self.maya.pk},
+            {"id": "junk", "type": "pen", "page": 1, "pts": "nope"},
+        ]
+        sheet.save()
+        with mock.patch.object(rl_config, "pageCompression", 0):
+            raw = render_lesson_pdf(self.b)
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(raw))
+        self.assertIn("Look again!", reader.pages[-1].extract_text())
+        self.assertIn("Worksheet page 1", reader.pages[-2].extract_text())
+
+
+class CreateAdminFromEnvTests(TestCase):
+    """`createadmin --from-env` runs in every Render build."""
+
+    def _run(self, **env):
         from io import StringIO
         from django.core.management import call_command
         out = StringIO()
@@ -3692,8 +4304,7 @@ class CreateAdminFromEnvTests(TestCase):
             for k in ("ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_NAME"):
                 if k not in env:
                     os.environ.pop(k, None)
-            kwargs = {"from_env": True} if cmd == "createadmin" else {}
-            call_command(cmd, stdout=out, **kwargs)
+            call_command("createadmin", from_env=True, stdout=out)
         return out.getvalue()
 
     def test_skips_when_env_unset(self):
@@ -3709,7 +4320,480 @@ class CreateAdminFromEnvTests(TestCase):
         self.assertIn("already exists", self._run(**env))
         self.assertEqual(User.objects.filter(email="boss@example.at").count(), 1)
 
-    def test_bootstrap_admin_alias_still_works(self):
-        self._run("bootstrap_admin", ADMIN_EMAIL="a@b.at", ADMIN_PASSWORD="pw-123456")
-        self.assertEqual(User.objects.get(email="a@b.at").role, "admin")
-        self.assertIn("already exists", self._run("bootstrap_admin", ADMIN_EMAIL="a@b.at", ADMIN_PASSWORD="x"))
+
+# --------------------------------------------------------------------------- #
+# Schularbeiten / tests on the student profile
+# --------------------------------------------------------------------------- #
+class SchoolTestApiTests(FluentDataMixin, TestCase):
+    def post(self, url, data, method="post"):
+        return getattr(self.client, method)(url, data=json.dumps(data), content_type="application/json")
+
+    def test_student_adds_own_test_and_ignores_other_slug(self):
+        self.client.force_login(self.maya)
+        r = self.post("/api/school-tests/", {"date": "2026-11-20", "kind": "sa", "topic": "Unit 4",
+                                             "studentSlug": "ines"})
+        self.assertEqual(r.status_code, 200)
+        t = SchoolTest.objects.get()
+        self.assertEqual(t.student, self.maya)
+        self.assertEqual(r.json()["test"]["topic"], "Unit 4")
+
+    def test_tutor_adds_test_with_grade_and_reflection(self):
+        self.client.force_login(self.davit)
+        r = self.post("/api/school-tests/", {"studentSlug": "maya", "date": "2026-10-01", "grade": 2,
+                                             "wentWell": "Vocab", "toImprove": "Tenses"})
+        self.assertEqual(r.status_code, 200)
+        t = SchoolTest.objects.get()
+        self.assertEqual((t.student, t.grade, t.went_well, t.to_improve), (self.maya, 2, "Vocab", "Tenses"))
+
+    def test_validation(self):
+        self.client.force_login(self.davit)
+        for bad in ({"studentSlug": "maya"}, {"studentSlug": "maya", "date": "x"},
+                    {"studentSlug": "maya", "date": "2026-10-01", "grade": 6},
+                    {"studentSlug": "maya", "date": "2026-10-01", "kind": "quiz"},
+                    {"studentSlug": "nobody", "date": "2026-10-01"}):
+            self.assertEqual(self.post("/api/school-tests/", bad).status_code, 400, bad)
+        self.assertFalse(SchoolTest.objects.exists())
+
+    def test_student_cannot_touch_other_students_tests(self):
+        t = SchoolTest.objects.create(student=self.ines, date=date(2026, 11, 1))
+        self.client.force_login(self.maya)
+        self.assertEqual(self.post(f"/api/school-tests/{t.pk}/", {"grade": 1}, "put").status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/school-tests/{t.pk}/").status_code, 404)
+        self.assertTrue(SchoolTest.objects.filter(pk=t.pk).exists())
+
+    def test_edit_and_delete(self):
+        t = SchoolTest.objects.create(student=self.maya, date=date(2026, 11, 1))
+        self.client.force_login(self.maya)
+        r = self.post(f"/api/school-tests/{t.pk}/", {"grade": 3, "toImprove": "Writing"}, "put")
+        self.assertEqual(r.status_code, 200)
+        t.refresh_from_db()
+        self.assertEqual((t.grade, t.to_improve), (3, "Writing"))
+        self.assertEqual(self.post(f"/api/school-tests/{t.pk}/", {"grade": None}, "put").json()["test"]["grade"], None)
+        self.assertEqual(self.client.delete(f"/api/school-tests/{t.pk}/").status_code, 200)
+        self.assertFalse(SchoolTest.objects.exists())
+
+    def test_anonymous_rejected(self):
+        self.assertEqual(self.post("/api/school-tests/", {"date": "2026-10-01"}).status_code, 401)
+
+    def test_payload_scoped_by_role(self):
+        SchoolTest.objects.create(student=self.maya, date=date(2026, 11, 1))
+        SchoolTest.objects.create(student=self.ines, date=date(2026, 11, 2))
+        self.client.force_login(self.maya)
+        mine = extract_payload(self.client.get(reverse("app")).content.decode())["schoolTests"]
+        self.assertEqual({t["studentId"] for t in mine}, {"maya"})
+        self.client.force_login(self.davit)
+        alls = extract_payload(self.client.get(reverse("app")).content.decode())["schoolTests"]
+        self.assertEqual({t["studentId"] for t in alls}, {"maya", "ines"})
+
+
+class SchoolTestDomTests(_DomProbeBase):
+    def test_tutor_profile_shows_tests_and_timeline(self):
+        soon = timezone.localdate() + timedelta(days=5)
+        SchoolTest.objects.create(student=self.maya, date=soon, topic="<i data-xss>Unit 4</i>")
+        SchoolTest.objects.create(student=self.maya, date=timezone.localdate() - timedelta(days=20),
+                                  grade=4, to_improve="Tenses")
+        Booking.objects.create(student=self.maya, tutor=self.davit, date=timezone.localdate() - timedelta(days=3),
+                               time="10:00", title="Maya lesson", summary="Past simple")
+        r = self.run_probe(self.davit, school_tests=True)["schoolTests"]
+        self.assertNotIn("error", r)
+        self.assertIn("in 5 Tagen", r["rosterSub"])
+        self.assertEqual(len(r["rows"]), 2)
+        self.assertIn("in 5 Tagen", r["rows"][0])
+        self.assertIn("Note 4", r["rows"][1])
+        self.assertTrue(any("Past simple" in x for x in r["timeline"]))
+        self.assertTrue(any("Daran arbeiten: Tenses" in x for x in r["timeline"]))
+        self.assertEqual(r["post"]["studentSlug"], "maya")
+        self.assertEqual((r["post"]["date"], r["post"]["grade"]), ("2026-12-01", 2))
+        self.assertEqual(len(r["after"]), 3)
+
+    def test_student_sees_own_tests_and_can_add(self):
+        r = self.run_probe(self.maya, school_tests=True)
+        self.assertEqual(r["initErrors"], [])
+        self.assertEqual(r["xss"], 0)
+        st = r["schoolTests"]
+        self.assertEqual(st["rows"], [])
+        self.assertEqual(st["post"]["topic"], "Past tenses")
+        self.assertEqual(len(st["after"]), 1)
+
+    def test_progress_tiles(self):
+        b = Booking.objects.create(student=self.maya, tutor=self.davit, date=timezone.localdate() - timedelta(days=3),
+                                   time="10:00", homework="Workbook p. 12", homework_done=True)
+        ErrorCard.objects.create(student=self.maya, booking=b, front="He go.", back="He goes.",
+                                 status=ErrorCard.STATUS_MASTERED)
+        ErrorCard.objects.create(student=self.maya, booking=b, front="I am agree.", back="I agree.")
+        SchoolTest.objects.create(student=self.maya, date=timezone.localdate() - timedelta(days=1), grade=2)
+        for user in (self.davit, self.maya):
+            stats = self.run_probe(user, school_tests=True)["schoolTests"]["stats"]
+            self.assertEqual(stats, ["1Stunde", "1/2Fehler gemeistert", "0neue Wörter",
+                                     "1/1Hausaufgaben erledigt", "2letzte Note · Schularbeit"], user)
+
+
+# --------------------------------------------------------------------------- #
+# English version of the public pages (German default, English under /en/)
+# --------------------------------------------------------------------------- #
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    EMAIL_ASYNC=False,
+)
+class EnglishSiteTests(FluentDataMixin, TestCase):
+    PUBLIC = ["/", "/faq/", "/intro/", "/impressum/", "/datenschutz/", "/agb/", "/widerruf/"]
+
+    def test_public_pages_exist_in_both_languages(self):
+        for path in self.PUBLIC:
+            de = self.client.get(path)
+            en = self.client.get("/en" + path)
+            self.assertEqual(de.status_code, 200, path)
+            self.assertEqual(en.status_code, 200, "/en" + path)
+            self.assertContains(de, '<html lang="de"')
+            self.assertContains(en, '<html lang="en"')
+
+    def test_german_stays_the_default_whatever_the_browser_asks_for(self):
+        resp = self.client.get("/", HTTP_ACCEPT_LANGUAGE="en-GB,en;q=0.9")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '<html lang="de"')
+        self.assertContains(resp, "Englisch, das <em>sitzen bleibt</em>")
+
+    def test_landing_is_translated_and_links_stay_in_english(self):
+        html = self.client.get("/en/").content.decode()
+        self.assertIn("English that <em>sticks</em>", html)
+        self.assertNotIn("sitzen bleibt", html)
+        # Navigation keeps the visitor on the English pages.
+        self.assertIn('href="/en/intro/"', html)
+        self.assertIn('href="/en/faq/"', html)
+        self.assertIn('href="/en/impressum/"', html)
+        # Prices come from the same packs, with English units.
+        self.assertIn("per lesson", html)
+        self.assertNotIn("pro Einheit", html)
+
+    def test_language_switch_points_to_the_same_page(self):
+        de = self.client.get("/faq/").content.decode()
+        en = self.client.get("/en/faq/").content.decode()
+        self.assertIn('class="lang-switch" href="/en/faq/"', de)
+        self.assertIn('class="lang-switch" href="/faq/"', en)
+        self.assertIn('hreflang="en" href="https://thegreenpencil.at/en/faq/"', de)
+        self.assertIn('<link rel="canonical" href="https://thegreenpencil.at/en/faq/"', en)
+
+    def test_english_legal_pages_point_to_the_binding_german_text(self):
+        for path in ["/impressum/", "/datenschutz/", "/agb/", "/widerruf/"]:
+            self.assertContains(self.client.get("/en" + path), "courtesy translation")
+
+    def test_app_and_login_stay_german_only(self):
+        self.assertEqual(self.client.get("/en/login/").status_code, 404)
+        self.assertEqual(self.client.get("/en/app/").status_code, 404)
+        self.assertNotContains(self.client.get("/login/"), 'class="lang-switch"')
+
+    def _book(self, prefix):
+        d = date.today() + timedelta(days=5)
+        return self.client.post(
+            prefix + "/api/intro-bookings/",
+            data=json.dumps({
+                "tutorSlug": "davit", "date": d.isoformat(), "time": "14:00",
+                "name": "Sam Guest", "email": "sam@example.com", "phone": "+43 660 1234567",
+            }),
+            content_type="application/json",
+        )
+
+    def test_english_booking_errors_are_english(self):
+        resp = self.client.post(
+            "/en/api/intro-bookings/", data=json.dumps({"tutorSlug": "davit"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("Please enter your name.", resp.json()["error"])
+        self.assertIn("get in touch with Davit", resp.json()["error"])
+
+    def test_english_guest_gets_english_confirmation_and_cancel_link(self):
+        from django.core import mail
+        self.assertEqual(self._book("/en").status_code, 200)
+        msg = [m for m in mail.outbox if m.to == ["sam@example.com"]][0]
+        self.assertIn("Your trial lesson is confirmed", msg.subject)
+        self.assertIn("You're all set, Sam!", msg.body)
+        token = Booking.objects.latest("id").cancel_token
+        self.assertIn(f"https://thegreenpencil.at/en/cancel/{token}/", msg.body)
+        self.assertEqual([a[0] for a in msg.attachments], ["trial-lesson.ics"])
+
+    def test_german_guest_still_gets_german_confirmation(self):
+        from django.core import mail
+        self.assertEqual(self._book("").status_code, 200)
+        msg = [m for m in mail.outbox if m.to == ["sam@example.com"]][0]
+        self.assertIn("Schnupperstunde ist bestätigt", msg.subject)
+        token = Booking.objects.latest("id").cancel_token
+        self.assertIn(f"https://thegreenpencil.at/cancel/{token}/", msg.body)
+
+    def test_english_cancel_page_and_mail(self):
+        from django.core import mail
+        self._book("/en")
+        token = Booking.objects.latest("id").cancel_token
+        page = self.client.get(f"/en/cancel/{token}/")
+        self.assertContains(page, "Cancel your trial lesson?")
+        mail.outbox.clear()
+        done = self.client.post(f"/en/cancel/{token}/")
+        self.assertContains(done, "Trial lesson cancelled")
+        msg = [m for m in mail.outbox if m.to == ["sam@example.com"]][0]
+        self.assertIn("Cancelled: your trial lesson", msg.subject)
+
+    def test_sitemap_lists_both_languages(self):
+        body = self.client.get("/sitemap.xml").content.decode()
+        self.assertIn("<loc>http://testserver/en/faq/</loc>", body)
+        self.assertIn("<loc>http://testserver/faq/</loc>", body)
+        self.assertIn('hreflang="en"', body)
+
+
+class ProgressChartDomTests(_DomProbeBase):
+    def test_progress_charts_and_lessons_per_week(self):
+        User.objects.filter(pk=self.maya.pk).update(weekly_lessons=Decimal("1.5"))
+        today = timezone.localdate()
+        for days in (6, 13, 20, 27):  # one lesson a week for four weeks
+            Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=days), time="09:00")
+        b = Booking.objects.filter(student=self.maya).first()
+        ErrorCard.objects.create(student=self.maya, booking=b, front="He go.", back="He goes.")
+        SchoolTest.objects.create(student=self.maya, date=today - timedelta(days=2), grade=3, topic="Unit 2")
+        r = self.run_probe(self.davit, school_tests=True)
+        self.assertEqual(r["initErrors"], [])
+        st = r["schoolTests"]
+        self.assertEqual([c["title"] for c in st["charts"]],
+                         ["Niveau über die Zeit", "Niveau je Bereich", "Stunden pro Monat", "Fehler über die Zeit", "Noten"])
+        self.assertFalse(st["charts"][0]["svg"])  # no scored exercises yet
+        st["charts"] = st["charts"][2:]
+        self.assertTrue(all(c["svg"] for c in st["charts"]))
+        self.assertTrue(any("Note 3" in t for t in st["charts"][2]["tips"]))
+        per = dict(st["week"]["perStudent"])
+        self.assertEqual(per["Maya Karlsson"], "1,5")  # set by hand, not from the four bookings
+        self.assertEqual(per["Ines Reyes"], "0")
+        self.assertIn("1,5 Stunden pro Woche", st["week"]["total"])
+        # The student sees the same charts on their own page.
+        mine = self.run_probe(self.maya, school_tests=True)["schoolTests"]["charts"]
+        self.assertEqual(len(mine), 3)
+
+
+class LevelProgressDomTests(_DomProbeBase):
+    def test_level_charts_detail_and_student_view(self):
+        today = timezone.localdate()
+        scores = [(60, "B1.1", 7, 10, "grammar"), (40, "B1.1", 8, 10, "reading"),
+                  (20, "B1.2", 5, 10, "grammar"), (5, "B1.2", 8, 10, "reading")]
+        for days, lv, right, total, skill in scores:
+            b = Booking.objects.create(student=self.maya, tutor=self.davit, date=today - timedelta(days=days), time="09:00")
+            SessionExercise.objects.create(booking=b, title=f"Ex {lv} {skill}", score_right=right, score_total=total,
+                                           level=lv, skill=skill)
+        r = self.run_probe(self.davit, school_tests=True)
+        self.assertEqual(r["initErrors"], [])
+        st = r["schoolTests"]
+        a, c = st["charts"][0], st["charts"][1]
+        self.assertTrue(a["svg"] and c["svg"])
+        self.assertTrue(any("5/10 auf B1.2" in t for t in a["tips"]))
+        d = st["detail"]
+        self.assertFalse(d["hidden"])
+        self.assertEqual(d["title"], "Niveau über die Zeit")
+        self.assertEqual(len(d["table"]), 4)
+        self.assertIn("8/10", d["table"][0])  # newest first
+        self.assertEqual(d["grammarRows"], 2)
+        self.assertEqual((d["skillTitle"], d["skillBars"]), ("Niveau je Bereich", 2))
+        way = self.run_probe(self.maya, school_tests=True)["schoolTests"]["way"]
+        self.assertIn("Dein Weg durch B1.2", way[0])
+        self.assertIn("65 %", way[0])  # average of the two B1.2 results
+        self.assertIn("5 von 10 Stufen geschafft", way[0])
+        self.assertIn("BewerteteÜbungeninsgesamt4", way[1].replace(" ", ""))
+
+
+class ExerciseScoreApiTests(FluentDataMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.b = Booking.objects.create(student=self.maya, tutor=self.davit, date=timezone.localdate(), time="09:00")
+        self.ex = SessionExercise.objects.create(booking=self.b, title="Unit 1")
+
+    def _put(self, body, actor=None):
+        self.client.force_login(actor or self.davit)
+        return self.client.put(f"/api/exercises/{self.ex.id}/", data=json.dumps(body), content_type="application/json")
+
+    def test_tutor_scores_exercise(self):
+        r = self._put({"right": 7, "total": 10, "level": "B1.2", "skill": "grammar"})
+        self.assertEqual(r.status_code, 200)
+        e = r.json()["exercise"]
+        self.assertEqual((e["right"], e["total"], e["level"], e["skill"]), (7, 10, "B1.2", "grammar"))
+        r = self._put({"right": None, "total": None})
+        self.assertEqual((r.json()["exercise"]["right"], r.json()["exercise"]["level"]), (None, "B1.2"))
+
+    def test_validation_and_student(self):
+        for bad in ({"right": 11, "total": 10}, {"right": -1, "total": 10}, {"right": 1, "total": 0},
+                    {"right": 1}, {"right": "3", "total": 5}, {"level": "B3"}, {"skill": "dance"}):
+            self.assertEqual(self._put(bad).status_code, 400, bad)
+        self._put({"right": 3, "total": 5}, actor=self.maya)
+        self.ex.refresh_from_db()
+        self.assertIsNone(self.ex.score_right)
+
+
+class WeeklyLessonsTests(FluentDataMixin, TestCase):
+    def _set(self, actor, slug, value):
+        self.client.force_login(actor)
+        return self.client.post(f"/api/students/{slug}/weekly-lessons/", data=json.dumps({"weeklyLessons": value}),
+                                content_type="application/json")
+
+    def test_tutor_sets_weekly_lessons(self):
+        r = self._set(self.davit, "maya", 2.5)
+        self.assertEqual((r.status_code, r.json()["weeklyLessons"]), (200, 2.5))
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.weekly_lessons, Decimal("2.5"))
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual({s["slug"]: s["weeklyLessons"] for s in payload["students"]}["maya"], 2.5)
+
+    def test_validation_and_roles(self):
+        for bad in (-1, 21, 1.3, "2", True, None):
+            self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
+        self.assertEqual(self._set(self.davit, "nobody", 1).status_code, 404)
+        self.assertEqual(self._set(self.maya, "maya", 3).status_code, 403)
+
+
+class RosterGroupTests(FluentDataMixin, TestCase):
+    def _set(self, actor, slug, value):
+        self.client.force_login(actor)
+        return self.client.post(f"/api/students/{slug}/roster-group/", data=json.dumps({"rosterGroup": value}),
+                                content_type="application/json")
+
+    def test_tutor_moves_student_between_groups(self):
+        self.assertEqual(self.maya.roster_group, "active")
+        r = self._set(self.davit, "maya", "exam")
+        self.assertEqual((r.status_code, r.json()["rosterGroup"]), (200, "exam"))
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.roster_group, "exam")
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual({s["slug"]: s["rosterGroup"] for s in payload["students"]}["maya"], "exam")
+
+    def test_validation_and_roles(self):
+        for bad in ("weekly", "", None, 1):
+            self.assertEqual(self._set(self.davit, "maya", bad).status_code, 400, bad)
+        self.assertEqual(self._set(self.davit, "nobody", "done").status_code, 404)
+        self.assertEqual(self._set(self.maya, "maya", "done").status_code, 403)
+
+
+from django.core import mail  # noqa: E402
+
+from .middleware import LANGUAGE_COOKIE as LANGUAGE_COOKIE_NAME  # noqa: E402
+
+
+class AppLanguageTests(FluentDataMixin, TestCase):
+    """The DE/EN switch for the signed-in app, the login page and app e-mails."""
+
+    def set_language(self, lang):
+        return self.client.post("/api/language/", data=json.dumps({"language": lang}),
+                                content_type="application/json")
+
+    def test_app_is_german_by_default(self):
+        self.client.force_login(self.maya)
+        html = self.client.get(reverse("app")).content.decode()
+        self.assertIn('<html lang="de"', html)
+        self.assertNotIn("js/i18n/translate.js", html)
+        self.assertIn('data-set-lang="en"', html)
+
+    def test_switch_saves_the_language_on_the_account(self):
+        self.client.force_login(self.maya)
+        resp = self.set_language("en")
+        self.assertEqual(resp.status_code, 200)
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.language, "en")
+        html = self.client.get(reverse("app")).content.decode()
+        self.assertIn('<html lang="en"', html)
+        self.assertIn("js/i18n/en.js", html)
+        self.assertIn("js/i18n/translate.js", html)
+        self.assertIn('data-set-lang="de"', html)
+        # The calendar's day and month names are English too.
+        self.assertIn('const DOW = ["Mon"', html)
+
+    def test_unknown_language_is_rejected(self):
+        self.assertEqual(self.set_language("fr").status_code, 400)
+
+    def test_login_page_follows_the_cookie_and_login_keeps_it(self):
+        self.set_language("en")
+        self.assertIn(LANGUAGE_COOKIE_NAME, self.client.cookies)
+        self.assertContains(self.client.get("/login/"), '<html lang="en"')
+        resp = self.client.post("/api/login/", data=json.dumps(
+            {"email": "ines@fluent.at", "password": "password"}), content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.ines.refresh_from_db()
+        self.assertEqual(self.ines.language, "en")
+
+    def test_account_language_wins_over_a_stale_cookie(self):
+        self.maya.language = "en"
+        self.maya.save()
+        self.client.force_login(self.maya)
+        self.client.cookies[LANGUAGE_COOKIE_NAME] = "de"
+        self.assertContains(self.client.get(reverse("app")), '<html lang="en"')
+
+    def test_public_pages_ignore_the_app_language(self):
+        self.maya.language = "en"
+        self.maya.save()
+        self.client.force_login(self.maya)
+        self.assertContains(self.client.get("/"), '<html lang="de"')
+        self.assertContains(self.client.get("/en/"), '<html lang="en"')
+
+    def test_api_messages_stay_german_for_the_dictionary(self):
+        # The translator swaps German API messages for English in the browser,
+        # so the server keeps sending the German text whatever the language.
+        self.set_language("en")
+        resp = self.client.post("/api/login/", data=json.dumps(
+            {"email": "maya@fluent.at", "password": "wrong"}), content_type="application/json")
+        self.assertEqual(resp.json()["error"], "E-Mail oder Passwort ungültig.")
+
+    def test_lesson_mails_follow_each_recipients_language(self):
+        from . import emails
+        self.maya.language = "en"
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        self.davit.email = "davit@example.com"
+        self.davit.save()
+        b = Booking.objects.create(student=self.maya, tutor=self.davit, date=date(2026, 7, 6),
+                                   time="10:00", title="Speaking", cancel_token="tok123")
+        mail.outbox.clear()
+        emails.send_lesson_student_confirmation(b.pk)
+        emails.send_lesson_tutor_notification(b.pk)
+        student, tutor = mail.outbox
+        self.assertTrue(student.subject.startswith("Your English lesson is booked · Monday, 6 July 2026"))
+        self.assertIn("/en/cancel/tok123/", student.body)
+        self.assertTrue(tutor.subject.startswith("Neue Buchung: Maya Karlsson · Montag, 6. Juli 2026"))
+        self.assertIn("/cancel/tok123/", tutor.body)
+        self.assertNotIn("/en/cancel/", tutor.body)
+
+    def test_cancellation_mails_follow_each_recipients_language(self):
+        from . import emails
+        self.davit.language = "en"
+        self.davit.email = "davit@example.com"
+        self.davit.save()
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        b = Booking.objects.create(student=self.maya, tutor=self.davit, date=date(2026, 7, 6),
+                                   time="10:00", title="Speaking")
+        snapshot = emails._cancel_snapshot(b, refunded=True)
+        mail.outbox.clear()
+        emails.send_cancellation_notifications(snapshot)
+        student, tutor = mail.outbox
+        self.assertTrue(student.subject.startswith("Storniert: deine Englischstunde · Montag"))
+        self.assertTrue(tutor.subject.startswith("Cancelled: Maya Karlsson · English lesson · Monday"))
+        self.assertIn("Monday, 6 July 2026", tutor.body)
+
+    def test_password_reset_mail_in_english(self):
+        from . import emails
+        self.maya.language = "en"
+        self.maya.email = "maya@example.com"
+        self.maya.save()
+        mail.outbox.clear()
+        emails.send_password_reset(self.maya.pk, "https://example.com/reset/")
+        self.assertEqual(mail.outbox[0].subject, "Reset your password · The Green Pencil")
+        self.assertIn("https://example.com/reset/", mail.outbox[0].body)
+
+    def test_translator_in_a_headless_browser(self):
+        node = _node_bin()
+        if not node or not _jsdom_installed():
+            self.skipTest("node/jsdom not available — run `cd tests/frontend && npm install`")
+        out = subprocess.run([node, os.path.join(FRONTEND_DIR, "i18n_probe.js")],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        r = json.loads(out.stdout)
+        self.assertEqual(r["out"], "  Sign out ")          # surrounding spaces kept
+        self.assertEqual(r["keep"], "Abmelden")            # data-no-i18n left alone
+        self.assertEqual(r["ta"], "Abmelden")              # typed text left alone
+        self.assertEqual(r["note"], "Save")                # attribute changed later
+        self.assertEqual(r["req"], "Request sent to Davit · Mo 3")
+        self.assertEqual(r["one"], "1 outstanding credit · € 30")
+        self.assertEqual(r["many"], "3 outstanding credits · € 90")
+        self.assertEqual((r["att"], r["attTitle"], r["txt"]), ("Lesson booked", "Save", "Save"))
+        self.assertEqual(r["confirm"], "Sign out")
+        self.assertEqual(r["title"], "Save")
