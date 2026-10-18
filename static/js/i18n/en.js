@@ -966,6 +966,8 @@ window.TGP_I18N = {
     "schon als Hausübung": "already set as homework",
     "Das Arbeitsblatt, das ihr in der Stunde durchgeht. Darin markierst du dann Wörter und Fehler. Oben bei „+ AB“ geht es auch aus den Lernmaterialien, bei „+ HÜ“ legst du eine Hausübung an.": "The worksheet you go through in the lesson. You mark words and mistakes right in it. Use “+ WS” at the top to add one from the learning materials, or “+ HW” to set homework.",
     "Tippe aufs Blatt, um eine Notiz zu schreiben. Tippe eine Notiz an, um Text, Farbe oder Größe zu ändern.": "Tap the sheet to write a note. Tap a note to change its text, colour or size.",
+    "Schrift kleiner": "Smaller text",
+    "Schrift größer": "Larger text",
     "⤢ Ganze Seite": "⤢ Full page",
     "⤡ Seitenleiste": "⤡ Side panel",
     "Arbeitsblatt über die ganze Seite": "Worksheet across the whole page",

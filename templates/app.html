@@ -593,6 +593,9 @@
   .sx-pages[data-tool="text"] .sx-notes { cursor: text; }
   .sx-pages[data-tool="erase"] .sx-notes { cursor: cell; }
   .sx-pages[data-tool="text"] .sx-note { cursor: pointer; }
+  /* In Auswahl a note can still be tapped to change its text, colour or size. */
+  .sx-pages[data-tool="select"] .sx-note { pointer-events: auto; cursor: pointer; }
+  .ink-step { font-weight: 700; font-size: 13px; min-width: 30px; }
   .sx-pages[data-tool="erase"] .sx-note:hover { text-decoration: line-through; }
   /* Mark menu / form over the sheet */
   .sx-pop { position: absolute; z-index: 20; background: #243528; color: #fbf8f1; border-radius: 12px; padding: 5px;
@@ -4947,7 +4950,7 @@
         ${tool("erase", "Radierer", "Über Striche oder Notizen fahren, um sie zu löschen")}
       </span>
       ${kind ? `<span class="sep"></span><span class="grp">${INK_COLORS[kind].map(c=>`<button class="ink-dot ${curColor===c?"on":""}" data-ink-color="${c}" aria-label="Farbe ${c}"><i style="background:${c}"></i></button>`).join("")}</span>
-        <span class="sep"></span><span class="grp">${[0,1,2].map(n=>`<button class="ink-dot ink-size ${curSize===n?"on":""}" data-ink-size="${n}" aria-label="${["Dünn","Mittel","Dick"][n]}"><i style="width:${6+n*4}px;height:${6+n*4}px"></i></button>`).join("")}</span>` : ""}
+        <span class="sep"></span><span class="grp">${[0,1,2].map(n=>`<button class="ink-dot ink-size ${curSize===n?"on":""}" data-ink-size="${n}" aria-label="${["Dünn","Mittel","Dick"][n]}"><i style="width:${6+n*4}px;height:${6+n*4}px"></i></button>`).join("")}${ed ? `<button class="ink-tool ink-step" data-ink-step="-1" title="Schrift kleiner">A−</button><button class="ink-tool ink-step" data-ink-step="1" title="Schrift größer">A+</button>` : ""}</span>` : ""}
       <span class="sp"></span>
       <button class="ink-tool" id="inkUndo" title="Rückgängig (Strg+Z)" ${ink.undo.length?"":"disabled"}>${INK_ICONS.undo}<span>Rückgängig</span></button>
       ${tutor ? `<button class="ink-tool danger" id="inkClear" title="Alle Zeichnungen und Notizen auf diesem Arbeitsblatt löschen" ${ink.items.length?"":"disabled"}>Alles löschen</button>` : ""}`;
@@ -4958,7 +4961,8 @@
       renderInkBar(b, sx, f);
     });
     // Keep the open note focused while a colour or size is picked for it.
-    bar.onpointerdown=bar.onmousedown=(e)=>{ if(noteEditor && e.target.closest("[data-ink-color],[data-ink-size]")) e.preventDefault(); };
+    bar.onpointerdown=bar.onmousedown=(e)=>{ if(noteEditor && e.target.closest("[data-ink-color],[data-ink-size],[data-ink-step]")) e.preventDefault(); };
+    const sizeNote=(size)=>{ ed.size=size; ed.el.style.fontSize=ed.size*ed.el.parentElement.parentElement.offsetWidth+"px"; ed.el.dispatchEvent(new Event("input")); ed.el.focus(); };
     bar.querySelectorAll("[data-ink-color]").forEach(btn=> btn.onclick=()=>{
       const c=btn.dataset.inkColor;
       if(ed && noteEditor===ed){ ed.color=c; ed.el.style.color=c; ed.el.focus(); }
@@ -4966,8 +4970,14 @@
     });
     bar.querySelectorAll("[data-ink-size]").forEach(btn=> btn.onclick=()=>{
       const n=+btn.dataset.inkSize;
-      if(ed && noteEditor===ed){ ed.size=INK_SIZES.text[n]; ed.el.style.fontSize=ed.size*ed.el.parentElement.parentElement.offsetWidth+"px"; ed.el.dispatchEvent(new Event("input")); ed.el.focus(); }
+      if(ed && noteEditor===ed) sizeNote(INK_SIZES.text[n]);
       inkPrefs.size=n; renderInkBar(b, sx, f);
+    });
+    // A−/A+ step the open note's size in finer steps than the three presets.
+    bar.querySelectorAll("[data-ink-step]").forEach(btn=> btn.onclick=()=>{
+      if(!ed || noteEditor!==ed) return;
+      const next=+(ed.size*(btn.dataset.inkStep>0 ? 1.2 : 1/1.2)).toFixed(4);
+      sizeNote(Math.min(0.08, Math.max(0.008, next)));
     });
     $("#inkUndo").onclick=()=>inkUndo(f.id);
     if($("#inkClear")) $("#inkClear").onclick=()=>{
@@ -5114,7 +5124,13 @@
     const pageOf=e=>{ const n=e.target.closest && e.target.closest(".sx-notes"); return n ? n.parentElement : null; };
     const repaintLive=div=>{ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{ rafPending=false; paintInkPage(div, sx.fileId); }); };
     pages.addEventListener("pointerdown", e=>{
-      const tool=inkPrefs.tool; if(tool==="select") return;
+      let tool=inkPrefs.tool;
+      // Tapping a note in Auswahl opens it, like the Text tool does.
+      if(tool==="select"){
+        const note=e.target.closest && e.target.closest(".sx-note");
+        if(!note || e.button>0) return;
+        inkPrefs.tool=tool="text"; pages.dataset.tool="text";
+      }
       const div=pageOf(e); if(!div || e.target.closest(".sx-note-in")) return;
       if(e.button>0) return;
       if(e.pointerType==="pen") penSeen=true;
