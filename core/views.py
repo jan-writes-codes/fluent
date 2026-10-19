@@ -3432,12 +3432,24 @@ def _leave_family(student):
     student.save(update_fields=["family", "credits", "group_credits"])
 
 
+def _student_balances(pks):
+    """Fresh balances of the given students, for the admin screen to update."""
+    return {
+        u.slug: {"credits": u.balance(CREDIT_SINGLE), "groupCredits": u.balance(CREDIT_GROUP),
+                 "familyId": u.family_id, "familyName": u.family.name if u.family_id else ""}
+        for u in User.objects.filter(pk__in=pks).select_related("family")
+    }
+
+
 def _set_family_members(family, students):
+    """Make ``students`` the family's members; returns the pks of everyone affected."""
     keep = {s.pk for s in students}
+    affected = keep | set(family.members.values_list("pk", flat=True))
     for gone in family.members.exclude(pk__in=keep):
         _leave_family(User.objects.select_for_update().get(pk=gone.pk))
     for s in students:
         _join_family(s, family)
+    return affected
 
 
 @require_http_methods(["POST"])
@@ -3451,9 +3463,9 @@ def api_families(request):
         return JsonResponse({"error": str(e)}, status=400)
     with db_transaction.atomic():
         family = Family.objects.create(name=name)
-        _set_family_members(family, students)
+        affected = _set_family_members(family, students)
     family.refresh_from_db()
-    return JsonResponse({"family": serialize_family(family)})
+    return JsonResponse({"family": serialize_family(family), "students": _student_balances(affected)})
 
 
 @require_http_methods(["PUT", "DELETE"])
@@ -3466,9 +3478,9 @@ def api_family_detail(request, pk):
         return JsonResponse({"error": "not found"}, status=404)
     if request.method == "DELETE":
         with db_transaction.atomic():
-            _set_family_members(family, [])
+            affected = _set_family_members(family, [])
             family.delete()
-        return JsonResponse({"ok": True})
+        return JsonResponse({"ok": True, "students": _student_balances(affected)})
     data = parse_body(request)
     try:
         if "name" in data:
@@ -3476,12 +3488,13 @@ def api_family_detail(request, pk):
         students = _member_students(data) if "members" in data else None
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
+    affected = set(family.members.values_list("pk", flat=True))
     with db_transaction.atomic():
         family.save(update_fields=["name"])
         if students is not None:
-            _set_family_members(family, students)
+            affected = _set_family_members(family, students)
     family.refresh_from_db()
-    return JsonResponse({"family": serialize_family(family)})
+    return JsonResponse({"family": serialize_family(family), "students": _student_balances(affected)})
 
 
 def _group_fields(group, data):

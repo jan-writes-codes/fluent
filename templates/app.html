@@ -1419,6 +1419,38 @@
   .snote-date { font-size: 11px; color: var(--faint); letter-spacing: 0.04em; margin-bottom: 3px; }
   .snote-text { font-size: 13.5px; color: var(--ink); line-height: 1.5; }
 
+  /* ---------- Families & groups ---------- */
+  .fg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 8px; align-items: start; }
+  @media (max-width: 760px) { .fg-cols { grid-template-columns: 1fr; gap: 18px; } }
+  .fg-col { min-width: 0; }
+  .fg-card { border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; margin-bottom: 10px; background: rgba(255,255,255,0.35); }
+  .fg-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .fg-name { font-weight: 600; font-size: 14.5px; overflow-wrap: anywhere; }
+  .fg-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .fg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .fg-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: color-mix(in oklch, var(--c1) 12%, transparent); }
+  .fg-picklist { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; margin: 6px 0 10px; }
+  .fg-pick { display: flex; align-items: center; gap: 10px; padding: 9px 6px; font-size: 14px; cursor: pointer; min-height: 40px; }
+  .fg-pick + .fg-pick { border-top: 1px solid var(--line); }
+  .fg-pick input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--c1); }
+  .fg-pick em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--faint); text-align: right; }
+  .fg-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .fg-actions .btn { flex: 1; }
+  .grp-seats { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+  .grp-seat { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .grp-seat .avatar { flex-shrink: 0; }
+  .gs-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gs-cr { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .slot.t-group { box-shadow: inset 3px 0 0 #7a6bb0; }
+  .seat-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+  .ss-lbl { font-size: 12.5px; color: var(--muted); }
+  .sx-chip.seat { padding-top: 4px; padding-bottom: 4px; }
+  .bal-group { margin-top: 18px; font-size: 14px; }
+  .bal-group b { font-family: var(--font-display); font-size: 22px; margin-right: 4px; }
+  .bal-group span { color: var(--muted); font-size: 12.5px; }
+  .bal-family, .fam-line { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .fam-line { margin-top: 2px; }
+
   /* ---------- Admin portal ---------- */
   .admin-grid { display: grid; grid-template-columns: 320px 1fr; gap: 22px; margin-top: 26px; align-items: start; }
   @media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
@@ -1654,6 +1686,7 @@
                 <div class="m"><div class="mv" id="statBooked">0</div><div class="mk">Geplant</div></div>
                 <div class="m"><div class="mv" id="statDone">0</div><div class="mk">Abgeschlossen</div></div>
               </div>
+              <div id="balanceExtra"></div>
               <div id="settleBox" hidden style="margin-top:22px;padding:16px;border-radius:14px;background:rgba(194,85,47,0.10);border:1px solid rgba(194,85,47,0.25);">
                 <div style="font-weight:700;color:#c2552f;font-size:14px;" id="settleTitle"></div>
                 <div class="micro" id="settleSub" style="margin:4px 0 12px;"></div>
@@ -1665,6 +1698,7 @@
               <div class="section-h"><h2>Einheiten aufladen</h2></div>
               <div class="packs" id="packs"></div>
               <div class="micro" style="margin-top:16px;">Einheiten verfallen nie. Tippe ein Paket an, um es aufzuladen.</div>
+              <div id="groupPacks"></div>
             </div>
           </div>
 
@@ -1843,6 +1877,24 @@
               <button class="btn ghost" id="adminAddTutorBtn" style="margin:8px; width:calc(100% - 16px);">+ Tutor*in hinzufügen</button>
             </div>
             <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
+          </div>
+
+          <div class="panel" style="padding: 24px; margin-top: 22px;">
+            <div class="section-h"><h2>Familien &amp; Gruppen</h2></div>
+            <div class="fg-cols">
+              <div class="fg-col">
+                <div class="txn-col-h">Familien</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;">Geschwister teilen sich ein Guthaben. Jede*r behält das eigene Profil, den eigenen Kalender und die eigenen Hausübungen.</div>
+                <div id="adminFamilies"></div>
+                <button class="btn ghost" id="addFamilyBtn" style="margin-top:10px;">+ Familie anlegen</button>
+              </div>
+              <div class="fg-col">
+                <div class="txn-col-h">Gruppen</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;">Für Gruppenstunden. Jede*r zahlt mit den eigenen Gruppeneinheiten (€ <span id="grpPriceLbl"></span> pro Stunde).</div>
+                <div id="adminGroups"></div>
+                <button class="btn ghost" id="addGroupBtn" style="margin-top:10px;">+ Gruppe anlegen</button>
+              </div>
+            </div>
           </div>
 
           <div class="panel" style="padding: 24px; margin-top: 22px;">
@@ -2036,6 +2088,12 @@
     currentUser: DJ.currentUserId || "maya",
     creditPrice: (DJ.settings && DJ.settings.creditPrice) || 30,
     popularN: (DJ.settings && DJ.settings.popularN) || 0,
+    // Group sessions: the price of a group credit, the groups (a student gets
+    // only their own) and, for the admin, the families sharing a balance.
+    groupCreditPrice: (DJ.settings && DJ.settings.groupCreditPrice) || 30,
+    groupCredits: (DJ.currentUser && DJ.currentUser.groupCredits) || 0,
+    groups: DJ.groups || [],
+    families: DJ.families || [],
     stripe: DJ.stripe || { enabled: false, publishableKey: "" },
     impersonating: false,
     adminSel: (DJ.tutors && DJ.tutors[0] && DJ.tutors[0].slug) || (DJ.students && DJ.students[0] && DJ.students[0].slug) || "admin",
@@ -2210,8 +2268,25 @@
   function closeReceipt(){ $("#receiptModal").hidden=true; }
   // Balances may go negative (a tutor booking a lesson the student hasn't paid
   // for yet); the server is authoritative, so we don't clamp here.
-  function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; s.credits=val; if(id===state.currentUser){ state.credits=s.credits; updateCredits(); } }
+  function setStudentCredits(id, val){ const s=studentById(id); if(!s) return; familyOf(s).forEach(x=>{ x.credits=val; }); if(familyOf(s).some(x=>x.id===state.currentUser)){ state.credits=val; updateCredits(); } }
   function addStudentCredits(id, n){ const s=studentById(id); if(!s) return; setStudentCredits(id, s.credits + n); }
+  // ---------- Families & groups ----------
+  // Siblings in a family share one balance, so a change shows on each of them.
+  function familyOf(s){ return !s ? [] : s.familyId ? state.students.filter(x=>x.familyId===s.familyId) : [s]; }
+  function setGroupCredits(id, val){
+    const s=studentById(id); if(!s) return;
+    familyOf(s).forEach(x=>{ x.groupCredits=val; });
+    if(familyOf(s).some(x=>x.id===state.currentUser)){ state.groupCredits=val; renderGroupCredits(); }
+  }
+  function groupById(id){ return (state.groups||[]).find(g=>g.id===id); }
+  // A group session is one booking per student, tied together by groupSession.
+  function groupSeats(b){ return b && b.groupSession ? state.bookings.filter(x=>x.groupSession===b.groupSession) : (b ? [b] : []); }
+  function oneSeatPerGroup(list){ const seen=new Set(); return list.filter(b=>{ if(!b.groupSession) return true; if(seen.has(b.groupSession)) return false; seen.add(b.groupSession); return true; }); }
+  // Who a booking shows as for the tutor: the student, or the group as a whole.
+  function groupFace(b){ const nm=b.groupName||"Gruppe"; return { id:"group-"+b.groupSession, name:nm, i:initialsOf(nm), c:["#7a6bb0","#5a4c90"], isGroup:true, credits:0, billing:{}, log:[] }; }
+  function bookingFace(b){ return (b && b.groupSession && state.role!=="student") ? groupFace(b) : bookingStudent(b); }
+  function seatNames(b){ return groupSeats(b).map(x=>bookingStudent(x).name.split(" ")[0]).join(", "); }
+
   // Avatar contents: a photo (as background) wins, then a chosen emoji, else initials.
   function avatarText(t){ if(t && !t.photo && t.avatarEmoji) return `<span class="av-emoji">${esc(t.avatarEmoji)}</span>`; return esc((t && t.i) || ""); }
   function avatarStyle(t){ if(t && t.photo) return `background-image:url('${esc(t.photo)}'); background-size:cover; background-position:center; color:transparent;`; if(t && t.avatarEmoji && /^#[0-9a-f]{6}$/i.test(t.avatarBg||"")) return `background:${t.avatarBg};`; const c=(t&&t.c)||["#309050","#277a42"]; return `background: conic-gradient(from 140deg, ${c[0]}, ${c[1]}, ${c[0]});`; }
@@ -2396,6 +2471,7 @@
   }
 
   function cancelBooking(b){
+    if(b.creditKind==="group"){ cancelGroupSeat(b); return; }
     const i=state.bookings.indexOf(b); if(i<0) return;
     const refund=canModify(b);
     state.bookings.splice(i,1);
@@ -2657,6 +2733,8 @@
       if (mod) {
         $("#reschBtn").onclick = ()=>startReschedule(b);
         $("#cancelBtn").onclick = ()=>cancelBooking(b);
+        // A group session moves only with the whole group (the tutor does that).
+        if (b.groupSession) $("#reschBtn").remove();
       }
       $("#manageIcs").onclick = ()=>downloadIcs(b);
       $("#manageBack").onclick = ()=>{ state.managing=null; renderSummary(); };
@@ -2733,6 +2811,7 @@
     $("#balanceBig").textContent = state.credits;
     renderLessonStats();
     renderSettleBox();
+    renderGroupCredits();
   }
 
   // "Geplant" / "Abgeschlossen" on the student's balance card. Abgeschlossen
@@ -2825,6 +2904,7 @@
   }
   function openBuyInfo(p){
     const m=$("#buyModal");
+    const unitWord = p.kind==="group" ? "Gruppeneinheiten" : "Einheiten";
     const stripeOn = !!(state.stripe && state.stripe.enabled);
     // Card payments need a completed account (real e-mail + receipt address).
     const missing = stripeOn ? paymentSetupMissing(studentById(state.currentUser)) : [];
@@ -2838,19 +2918,19 @@
     m.innerHTML = `<div class="modal-card buy-card" id="buyCard">
       <button class="modal-x" id="buyX" aria-label="Close">×</button>
       <div class="buy-ic">${stripeOn ? `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>` : `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg>`}</div>
-      ${stripeOn ? (needBilling ? `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
+      ${stripeOn ? (needBilling ? `<h3 class="buy-h">${p.n} ${unitWord} kaufen</h3>
       <p class="buy-p">Bevor du per Karte bezahlen kannst, hinterlege bitte ${setupMissingText(missing)} in deinem Konto. Dorthin gehen deine Belege.</p>
       <button class="btn" id="buyBilling"><span class="grainbtn"></span>Konto vervollständigen</button>
       <button class="btn ghost" id="buyClose">Schließen</button>`
-      : `<h3 class="buy-h">${p.n} Einheiten kaufen</h3>
-      <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) sicher per Karte. Deine <b>${p.n} Einheiten</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
+      : `<h3 class="buy-h">${p.n} ${unitWord} kaufen</h3>
+      <p class="buy-p">Bezahle das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) sicher per Karte. Deine <b>${p.n} ${unitWord}</b> werden sofort gutgeschrieben und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       <label class="buy-consent"><input type="checkbox" id="buyConsent"><span>Ich stimme den <a href="/agb/" target="_blank" rel="noopener">AGB</a> zu und habe die <a href="/widerruf/" target="_blank" rel="noopener">Widerrufsbelehrung</a> zur Kenntnis genommen. Löse ich eine Einheit vor Ablauf der Widerrufsfrist ein, wünsche ich die vorzeitige Leistungserbringung ausdrücklich und nehme zur Kenntnis, dass mein Widerrufsrecht bei vollständiger Erbringung erlischt.</span></label>
       <button class="btn" id="buyStripe" disabled><span class="grainbtn"></span>Jetzt sicher bezahlen</button>
       <a class="btn ghost" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener">Lieber per WhatsApp schreiben</a>
       <button class="btn ghost" id="buyClose">Schließen</button>
       <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
-      : `<h3 class="buy-h">Einheiten fügt dein*e Tutor*in hinzu</h3>
-      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die Einheiten werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
+      : `<h3 class="buy-h">${unitWord} fügt dein*e Tutor*in hinzu</h3>
+      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die ${unitWord} werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
       ${billingComplete(studentById(state.currentUser)) ? "" : `<div class="credit-warn" role="alert">⚠ Deine Rechnungsadresse ist noch unvollständig. Ergänze sie vorher in deinem Konto, sonst steht sie nicht auf deinem Beleg.</div>`}
       ${waNum ? `<div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg><span>WhatsApp ${esc(waNum)}</span></div>` : ""}
       <a class="btn" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener"><span class="grainbtn"></span>Auf WhatsApp schreiben</a>
@@ -2870,7 +2950,7 @@
     if(consent && !consent.checked){ return; }
     const btn=$("#buyStripe");
     if(btn){ btn.disabled=true; btn.style.opacity="0.6"; }
-    apiResult('POST', '/api/checkout/', { n: p.n }).then(res => {
+    apiResult('POST', '/api/checkout/', p.kind==="group" ? { n: p.n, kind: "group" } : { n: p.n }).then(res => {
       if (res.ok && res.data && res.data.url) { window.location.href = res.data.url; return; }
       if(btn){ btn.disabled=false; btn.style.opacity=""; }
       // Server guard fallback: account incomplete → route to the account form.
@@ -2893,8 +2973,8 @@
     if (!sid) return;
     api('POST', '/api/checkout/confirm/', { sessionId: sid }).then(res => {
       if (res && res.paid) {
-        state.credits = res.credits;
-        const s = studentById(state.currentUser); if (s) s.credits = res.credits;
+        setStudentCredits(state.currentUser, res.credits);
+        if (typeof res.groupCredits === "number") setGroupCredits(state.currentUser, res.groupCredits);
         if (res.receipt) {
           const r = res.receipt;
           // The server already records this purchase as a transaction ("Einheiten
@@ -2942,6 +3022,7 @@
       if (mod) {
         row.querySelector(".resch").onclick = ()=>startReschedule(b);
         row.querySelector(".cancel").onclick = ()=>cancelBooking(b);
+        if (b.groupSession) row.querySelector(".resch").remove();
       }
       return row;
     });
@@ -3133,7 +3214,7 @@
       if(state.editAvail){
         if(isPast) return;
         if(bk){
-          const s=bookingStudent(bk);
+          const s=bookingFace(bk);
           el.className="slot t-booked locked";
           el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${esc(s.name.split(" ")[0])}</span>`;
           el.onclick=()=>toast("Gebuchte Zeit kann nicht geschlossen werden");
@@ -3166,9 +3247,9 @@
         el.innerHTML=`<span class="ts-time">${time}</span><span class="ts-add">+ Nachtragen</span>`;
         el.onclick=()=>openBackdate({ date:new Date(date), time });
       } else if(bk){
-        const s=bookingStudent(bk);
-        el.className="slot t-booked"+(bk.status==="requested"?" t-req":"")+(state.teacherManage===bk?" sel":"");
-        el.innerHTML=`<span class="ts-time">${time}${bk.status==="requested"?' · Anfrage':''}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${esc(s.name.split(" ")[0])}${bk.isIntro?' <span class="ts-intro">· Intro</span>':''}</span>`;
+        const s=bookingFace(bk);
+        el.className="slot t-booked"+(bk.status==="requested"?" t-req":"")+(bk.groupSession?" t-group":"")+(state.teacherManage && groupSeats(state.teacherManage).includes(bk)?" sel":"");
+        el.innerHTML=`<span class="ts-time">${time}${bk.status==="requested"?' · Anfrage':''}</span><span class="ts-name"><span class="ts-dot" style="${avatarStyle(s)}"></span>${esc(bk.groupSession ? s.name : s.name.split(" ")[0])}${bk.isIntro?' <span class="ts-intro">· Intro</span>':''}${bk.groupSession?` <span class="ts-intro">· ${groupSeats(bk).length}</span>`:''}</span>`;
         el.onclick=()=>teacherManageSlot(bk);
       } else {
         const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
@@ -3234,7 +3315,8 @@
   // "Diese Woche: n Stunden" and "<Monat>: n gehalten" next to the calendar.
   function renderTeacherCounts(weekStart){
     const el=$("#tCounts"); if(!el) return;
-    const mine=state.bookings.filter(b=>b.tutorId===state.myTutor && b.studentId!=="__blocked__");
+    // A group session counts once, however many students sit in it.
+    const mine=oneSeatPerGroup(state.bookings.filter(b=>b.tutorId===state.myTutor && b.studentId!=="__blocked__"));
     const weekEnd=addDays(weekStart,7);
     const inWeek=mine.filter(b=>b.date>=weekStart && b.date<weekEnd).length;
     // The month of the week shown (the month most of its days are in).
@@ -3482,27 +3564,34 @@
         ${sel.closed ? `<div class="micro" style="text-align:left;margin:-4px 0 12px;">Diese Zeit ist nicht als Verfügbarkeit freigegeben. Schüler*innen können sie nicht buchen, nur du trägst hier jemanden ein.</div>` : ""}
         <label class="field-label">Schüler*in</label>
         <select class="t-select" id="assignSel">${opts}</select>
+        ${myGroups().length ? `<label class="field-label" style="margin-top:12px;">oder Gruppe <span class="lbl-only">· je 1 Gruppeneinheit</span></label>
+        <select class="t-select" id="assignGroup"><option value="">Keine Gruppe</option>${myGroups().map(g=>`<option value="${g.id}">${esc(g.name)} (${g.members.length})</option>`).join("")}</select>` : ""}
         <div class="assign-note" id="assignNote"></div>
         <button class="btn" id="assignBtn"><span class="grainbtn"></span>Eintragen</button>
         ${sugg.length ? `<button class="btn ghost" id="assignSkip" style="margin-top:10px;">Diese Woche nicht</button>` : ""}
         <button class="btn-text" id="assignCancel">Abbrechen</button>
       `;
       if($("#assignSkip")) $("#assignSkip").onclick=()=>skipUsualSlot(sugg, sel);
-      const selEl=$("#assignSel");
-      const note=()=>{ const s=studentById(selEl.value); $("#assignNote").innerHTML = s.credits>0
+      const selEl=$("#assignSel"), grpEl=$("#assignGroup");
+      const note=()=>{ const g=grpEl && grpEl.value ? groupById(+grpEl.value) : null;
+        selEl.disabled=!!g;
+        if(g){ $("#assignNote").innerHTML=groupAssignNote(g); return; }
+        const s=studentById(selEl.value); $("#assignNote").innerHTML = s.credits>0
         ? `Bucht die Stunde und zieht <b style='color:var(--c1)'>1 Einheit</b> von ${esc(s.name.split(" ")[0])} ab (→ ${s.credits-1}).`
         : `<span class="warn">${esc(s.name.split(" ")[0])} hat keine Einheiten mehr offen.</span>`; };
-      selEl.onchange=note; note();
+      selEl.onchange=note; if(grpEl) grpEl.onchange=note; note();
       $("#assignTime").oninput=(e)=>{ if(/^\d{2}:\d{2}$/.test(e.target.value)) $("#assignEnd").textContent="endet "+endTime(e.target.value); };
       $("#assignBtn").onclick=()=>{
         const tm=$("#assignTime").value;
         if(!/^\d{2}:\d{2}$/.test(tm)){ toast("Gib eine gültige Startzeit ein"); return; }
         if(bookingConflict(sel.date, tm, null, state.myTutor)){ toast("Das überschneidet eine andere Buchung. Wähle eine andere Zeit"); return; }
+        if(grpEl && grpEl.value){ teacherAssignGroup(sel.date, tm, +grpEl.value); return; }
         teacherAssign(sel.date, tm, selEl.value);
       };
       $("#assignCancel").onclick=()=>{ state.teacherSel=null; renderTeacherWeek(); renderTeacherSummary(); };
       return;
     }
+    if(state.teacherManage && state.teacherManage.groupSession){ renderGroupManage(card, state.teacherManage); return; }
     if(state.teacherManage){
       const bk=state.teacherManage, s=bookingStudent(bk);
       const guestLine = s.isGuest ? `<div class="rl">${esc(s.guestEmail||"Schnupperstunde · Gast")}</div>` : "";
@@ -3683,12 +3772,13 @@
       const r = res.receipt;
       state.receipts.push(r);
       const paid = opts.method === "transfer" ? "per Überweisung bezahlt" : "bar bezahlt";
-      s.log.unshift({ type:"buy", label: opts.note || "Einheiten von Tutor*in", sub:"Heute · "+paid, amt:"+"+n, receiptNo: r.no });
-      addStudentCredits(s.id, n);
+      const group = opts.kind === "group";
+      s.log.unshift({ type:"buy", label: opts.note || (group ? "Gruppeneinheiten von Tutor*in" : "Einheiten von Tutor*in"), sub:"Heute · "+paid, amt:"+"+n, receiptNo: r.no, creditKind: group ? "group" : "single" });
+      if (group) setGroupCredits(s.id, (s.groupCredits||0) + n); else addStudentCredits(s.id, n);
       renderRoster(); renderAccount();
       if(fromModal) renderStudentModal();
       openReceipt(r);
-      toast(`+${n} Einheiten → ${s.name.split(" ")[0]}`);
+      toast(group ? `+${n} Gruppeneinheiten → ${s.name.split(" ")[0]}` : `+${n} Einheiten → ${s.name.split(" ")[0]}`);
     });
   }
 
@@ -3705,7 +3795,7 @@
         <div class="st-sheet-top">
         <div class="sum-head">
           ${s.isGuest ? `<div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${avatarText(s)}</div>` : `<button class="av-edit" id="modalAvatarBtn" title="Profilbild ändern" aria-label="Profilbild ändern"><div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${avatarText(s)}</div></button>`}
-          <div><div class="nm">${esc(s.name)}</div><div class="rl">${s.credits} Einheiten · ${upc} geplante Stunde${upc!==1?"n":""}</div></div>
+          <div><div class="nm">${esc(s.name)}</div><div class="rl">${s.credits} Einheiten · ${upc} geplante Stunde${upc!==1?"n":""}</div>${familyLineHtml(s)}</div>
         </div>
         <div class="modal-add">
           <span class="ma-label">Einheiten hinzufügen<em>Bar oder Stripe</em></span>
@@ -3714,6 +3804,11 @@
             <button class="mini-btn" id="maddCustom" title="Beliebige Anzahl und Betrag, z. B. Familienangebot">Individuell…</button>
           </div>
         </div>
+        ${showsGroupCredits(s) ? `
+        <div class="modal-add">
+          <span class="ma-label">Gruppeneinheiten · ${s.groupCredits||0}<em>bar, je € ${state.groupCreditPrice}</em></span>
+          <div class="ma-btns">${[1,5,10].map(n=>`<button class="mini-btn" data-gadd="${n}">+${n}</button>`).join("")}</div>
+        </div>` : ""}
         ${s.credits < 0 ? `
         <div class="modal-add" style="background:rgba(194,85,47,0.08);border-color:rgba(194,85,47,0.25);">
           <span class="ma-label" style="color:#c2552f;">Offene Einheiten begleichen<em>${-s.credits} × € ${settleUnitEuros(-s.credits)} = € ${settleUnitEuros(-s.credits)*(-s.credits)}</em></span>
@@ -3759,6 +3854,11 @@
     $("#studentModal").querySelectorAll("[data-session]").forEach(btn=> btn.onclick=()=>openSession(+btn.dataset.session));
     $("#maddCustom").onclick=()=>openCustomTopUp(s, true);
     bindStudentProfile($("#studentModal"), s);
+    $("#studentModal").querySelectorAll("[data-gadd]").forEach(btn=> btn.onclick=()=>{
+      const n=+btn.dataset.gadd;
+      if(!window.confirm(`${n} Gruppeneinheit${n===1?"":"en"} für ${s.name} gutschreiben (bar bezahlt, € ${n*state.groupCreditPrice})? Der Beleg wird gleich ausgestellt.`)) return;
+      topUp(s, n, true, { kind: "group" });
+    });
     bindSchoolTests($("#modalTests"), s.id, renderStudentModal);
     bindHomeworkCard($("#modalHomework"));
     bindLevelCharts($("#studentModal"), s.id);
@@ -3890,8 +3990,8 @@
     // Hide a student's anonymized "__blocked__" slot, but show real bookings and
     // free guest intro sessions (which have no roster account).
     if(b.studentId==="__blocked__") return "";
-    const s=bookingStudent(b);
-    const nameLine = s.isGuest ? `${esc(s.name)} · Intro` : esc(s.name);
+    const s=bookingFace(b);
+    const nameLine = s.isGuest ? `${esc(s.name)} · Intro` : s.isGroup ? `${esc(s.name)} · ${esc(seatNames(b))}` : esc(s.name);
     return `<div class="li">
       <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
       <div class="avatar" style="${avatarStyle(s)};width:38px;height:38px;font-size:13px;">${avatarText(s)}</div>
@@ -3963,8 +4063,8 @@
   function renderTutorLists(){
     const up=$("#tutorUpcoming"), done=$("#tutorCompleted");
     if(!up||!done) return;
-    const upcoming = state.bookings.filter(b=> b.date>=NOW || sameDay(b.date,NOW)).sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
-    const past = state.bookings.filter(b=> b.date<NOW && !sameDay(b.date,NOW)).sort((a,b)=> b.date-a.date || toMin(b.time)-toMin(a.time));
+    const upcoming = oneSeatPerGroup(state.bookings.filter(b=> b.date>=NOW || sameDay(b.date,NOW))).sort((a,b)=>a.date-b.date || toMin(a.time)-toMin(b.time));
+    const past = oneSeatPerGroup(state.bookings.filter(b=> b.date<NOW && !sameDay(b.date,NOW))).sort((a,b)=> b.date-a.date || toMin(b.time)-toMin(a.time));
     const real=b=>b.studentId!=="__blocked__";
     if(upcoming.some(real)) renderGroupedList(up, upcoming.filter(real), "tUp", false, b=>tutorRow(b,false));
     else up.innerHTML=`<div class="empty-list">Keine geplanten Stunden.</div>`;
@@ -4067,7 +4167,7 @@
 
   // ---------- Admin: user management ----------
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
-  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); renderAdminTxns(); renderPayouts(); }
+  function renderAdmin(){ renderAdminList(); renderAdminEditor(); renderAdminPacks(); renderAdminTxns(); renderPayouts(); renderAdminGroups(); }
   // Per-tutor payout basis. Lessons paid for with *migrated* (opening-balance)
   // credits carry no on-platform revenue, so they can't be paid out. For each
   // student we treat their earliest completed lessons as consuming the opening
@@ -4376,6 +4476,209 @@
     if(state.myTutor===u.id) state.myTutor=(tutorAccounts[0]||{id:""}).id;
     state.adminSel=(allAccounts()[0]||{id:"admin"}).id;
     renderAdmin(); renderRoster(); toast("Tutor*in entfernt");
+  }
+
+  // ---------- Group sessions, group credits, families ----------
+  // Groups the signed-in tutor can book: their own, and groups without a tutor.
+  function myGroups(){ return (state.groups||[]).filter(g=> g.members.length && (!g.tutorId || g.tutorId===state.myTutor)); }
+  function groupAssignNote(g){
+    const ms=g.members.map(studentById).filter(Boolean);
+    const low=ms.filter(s=>(s.groupCredits||0)<1);
+    return `Bucht eine Gruppenstunde für ${ms.map(s=>esc(s.name.split(" ")[0])).join(", ")} und zieht jeder*m <b style='color:var(--c1)'>1 Gruppeneinheit</b> ab.`
+      + (low.length ? `<br><span class="warn">Keine Gruppeneinheiten mehr: ${low.map(s=>esc(s.name.split(" ")[0])).join(", ")}</span>` : "");
+  }
+  function addSeats(list){
+    list.forEach(b=> state.bookings.push({ ...b, _pk:b.pk, date:new Date(b.date+"T00:00:00"), exercises:b.exercises||[], files:b.files||[] }));
+  }
+  function teacherAssignGroup(date, time, groupId){
+    const g=groupById(groupId); if(!g) return;
+    apiResult('POST', '/api/group-sessions/', { groupId, tutorSlug: state.myTutor, date: ymd(date), time, title: "Gruppenstunde" }).then(res=>{
+      const d=res.data||{};
+      if(res.status===409 && d.error==="credit_floor_reached"){ toast(`${(d.students||[]).join(", ")}: Limit offener Gruppeneinheiten erreicht. Bitte zuerst aufladen`); return; }
+      if(res.status===409){ toast("Zu dieser Zeit gibt es schon eine Buchung"); return; }
+      if(!res.ok || !d.bookings){ toast("Buchung fehlgeschlagen"); return; }
+      addSeats(d.bookings);
+      Object.entries(d.balances||{}).forEach(([sid, v])=>setGroupCredits(sid, v));
+      state.teacherSel=null; state.teacherManage=null;
+      renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderWeek();
+      toast(`${g.name} eingetragen · ${MONTHS_S[date.getMonth()]} ${date.getDate()}, ${time}`);
+    });
+  }
+  // The calendar panel for a group session: who is in it, the slot, and the
+  // actions for the whole group.
+  function renderGroupManage(card, bk){
+    const seats=groupSeats(bk), face=groupFace(bk), ended=lessonEnded(bk);
+    card.innerHTML=`
+      <div class="manage-eyebrow">Gruppenstunde</div>
+      <div class="sum-head"><div class="avatar" style="${avatarStyle(face)}">${avatarText(face)}</div><div><div class="nm">${esc(face.name)}</div><div class="rl">${bk.time} · ${fmtLong(bk.date)}</div></div></div>
+      <div class="grp-seats">${seats.map(x=>{ const s=bookingStudent(x); return `<div class="grp-seat"><span class="avatar" style="${avatarStyle(s)};width:28px;height:28px;font-size:11px;">${avatarText(s)}</span><span class="gs-nm">${esc(s.name)}</span><span class="gs-cr">${s.groupCredits||0} Gruppeneinh.</span></div>`; }).join("")}</div>
+      ${ended ? `<div class="done-note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg><span><b>Abgeschlossen.</b> Zusammenfassung, Übungen und Fehler trägst du auf der Seite der Stunde ein.</span></div>` : `
+      <label class="field-label">Titel der Stunde</label>
+      <input class="bf-input" id="gTitle" value="${esc(bk.title)}">
+      <label class="field-label" style="margin-top:12px;">Tag und Startzeit <span class="lbl-only">· 45 Min.</span></label>
+      <div class="time-edit">
+        <input type="date" class="bf-input" id="gDate" value="${ymd(bk.date)}" aria-label="Tag">
+        <input type="time" class="bf-input" id="gTime" value="${bk.time}" step="300" min="07:00" max="21:00" aria-label="Startzeit">
+      </div>
+      <label class="field-label" style="margin-top:12px;">Call-Link <span class="lbl-only">· ${DEFAULT_CALL ? "leer = euer fester Link" : "Zoom, Teams…"}</span></label>
+      <input class="bf-input" id="gLink" type="url" value="${esc(bk.callLinkOwn!=null ? bk.callLinkOwn : bk.callLink)}" placeholder="${DEFAULT_CALL ? esc(DEFAULT_CALL) : "https://… Meeting-Link einfügen"}">
+      <button class="btn" id="gSave" style="margin-top:12px;"><span class="grainbtn"></span>Für alle speichern</button>`}
+      <a class="btn ${ended?"":"ghost"}" id="gOpen" href="#stunde-${bk._pk}" style="margin-top:10px;">${ended?'<span class="grainbtn"></span>':""}Stunde öffnen · Notizen, Übungen, Fehler</a>
+      <button class="btn danger-btn" id="gCancel" style="margin-top:10px;"><span class="grainbtn"></span>Gruppenstunde absagen</button>
+      <button class="btn-text" id="tBack">← Zurück</button>
+      <div class="micro">Absagen gibt jeder*m in der Gruppe <b style='color:var(--c1)'>1 Gruppeneinheit</b> zurück.</div>`;
+    $("#gOpen").onclick=(e)=>{ e.preventDefault(); openSession(bk._pk); };
+    $("#tBack").onclick=()=>{ state.teacherManage=null; renderTeacherSummary(); renderTeacherWeek(); };
+    $("#gCancel").onclick=()=>{
+      if(!window.confirm(`Gruppenstunde ${face.name} am ${fmtLong(bk.date)} um ${bk.time} absagen? Alle bekommen ihre Gruppeneinheit zurück.`)) return;
+      api('DELETE', `/api/bookings/${bk._pk}/?group=all`).then(r=>{
+        if(!r){ toast("Absagen fehlgeschlagen"); return; }
+        seats.forEach(x=>{ const s=studentById(x.studentId); if(s) setGroupCredits(s.id, (s.groupCredits||0)+1); });
+        state.bookings=state.bookings.filter(x=>!seats.includes(x));
+        state.teacherManage=null;
+        renderTeacherWeek(); renderTeacherSummary(); renderRoster(); renderWeek();
+        toast(`${face.name} abgesagt · Gruppeneinheiten zurück`);
+      });
+    };
+    if($("#gSave")) $("#gSave").onclick=async ()=>{
+      let own=$("#gLink").value.trim();
+      if(own && !/^https?:\/\//i.test(own)){
+        if(/^[a-z][a-z0-9+.-]*:/i.test(own) && !/^[^/:]+:\d/.test(own)){ toast("Link muss mit http(s):// beginnen."); return; }
+        own="https://"+own;
+      }
+      const dv=$("#gDate").value, tv=$("#gTime").value;
+      const nd=/^\d{4}-\d{2}-\d{2}$/.test(dv) ? new Date(dv+"T00:00:00") : bk.date, tm=/^\d{2}:\d{2}$/.test(tv) ? tv : bk.time;
+      const moved = tm!==bk.time || !sameDay(nd, bk.date);
+      if(moved && state.bookings.some(x=>!seats.includes(x) && x.tutorId===bk.tutorId && sameDay(x.date, nd) && Math.abs(toMin(x.time)-toMin(tm))<45)){ toast("Diese Zeit überschneidet eine andere Buchung"); return; }
+      const title=$("#gTitle").value.trim()||bk.title;
+      const r=await apiResult('PUT', `/api/bookings/${bk._pk}/`, { title, callLink: own, date: ymd(nd), time: tm });
+      if(!r.ok){ toast(r.data && r.data.error==="slot_taken" ? "Zu dieser Zeit gibt es schon eine Buchung" : "Speichern fehlgeschlagen"); return; }
+      seats.forEach(x=>{ x.title=title; x.callLinkOwn=own; x.callLink=own||DEFAULT_CALL; x.date=nd; x.time=tm; });
+      if(moved && !dayTimes(nd, bk.tutorId).includes(tm)){ const cm=customMap(bk.tutorId), dk=ymd(nd); cm[dk]=cm[dk]||[]; cm[dk].push(tm); }
+      renderTeacherWeek(); renderTutorLists(); renderTeacherSummary();
+      toast(moved ? `Gruppenstunde verschoben auf ${fmtLong(nd)}, ${tm}` : "Für alle gespeichert");
+    };
+  }
+  // A student leaves their own seat in a group session (same 24 h rule).
+  function cancelGroupSeat(b){
+    const i=state.bookings.indexOf(b); if(i<0) return;
+    const refund=canModify(b);
+    state.bookings.splice(i,1);
+    if(refund) setGroupCredits(state.currentUser, (state.groupCredits||0)+1);
+    meLog().unshift({ type: refund?"buy":"done", label: refund?"Gruppenstunde storniert, Gruppeneinheit erstattet":"Gruppenstunde storniert (innerhalb 24 h)", sub: (b.groupName||"Gruppe")+" · "+MONTHS_S[b.date.getMonth()]+" "+b.date.getDate(), amt: refund?"+1":"", creditKind:"group" });
+    if (b._pk) api('DELETE', '/api/bookings/' + b._pk + '/').then(r => {
+      if (r && typeof r.credits === 'number') { setGroupCredits(state.currentUser, r.credits); renderAccount(); }
+    });
+    state.managing=null; state.selected=null; state.justBooked=null;
+    renderWeek(); renderSummary(); renderAccount();
+    toast(refund ? "Gruppenstunde storniert · 1 Gruppeneinheit erstattet" : "Gruppenstunde storniert");
+  }
+  // Group credits show for students who are in a group or hold some.
+  function showsGroupCredits(s){ return !!s && ((s.groupCredits||0)!==0 || (state.groups||[]).some(g=>g.members.includes(s.id))); }
+  function groupPacks(){ return [1,5,10].map(n=>({ n, kind:"group", price:"€"+(n*state.groupCreditPrice), each:"€"+state.groupCreditPrice+" / Gruppenstunde" })); }
+  function renderGroupCredits(){
+    if(state.role!=="student") return;
+    const me=studentById(state.currentUser), extra=$("#balanceExtra"), packsEl=$("#groupPacks");
+    if(!me || !extra || !packsEl) return;
+    me.groupCredits=state.groupCredits;
+    const show=showsGroupCredits(me);
+    extra.innerHTML = (show ? `<div class="bal-group"><b>${state.groupCredits}</b> Gruppeneinheit${state.groupCredits===1?"":"en"} <span>für Gruppenstunden</span></div>` : "")
+      + (me.familyName ? `<div class="bal-family">Familienkonto ${esc(me.familyName)} · geteilt mit deinen Geschwistern</div>` : "");
+    if(!show){ packsEl.innerHTML=""; return; }
+    packsEl.innerHTML=`<div class="section-h" style="margin-top:22px;"><h2>Gruppeneinheiten aufladen</h2></div>
+      <div class="packs" id="groupPackList"></div>
+      <div class="micro" style="margin-top:12px;">Für Gruppenstunden. Jede*r in der Gruppe zahlt mit den eigenen Gruppeneinheiten.</div>`;
+    const list=$("#groupPackList");
+    groupPacks().forEach(p=>{
+      const d=document.createElement("div"); d.className="pack";
+      d.innerHTML=`<div class="pc">${p.n}</div><div class="pl">Gruppeneinh.</div><div class="pp">${esc(p.price)}</div><div class="pe">${esc(p.each)}</div>`;
+      d.onclick=()=>openBuyInfo(p);
+      list.appendChild(d);
+    });
+  }
+  function familyLineHtml(s){
+    if(!s || !s.familyName) return "";
+    const sib=familyOf(s).filter(x=>x.id!==s.id).map(x=>esc(x.name.split(" ")[0]));
+    return `<div class="rl fam-line">Familienkonto ${esc(s.familyName)}${sib.length ? " · mit "+sib.join(", ") : ""}</div>`;
+  }
+  // Session page of a group session: the tutor switches between the students'
+  // seats (homework, results and the error log are per student).
+  function seatSwitchHtml(b, tutor){
+    if(!tutor) return `<div class="seat-switch"><span class="ss-lbl">Gruppenstunde · ${esc(b.groupName||"Gruppe")}</span></div>`;
+    return `<div class="seat-switch"><span class="ss-lbl">${esc(b.groupName||"Gruppe")} ·</span>${groupSeats(b).map(x=>`<button class="sx-chip seat ${x===b?"on":""}" data-seat="${x._pk}" title="Hausübung, Ergebnisse und Fehler von ${esc(bookingStudent(x).name)}">${esc(bookingStudent(x).name.split(" ")[0])}</button>`).join("")}</div>`;
+  }
+  // A worksheet uploaded in a group session is shared by every seat; a
+  // Hausübung comes back as one copy per student.
+  function shareNewFile(b, f, copies){
+    if(!b.groupSession) return;
+    if(f.kind==="worksheet") groupSeats(b).forEach(x=>{ if(x!==b && !(x.files||[]).some(y=>y.id===f.id)) x.files=[...(x.files||[]), f]; });
+    (copies||[]).forEach(c=>{ const x=bookingByPk(c.bookingPk); if(x && !(x.files||[]).some(y=>y.id===c.file.id)) x.files=[...(x.files||[]), c.file]; });
+  }
+
+  // Admin: families (shared balance) and groups (group sessions).
+  function renderAdminGroups(){
+    const fe=$("#adminFamilies"), ge=$("#adminGroups"); if(!fe || !ge) return;
+    const ed=state.fgEdit;
+    const chips=ids=> ids.map(id=>{ const s=studentById(id); return s ? `<span class="fg-chip">${esc(s.name)}</span>` : ""; }).join("") || `<span class="micro" style="margin:0;">Noch niemand</span>`;
+    const card=(type, x, sub)=> (ed && ed.type===type && ed.id===x.id) ? fgEditorHtml(type, x) : `<div class="fg-card">
+        <div class="fg-top"><div><div class="fg-name">${esc(x.name)}</div><div class="fg-sub">${sub}</div></div><button class="mini-btn" data-fg-edit="${type}:${x.id}">Bearbeiten</button></div>
+        <div class="fg-chips">${chips(x.members)}</div></div>`;
+    fe.innerHTML = state.families.map(f=>card("family", f, `${f.credits} Einheiten · ${f.groupCredits} Gruppeneinheiten`)).join("")
+      + (ed && ed.type==="family" && ed.id==="new" ? fgEditorHtml("family", { id:"new", name:"", members:[] }) : "")
+      || `<div class="empty-list">Noch keine Familien.</div>`;
+    ge.innerHTML = state.groups.map(g=>{ const t=tutorAccounts.find(x=>x.id===g.tutorId); return card("group", g, t ? "mit "+esc(t.name) : "ohne feste*n Tutor*in"); }).join("")
+      + (ed && ed.type==="group" && ed.id==="new" ? fgEditorHtml("group", { id:"new", name:"", tutorId:(tutorAccounts[0]||{}).id||"", members:[] }) : "")
+      || `<div class="empty-list">Noch keine Gruppen.</div>`;
+    document.querySelectorAll("[data-fg-edit]").forEach(btn=> btn.onclick=()=>{ const [type, id]=btn.dataset.fgEdit.split(":"); state.fgEdit={ type, id:+id }; renderAdminGroups(); });
+    const ef=document.querySelector(".fg-editor"); if(ef) bindFgEditor(ef);
+  }
+  function fgEditorHtml(type, x){
+    const fam=type==="family";
+    const rows=state.students.map(s=>{
+      const other = fam && s.familyId && s.familyId!==x.id ? (state.families.find(f=>f.id===s.familyId)||{}).name : "";
+      return `<label class="fg-pick"><input type="checkbox" value="${esc(s.id)}" ${x.members.includes(s.id)?"checked":""}><span>${esc(s.name)}</span>${other ? `<em>bisher ${esc(other)}</em>` : ""}</label>`;
+    }).join("");
+    return `<div class="fg-card fg-editor" data-type="${type}" data-id="${x.id}">
+      <label class="bf-lab">${fam ? "Name der Familie" : "Name der Gruppe"}<input class="bf-input" id="fgName" value="${esc(x.name)}" placeholder="${fam ? "z. B. Familie Huber" : "z. B. Matura-Gruppe Dienstag"}"></label>
+      ${fam ? "" : `<label class="bf-lab">Tutor*in<select class="bf-input" id="fgTutor"><option value="">Alle Tutor*innen</option>${tutorAccounts.map(t=>`<option value="${esc(t.id)}" ${t.id===x.tutorId?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>`}
+      <div class="field-label" style="margin-top:6px;">${fam ? "Geschwister" : "Schüler*innen"}</div>
+      <div class="fg-picklist">${rows || `<div class="micro">Noch keine Schüler*innen.</div>`}</div>
+      ${fam ? `<div class="micro" style="text-align:left;">Wer dazukommt, bringt das eigene Guthaben ins Familienkonto mit. Wer geht, startet wieder bei 0; die*der Letzte übernimmt den Rest.</div>` : ""}
+      <div class="fg-actions">
+        <button class="btn" id="fgSave"><span class="grainbtn"></span>Speichern</button>
+        <button class="btn ghost" id="fgCancel">Abbrechen</button>
+      </div>
+      ${x.id!=="new" ? `<button class="btn-text" id="fgDelete" style="color:#b8492c;">${fam ? "Familie auflösen" : "Gruppe löschen"}</button>` : ""}
+    </div>`;
+  }
+  function applyBalances(map){
+    Object.entries(map||{}).forEach(([sid, v])=>{ const s=studentById(sid); if(!s) return; Object.assign(s, v); });
+  }
+  function bindFgEditor(el){
+    const type=el.dataset.type, id=el.dataset.id==="new" ? null : +el.dataset.id, fam=type==="family";
+    const listKey=fam ? "families" : "groups", base=fam ? "/api/families/" : "/api/groups/";
+    $("#fgCancel").onclick=()=>{ state.fgEdit=null; renderAdminGroups(); };
+    $("#fgSave").onclick=async ()=>{
+      const body={ name:$("#fgName").value.trim(), members:[...el.querySelectorAll(".fg-pick input:checked")].map(i=>i.value) };
+      if(!body.name){ toast("Bitte einen Namen eingeben"); return; }
+      if(!fam) body.tutorSlug=$("#fgTutor").value;
+      const r=await apiResult(id ? "PUT" : "POST", id ? base+id+"/" : base, body);
+      if(!r.ok || !r.data){ toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); return; }
+      const saved=r.data[fam ? "family" : "group"], list=state[listKey], i=list.findIndex(x=>x.id===saved.id);
+      if(i>=0) list[i]=saved; else list.push(saved);
+      applyBalances(r.data.students);
+      state.fgEdit=null; renderAdminGroups(); renderAdmin(); renderRoster();
+      toast(saved.name+" gespeichert");
+    };
+    if($("#fgDelete")) $("#fgDelete").onclick=async ()=>{
+      const x=state[listKey].find(y=>y.id===id); if(!x) return;
+      if(!window.confirm(fam ? `Familie ${x.name} auflösen? Das gemeinsame Guthaben bekommt die*der zuletzt verbliebene Schüler*in.` : `Gruppe ${x.name} löschen? Gehaltene Gruppenstunden bleiben im Verlauf.`)) return;
+      const r=await apiResult("DELETE", base+id+"/");
+      if(!r.ok){ toast("Löschen fehlgeschlagen"); return; }
+      state[listKey]=state[listKey].filter(y=>y.id!==id);
+      applyBalances(r.data && r.data.students);
+      state.fgEdit=null; renderAdmin(); renderRoster();
+    };
   }
 
   // ---------- Toast ----------
@@ -4854,7 +5157,13 @@
   async function saveBooking(b, fields){
     const r=await apiResult('PUT', `/api/bookings/${b._pk}/`, fields);
     if(!r.ok){ toast("Speichern fehlgeschlagen"); return false; }
-    Object.assign(b, fields); return true;
+    Object.assign(b, fields);
+    // The server copies what the tutor writes to every seat of a group session.
+    if(b.groupSession && state.role!=="student"){
+      const shared={}; ["title","notes","tutorNotes","summary","homework"].forEach(k=>{ if(k in fields) shared[k]=fields[k]; });
+      groupSeats(b).forEach(x=>{ if(x!==b) Object.assign(x, shared); });
+    }
+    return true;
   }
 
   // PDF.js is shipped with the site (no third-party CDN) and only loaded the
@@ -4932,6 +5241,7 @@
       <div class="sx-ttl">
         ${tutor ? `<input class="sess-title-in" id="sessTitle" value="${esc(b.title)}" aria-label="Thema der Stunde">` : `<h1>${esc(b.title)}</h1>`}
         <div class="sx-meta">${lessonEnded(b) ? "" : "Geplant · "}${fmtLong(b.date)} · ${b.time}–${endTime(b.time)} · mit ${esc(tutor ? s.name : t.name)}${b.status==="requested" ? ' <span class="req-chip">Angefragt</span>' : ""}</div>
+        ${b.groupSession ? seatSwitchHtml(b, tutor) : ""}
       </div>
       <div class="sx-files">
         ${worksheets(b).map(f=>`<button class="sx-chip ${f.kind==="assignment"?"hu":""} ${f.id===sx.fileId?"on":""}" data-sheet="${f.id}" title="${f.kind==="assignment"?"Hausübung: ":""}${esc(f.name)}">${f.kind==="assignment"?'<span class="hu-tag">HÜ</span>':""}${esc(f.name.replace(/\.[^.]+$/, ""))}</button>`).join("")}
@@ -4940,6 +5250,7 @@
         <a class="sx-chip pdf" href="/api/bookings/${b._pk}/pdf/" target="_blank" rel="noopener" title="Stundenübersicht als PDF${tutor ? ", zum Verschicken" : ""}">↓ PDF</a>
       </div>`;
     $("#sessBack").onclick=leaveSession;
+    bar.querySelectorAll("[data-seat]").forEach(c=> c.onclick=()=>{ const pk=+c.dataset.seat; if(pk!==b._pk){ state.sx=null; openSession(pk); } });
     if($("#sessTitle")) $("#sessTitle").onchange=()=>{ const v=$("#sessTitle").value.trim(); if(v) saveBooking(b, { title: v }); };
     bar.querySelectorAll("[data-sheet]").forEach(c=> c.onclick=()=>{ sx.fileId=+c.dataset.sheet; closeSxPop(); renderSession(); });
     const menus=[...bar.querySelectorAll("[data-menu]")];
@@ -4996,6 +5307,7 @@
       const r=await apiResult('POST', `/api/bookings/${b._pk}/files/import/`, { materialId: +btn.dataset.mat, kind });
       if(!r.ok || !r.data || !r.data.file){ btn.disabled=false; toast((r.data && r.data.error) || "Hinzufügen fehlgeschlagen"); return; }
       if(!(b.files||[]).some(f=>f.id===r.data.file.id)) b.files=[...(b.files||[]), r.data.file];
+      shareNewFile(b, r.data.file, r.data.copies);
       sx.fileId=r.data.file.id; close(); renderSession(); toast(r.data.file.name+" hinzugefügt");
     });
     $("#mpSearch").oninput=e=>{ q=e.target.value; $("#mpList").innerHTML=listHtml(); bindList(); };
@@ -5011,6 +5323,7 @@
     const r=await apiUpload(`/api/bookings/${b._pk}/files/`, file, kind==="assignment" ? { kind } : null);
     if(!r || r.error){ toast((r && r.error) || "Hochladen fehlgeschlagen"); return; }
     b.files=[...(b.files||[]), r.file];
+    shareNewFile(b, r.file, r.copies);
     if(r.file.kind==="worksheet" || r.file.kind==="assignment") sx.fileId=r.file.id;
     renderSession(); toast("Hochgeladen");
   }
@@ -5264,7 +5577,7 @@
       if(!front || !back){ toast(vocab ? "Bitte die Bedeutung eintragen" : "Bitte die richtige Version eintragen"); return; }
       const r=await apiResult('POST', '/api/error-cards/', { kind, studentSlug:b.studentId, bookingPk:b._pk, front, back, note, fileId:sx.fileId, page:p.page, rects:p.rects });
       if(!r.ok){ toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); return; }
-      state.errorCards.push(r.data.card);
+      state.errorCards.push(...(r.data.cards || [r.data.card]));
       sx.tab=kind; sx.flash=r.data.card.id; sx.pending=null;
       closeSxPop(); renderSidePanel(b, sx); drawHighlights(b, sx);
       if(state.sxWide) toast(vocab ? "Zum Wortschatz hinzugefügt" : "Als Fehler gespeichert");
@@ -5739,7 +6052,7 @@
       if(!front || !back){ toast(kind==="vocab" ? "Bitte Wort und Bedeutung eintragen" : "Bitte falsch und richtig eintragen"); return; }
       const r=await apiResult('POST', '/api/error-cards/', { kind, studentSlug:b.studentId, bookingPk:b._pk, front, back });
       if(!r.ok){ toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); return; }
-      state.errorCards.push(r.data.card); sx.flash=r.data.card.id; renderSidePanel(b, sx); $("#sxAddFront").focus();
+      state.errorCards.push(...(r.data.cards || [r.data.card])); sx.flash=r.data.card.id; renderSidePanel(b, sx); $("#sxAddFront").focus();
     };
     const pasteTa=$("#sxPasteTa");
     if(pasteTa){
@@ -5755,7 +6068,7 @@
         state.errorCards.push(...r.data.cards);
         sx.pasteDraft = bad.join("\n"); sx.pasteOpen = !!bad.length;
         renderSidePanel(b, sx);
-        toast(`${r.data.cards.length} hinzugefügt${bad.length ? ` · ${bad.length} Zeile${bad.length===1?"":"n"} übrig` : ""}`);
+        toast(`${items.length} hinzugefügt${bad.length ? ` · ${bad.length} Zeile${bad.length===1?"":"n"} übrig` : ""}`);
       };
     }
     // Exercises
@@ -5776,7 +6089,9 @@
       const title=$("#exTitle").value.trim(); if(!title){ toast("Bitte die Übung eintragen"); return; }
       const r=await apiResult('POST', `/api/bookings/${b._pk}/exercises/`, { title, link: $("#exLink").value.trim() });
       if(!r.ok){ toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); return; }
-      b.exercises=[...ex, r.data.exercise]; renderSidePanel(b, sx); $("#exTitle").focus();
+      b.exercises=[...ex, r.data.exercise];
+      (r.data.copies||[]).forEach(c=>{ const x=bookingByPk(c.bookingPk); if(x) x.exercises=[...(x.exercises||[]), c.exercise]; });
+      renderSidePanel(b, sx); $("#exTitle").focus();
     };
     // Notes
     const autosave=(id, field)=>{ const x=$("#"+id); if(x) x.onchange=async ()=>{ if(await saveBooking(b, { [field]: x.value })) toast("Gespeichert"); }; };
@@ -6818,6 +7133,9 @@
   $("#billingSave").onclick=saveBilling;
   $("#adminAddBtn").onclick=addAdminStudent;
   if($("#adminAddTutorBtn")) $("#adminAddTutorBtn").onclick=addAdminTutor;
+  if($("#addFamilyBtn")) $("#addFamilyBtn").onclick=()=>{ state.fgEdit={ type:"family", id:"new" }; renderAdminGroups(); };
+  if($("#addGroupBtn")) $("#addGroupBtn").onclick=()=>{ state.fgEdit={ type:"group", id:"new" }; renderAdminGroups(); };
+  if($("#grpPriceLbl")) $("#grpPriceLbl").textContent=state.groupCreditPrice;
   $("#adminSettingsSave").onclick=saveSettings;
   $("#impExit").onclick=exitImpersonation;
   $("#calSyncBtn").onclick=openCalSync;
