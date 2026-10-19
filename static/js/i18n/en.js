@@ -25,7 +25,7 @@ window.TGP_I18N = {
     "Fester Termin entfernt": "Fixed time removed",
     "bestätigst du die Stunde für diese Woche.": "you confirm the lesson for this week.",
     "Letzte Woche": "Last week",
-    "Alles Liebe zu deinem Geburtstag! Wir wünschen dir ein wunderbares neues Lebensjahr.": "All the best on your birthday! We wish you a wonderful year ahead.",
+    "Alles Liebe zu deinem Geburtstag! Ich wünsche dir ein wunderbares neues Lebensjahr.": "All the best on your birthday! I wish you a wonderful year ahead.",
     "Danke! 🎉": "Thank you! 🎉",
     // Labels saved on older transactions, before the gender-inclusive wording.
     "Einheiten vom Tutor": "Credits from tutor",
