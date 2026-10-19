@@ -107,6 +107,9 @@ def serialize_user(u):
         "avatarBg": u.avatar_bg,
         "weeklyLessons": float(u.weekly_lessons),
         "rosterGroup": u.roster_group,
+        "birthday": u.birthday.isoformat() if u.birthday else "",
+        "usualSlots": u.usual_slots or [],
+        "skippedSlots": u.skipped_slots or [],
         "role": u.role,
         "billing": {
             "name": u.billing_name,
@@ -116,6 +119,28 @@ def serialize_user(u):
             "country": u.billing_country,
         },
     }
+
+
+def birthday_in(year, bday):
+    """The birthday's date in ``year``; 29 February falls on the 28th in other years."""
+    try:
+        return bday.replace(year=year)
+    except ValueError:
+        return date(year, 2, 28)
+
+
+def pending_birthday(user, today=None):
+    """The birthday a student should still be greeted for: the most recent one,
+    if it was at most a week ago and hasn't been greeted yet. Else None."""
+    if user.role != "student" or not user.birthday:
+        return None
+    today = today or timezone.localdate()
+    last = birthday_in(today.year, user.birthday)
+    if last > today:
+        last = birthday_in(today.year - 1, user.birthday)
+    if (today - last).days > 7 or user.birthday_greeted == last:
+        return None
+    return last
 
 
 def booking_student_slug(b):
@@ -1286,6 +1311,12 @@ def app_view(request):
         },
         "lessonCallLink": dj_settings.LESSON_CALL_LINK,
         "whatsapp": dj_settings.TUTOR_WHATSAPP,
+        # Set on a student's first visit on or up to a week after their
+        # birthday: the app plays the greeting, then POSTs /api/birthday-seen/.
+        "birthdayGreeting": (
+            {"name": user.first_name or user.get_full_name() or user.username}
+            if pending_birthday(user) else None
+        ),
     }
     if user.role == "tutor":
         conn = VideoConnection.objects.filter(tutor=user).first()
@@ -2733,6 +2764,101 @@ def api_roster_group(request, slug):
     student.roster_group = value
     student.save(update_fields=["roster_group"])
     return JsonResponse({"rosterGroup": student.roster_group})
+
+
+def _parse_usual_slots(value):
+    """Validate [{"dow": 0–6, "time": "HH:MM"}] (at most 7 entries); None if invalid."""
+    if not isinstance(value, list) or len(value) > 7:
+        return None
+    out = []
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        dow, tm = item.get("dow"), item.get("time")
+        if isinstance(dow, bool) or not isinstance(dow, int) or not 0 <= dow <= 6:
+            return None
+        if not isinstance(tm, str) or not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", tm):
+            return None
+        if {"dow": dow, "time": tm} not in out:
+            out.append({"dow": dow, "time": tm})
+    return sorted(out, key=lambda x: (x["dow"], x["time"]))
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_student_profile(request, slug):
+    """Tutor sets a student's birthday and fixed weekly lesson times. Only the
+    keys sent are changed; birthday "" clears it."""
+    student = User.objects.filter(slug=slug, role="student").first()
+    if student is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    data = parse_body(request)
+    fields = []
+    if "birthday" in data:
+        raw = data.get("birthday")
+        if raw in ("", None):
+            student.birthday = None
+        else:
+            try:
+                bday = date.fromisoformat(raw) if isinstance(raw, str) else None
+            except ValueError:
+                bday = None
+            if bday is None or not date(1900, 1, 1) <= bday <= timezone.localdate():
+                return JsonResponse({"error": "Bitte ein gültiges Geburtsdatum angeben."}, status=400)
+            if bday != student.birthday:
+                student.birthday_greeted = None
+            student.birthday = bday
+        fields += ["birthday", "birthday_greeted"]
+    if "usualSlots" in data:
+        slots = _parse_usual_slots(data.get("usualSlots"))
+        if slots is None:
+            return JsonResponse({"error": "Ungültige feste Termine."}, status=400)
+        student.usual_slots = slots
+        fields.append("usual_slots")
+    if fields:
+        student.save(update_fields=fields)
+    return JsonResponse({
+        "birthday": student.birthday.isoformat() if student.birthday else "",
+        "usualSlots": student.usual_slots,
+    })
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_skip_usual_slot(request, slug):
+    """Tutor hides (or brings back) one week's suggestion of a student's fixed
+    time in the calendar. Body: {"key": "YYYY-MM-DD|HH:MM", "skip": bool}."""
+    student = User.objects.filter(slug=slug, role="student").first()
+    if student is None:
+        return JsonResponse({"error": "not found"}, status=404)
+    data = parse_body(request)
+    key = data.get("key")
+    m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})\|([01]\d|2[0-3]):[0-5]\d", key or "") if isinstance(key, str) else None
+    try:
+        day = date.fromisoformat(m.group(1)) if m else None
+    except ValueError:
+        day = None
+    if day is None:
+        return JsonResponse({"error": "Ungültiger Termin."}, status=400)
+    # Only skips from the last two weeks on are worth keeping.
+    cutoff = (timezone.localdate() - timedelta(days=14)).isoformat()
+    skipped = [k for k in (student.skipped_slots or []) if k >= cutoff and k != key]
+    if data.get("skip", True):
+        skipped.append(key)
+    student.skipped_slots = sorted(skipped)
+    student.save(update_fields=["skipped_slots"])
+    return JsonResponse({"skippedSlots": student.skipped_slots})
+
+
+@require_http_methods(["POST"])
+@require_roles("student")
+def api_birthday_seen(request):
+    """The student's app played the birthday greeting: don't show it again."""
+    last = pending_birthday(request.user)
+    if last:
+        request.user.birthday_greeted = last
+        request.user.save(update_fields=["birthday_greeted"])
+    return JsonResponse({"ok": True})
 
 
 @require_http_methods(["POST"])

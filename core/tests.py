@@ -4727,6 +4727,76 @@ class RosterGroupTests(FluentDataMixin, TestCase):
         self.assertEqual(self._set(self.maya, "maya", "done").status_code, 403)
 
 
+class StudentProfileTests(FluentDataMixin, TestCase):
+    """Birthday and fixed weekly times set by the tutor; the birthday greeting."""
+
+    def _post(self, actor, url, body):
+        self.client.force_login(actor)
+        return self.client.post(url, data=json.dumps(body), content_type="application/json")
+
+    def test_tutor_sets_birthday_and_usual_slots(self):
+        r = self._post(self.davit, "/api/students/maya/profile/", {
+            "birthday": "2010-03-14",
+            "usualSlots": [{"dow": 2, "time": "16:00"}, {"dow": 0, "time": "15:30"}, {"dow": 2, "time": "16:00"}],
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["usualSlots"], [{"dow": 0, "time": "15:30"}, {"dow": 2, "time": "16:00"}])
+        self.maya.refresh_from_db()
+        self.assertEqual(self.maya.birthday, date(2010, 3, 14))
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        maya = {s["slug"]: s for s in payload["students"]}["maya"]
+        self.assertEqual((maya["birthday"], len(maya["usualSlots"])), ("2010-03-14", 2))
+        # Only the keys sent change; "" clears the birthday.
+        self._post(self.davit, "/api/students/maya/profile/", {"birthday": ""})
+        self.maya.refresh_from_db()
+        self.assertIsNone(self.maya.birthday)
+        self.assertEqual(len(self.maya.usual_slots), 2)
+
+    def test_profile_validation_and_roles(self):
+        url = "/api/students/maya/profile/"
+        for bad in ({"birthday": "14.03.2010"}, {"birthday": "2999-01-01"}, {"birthday": 5},
+                    {"usualSlots": [{"dow": 7, "time": "15:00"}]}, {"usualSlots": [{"dow": 1, "time": "25:00"}]},
+                    {"usualSlots": "Mo 15:00"}, {"usualSlots": [{"dow": True, "time": "15:00"}]}):
+            self.assertEqual(self._post(self.davit, url, bad).status_code, 400, bad)
+        self.assertEqual(self._post(self.davit, "/api/students/nobody/profile/", {}).status_code, 404)
+        self.assertEqual(self._post(self.maya, url, {"birthday": "2010-01-01"}).status_code, 403)
+
+    def test_skip_usual_slot_for_one_week(self):
+        key = (timezone.localdate() + timedelta(days=3)).isoformat() + "|16:00"
+        r = self._post(self.davit, "/api/students/maya/skip-usual-slot/", {"key": key, "skip": True})
+        self.assertEqual(r.json()["skippedSlots"], [key])
+        r = self._post(self.davit, "/api/students/maya/skip-usual-slot/", {"key": key, "skip": False})
+        self.assertEqual(r.json()["skippedSlots"], [])
+        self.assertEqual(self._post(self.davit, "/api/students/maya/skip-usual-slot/", {"key": "x"}).status_code, 400)
+        self.assertEqual(self._post(self.maya, "/api/students/maya/skip-usual-slot/", {"key": key}).status_code, 403)
+
+    def test_birthday_greeting_shows_once_within_a_week(self):
+        today = timezone.localdate()
+        self.maya.birthday = date(2010, 1, 1).replace(month=(today - timedelta(days=3)).month,
+                                                      day=(today - timedelta(days=3)).day)
+        self.maya.save()
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload["birthdayGreeting"]["name"], self.maya.first_name or "Maya")
+        self.assertEqual(self.client.post("/api/birthday-seen/").status_code, 200)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertIsNone(payload["birthdayGreeting"])
+
+    def test_no_greeting_more_than_a_week_after(self):
+        from .views import pending_birthday
+        self.maya.birthday = date(2010, 6, 1)
+        self.assertIsNotNone(pending_birthday(self.maya, today=date(2026, 6, 1)))
+        self.assertIsNotNone(pending_birthday(self.maya, today=date(2026, 6, 8)))
+        self.assertIsNone(pending_birthday(self.maya, today=date(2026, 6, 9)))
+        self.assertIsNone(pending_birthday(self.maya, today=date(2026, 5, 31)))
+        # Across the new year, and 29 February in a common year.
+        self.maya.birthday = date(2010, 12, 30)
+        self.assertIsNotNone(pending_birthday(self.maya, today=date(2027, 1, 3)))
+        self.maya.birthday = date(2008, 2, 29)
+        self.assertIsNotNone(pending_birthday(self.maya, today=date(2027, 2, 28)))
+        self.assertIsNone(pending_birthday(self.davit, today=date(2027, 2, 28)))
+
+
 from django.core import mail  # noqa: E402
 
 from .middleware import LANGUAGE_COOKIE as LANGUAGE_COOKIE_NAME  # noqa: E402

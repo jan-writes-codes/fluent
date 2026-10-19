@@ -3,6 +3,30 @@
  * See README.md in this folder for how to add strings. */
 window.TGP_I18N = {
   exact: {
+    // Tutor calendar: counters, birthdays, tests, fixed weekly times.
+    "Stunden diese Woche": "lessons this week",
+    "Stunde diese Woche": "lesson this week",
+    "Stunden in dieser Woche": "lessons in this week",
+    "Stunde in dieser Woche": "lesson in this week",
+    "Fester Termin · Vorschlag": "Fixed time · suggestion",
+    "Fester Termin. Tippen, um die Stunde einzutragen": "Fixed time. Tap to book the lesson",
+    "Diese Woche nicht": "Not this week",
+    "Vorschlag für diese Woche ausgeblendet": "Suggestion hidden for this week",
+    "Geburtstag": "Birthday",
+    "erscheint im Kalender": "shown in the calendar",
+    "Fester Termin": "Fixed time",
+    "wird jede Woche vorgeschlagen": "suggested every week",
+    "+ Termin": "+ Time",
+    "Termin entfernen": "Remove time",
+    "Wochentag": "Weekday",
+    "Uhrzeit": "Time",
+    "Geburtstag gespeichert": "Birthday saved",
+    "Geburtstag entfernt": "Birthday removed",
+    "Fester Termin entfernt": "Fixed time removed",
+    "bestätigst du die Stunde für diese Woche.": "you confirm the lesson for this week.",
+    "Letzte Woche": "Last week",
+    "Alles Liebe zu deinem Geburtstag! Wir wünschen dir ein wunderbares neues Lebensjahr.": "All the best on your birthday! We wish you a wonderful year ahead.",
+    "Danke! 🎉": "Thank you! 🎉",
     // Labels saved on older transactions, before the gender-inclusive wording.
     "Einheiten vom Tutor": "Credits from tutor",
     "Stunde vom Tutor gebucht": "Lesson booked by tutor",
@@ -1173,6 +1197,14 @@ window.TGP_I18N = {
     "Aus der Stunde vom {}": "From the lesson on {1}",
     "Aktuell · Stunde vom {}": "Current · lesson on {1}",
     "Hausübung: {}": "Homework: {1}",
-    "Stunde verschoben auf {}, {}": "Lesson moved to {1}, {2}"
+    "Stunde verschoben auf {}, {}": "Lesson moved to {1}, {2}",
+    "gehalten im {}": "held in {1}",
+    "{} geplant im {}": "{1} planned in {2}",
+    "{} Stunden": "{1} lessons",
+    "{} Stunde": "{1} lesson",
+    "Geburtstag: {} wird {}": "Birthday: {1} turns {2}",
+    "Fester Termin: {} {}": "Fixed time: {1} {2}",
+    "{} hat jeden {} um {} Stunde. Mit": "{1} has a lesson every {2} at {3}. With",
+    "{} haben jeden {} um {} Stunde. Mit": "{1} have a lesson every {2} at {3}. With"
   }
 };

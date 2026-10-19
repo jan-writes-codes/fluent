@@ -44,6 +44,17 @@ class User(AbstractUser):
     # "exam" is for students the tutor sees now and then (exam prep), not weekly.
     ROSTER_GROUPS = [('active', 'Aktiv'), ('exam', 'Prüfungsvorbereitung'), ('done', 'Abgeschlossen')]
     roster_group = models.CharField(max_length=10, choices=ROSTER_GROUPS, default='active')
+    # Students only, entered by the tutor: shown in the tutor calendar, and the
+    # student gets a happy-birthday greeting on their first visit up to a week
+    # after it. birthday_greeted is the birthday (that year's date) last greeted.
+    birthday = models.DateField(null=True, blank=True)
+    birthday_greeted = models.DateField(null=True, blank=True)
+    # Students only: their fixed weekly lesson times, [{"dow": 0–6 (Mon=0),
+    # "time": "HH:MM"}]. The tutor calendar suggests them every week until the
+    # tutor books the lesson or skips that week ("YYYY-MM-DD|HH:MM" in
+    # skipped_slots).
+    usual_slots = models.JSONField(default=list, blank=True)
+    skipped_slots = models.JSONField(default=list, blank=True)
     # Language of the app and of the e-mails and PDFs this user receives.
     # German unless they switch to English (DE/EN switch in the app header).
     LANGUAGES = [('de', 'Deutsch'), ('en', 'English')]

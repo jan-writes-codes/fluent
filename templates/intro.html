@@ -107,7 +107,8 @@
   .tutor-chip .tc-role { font-size: 12px; color: var(--muted); }
 
   .cal-head { display: flex; align-items: center; gap: 12px; margin: 26px 0 14px; }
-  .cal-month { font-family: var(--font-display); font-weight: 700; font-size: 19px; }
+  .cal-month { font-family: var(--font-display); font-weight: 700; font-size: 19px; white-space: nowrap; }
+  .weeknav .today-btn { white-space: nowrap; }
   .weeknav { display: flex; gap: 6px; margin-left: auto; }
   .weeknav button { background: rgba(255,255,255,0.6); border: 1px solid var(--line); border-radius: 10px; width: 36px; height: 36px; cursor: pointer; color: var(--ink); display: grid; place-items: center; transition: 0.16s; }
   .weeknav button:hover:not([disabled]) { background: #fff; }
@@ -133,6 +134,19 @@
   .slot { font-family: var(--font-body); font-size: 13.5px; font-weight: 600; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 8px 0; cursor: pointer; transition: 0.13s; }
   .slot:hover { border-color: var(--c1); color: var(--c1); transform: translateY(-1px); }
   .no-slot { text-align: center; color: var(--faint); font-size: 13px; padding: 8px 0; }
+  .days-row.cal-head { display: grid; margin: 0; align-items: start; }
+  .day-name .no-slot { padding: 2px 0 0; font-size: 11.5px; }
+  .days-row.s-grid { row-gap: 6px; }
+  /* Phones: three days fill the width and the week swipes sideways, snapping to a day. */
+  @media (max-width: 600px) {
+    .cal-head { flex-wrap: wrap; }
+    .cal-head .weeknav { margin-left: 0; width: 100%; }
+    .weeknav .today-btn { flex: 1; }
+    .cal-scroll { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; container-type: inline-size; }
+    .cal, .days-row { min-width: 0; }
+    .days-row { grid-template-columns: repeat(7, calc((100cqw - 16px) / 3)); column-gap: 8px; }
+    .days-row.cal-head .day-name { scroll-snap-align: start; }
+  }
 
   .modal-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(20,30,22,0.5); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 20px; }
   .modal-overlay[hidden] { display: none; }
@@ -349,32 +363,37 @@
     const perDay = days.map(d => d.isPastDay ? [] :
       dayTimes(d.date,state.tutor).filter(time =>
         !isPastSlot(d.date,time) && slotOpen(d.date,time,state.tutor) && !bookedConflict(d.date,time,state.tutor)));
+    // A day without any free time says so under its date.
+    days.forEach((d,i)=>{ if(!perDay[i].length) head.children[i].insertAdjacentHTML("beforeend", `<div class="no-slot">${d.isPastDay?"·":"{{ _("Voll")|escapejs }}"}</div>`); });
 
+    // Within a band each start time is one row across the week, so the same
+    // time always sits on the same line.
+    const emptyWeek = perDay.every(l => !l.length);
     BANDS.forEach((band,bi)=>{
+      const inBand = perDay.map(l => l.filter(t => band.test(parseInt(t.split(":")[0],10))));
+      if(!inBand.some(l => l.length) && !(emptyWeek && bi===0)) return;
       const section=document.createElement("div"); section.className="cal-band";
       const lbl=document.createElement("div"); lbl.className="band-h";
       lbl.innerHTML=`${band.label}<span>${band.hint}</span>`;
       section.appendChild(lbl);
-      const grid=document.createElement("div"); grid.className="days-row";
-      days.forEach((d,i)=>{
-        const cell=document.createElement("div"); cell.className="slots";
-        const items=perDay[i].filter(t => band.test(parseInt(t.split(":")[0],10)));
-        if(items.length){
-          items.forEach(time=>{
-            const b=document.createElement("button"); b.className="slot"; b.textContent=time;
-            b.onclick=()=>openBook(d.date,time);
-            cell.appendChild(b);
-          });
-        } else if(perDay[i].length===0 && bi===0){
-          // Whole day has no slots — show the placeholder once, in the first band.
-          const n=document.createElement("div"); n.className="no-slot"; n.textContent=d.isPastDay?"·":"{{ _("Voll")|escapejs }}";
-          cell.appendChild(n);
-        }
-        grid.appendChild(cell);
-      });
+      const grid=document.createElement("div"); grid.className="days-row s-grid";
+      const times=[...new Set(inBand.flat())].sort((x,y)=>toMin(x)-toMin(y));
+      times.forEach(time => days.forEach((d,i)=>{
+        if(inBand[i].includes(time)){
+          const b=document.createElement("button"); b.className="slot"; b.textContent=time;
+          b.onclick=()=>openBook(d.date,time);
+          grid.appendChild(b);
+        } else grid.appendChild(document.createElement("div"));
+      }));
       section.appendChild(grid);
       container.appendChild(section);
     });
+    // On a phone only a few days fit: open a new week on today (else Monday).
+    if(state.scrolledWeek!==state.weekOffset){
+      state.scrolledWeek=state.weekOffset;
+      const sc=container.parentElement, ti=days.findIndex(d=>d.isToday);
+      if(sc) sc.scrollLeft = ti>0 ? head.children[ti].offsetLeft - head.children[0].offsetLeft : 0;
+    }
   }
 
   // ---- booking modal ----
