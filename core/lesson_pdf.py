@@ -366,6 +366,12 @@ def render_lesson_pdf(booking, sheet_bytes=None):
     labels.update({c.pk: f"{_t('F')}{i}" for i, c in enumerate(errors, 1)})
 
     sheets = list(booking.files.filter(kind__in=("worksheet", "assignment")).defer("data"))
+    if booking.group_session:
+        # The shared in-lesson worksheets of a group session live on any seat.
+        from .models import SessionFile
+        sheets += list(SessionFile.objects.filter(
+            booking__group_session=booking.group_session, kind="worksheet",
+        ).exclude(booking=booking).defer("data"))
     appended = []  # (session file, kind, bytes) for the pages after the overview
     for f in sheets:
         kind = _sheet_kind(f.name)

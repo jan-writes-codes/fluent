@@ -212,7 +212,9 @@ def render_receipt_pdf(receipt):
     c.setFillColorRGB(*_INK)
     c.setFont("Helvetica", 10)
     c.drawString(c_menge, y, str(credits))
-    c.drawString(c_desc, y, "Einheiten für Englisch-Einzelunterricht")
+    group = getattr(receipt, "credit_kind", "") == "group"
+    c.drawString(c_desc, y, "Gruppeneinheiten für Englisch in der Gruppe" if group
+                 else "Einheiten für Englisch-Einzelunterricht")
     c.drawRightString(c_einzel, y, f"€ {_money(unit)}")
     c.drawRightString(c_betrag, y, f"€ {_money(net)}")
     c.setFillColorRGB(*_MUTE)

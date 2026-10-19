@@ -44,7 +44,7 @@ def _event_lines(booking, stamp):
     start = booking.start.astimezone(dt_timezone.utc)
     end = start + timedelta(minutes=booking.minutes)
 
-    with_name = booking.guest_name or booking.student_name or ""
+    with_name = booking.guest_name or booking.group_name or booking.student_name or ""
     summary = f"{booking.title} · {with_name}" if with_name else booking.title
     if booking.is_requested:
         summary = f"Anfrage: {summary}"  # still awaiting the tutor's confirmation
@@ -95,7 +95,13 @@ def build_tutor_feed(tutor, bookings):
         "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
         "X-PUBLISHED-TTL:PT1H",
     ]
+    seen_groups = set()
     for booking in bookings:
+        # A group session is one booking per student: one calendar event.
+        if booking.group_session:
+            if booking.group_session in seen_groups:
+                continue
+            seen_groups.add(booking.group_session)
         lines += _event_lines(booking, stamp)
     lines.append("END:VCALENDAR")
     return ics_join(lines)

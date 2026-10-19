@@ -27,9 +27,10 @@ from .models import (
     User, Booking, CreditTransaction, Receipt, AvailabilityOverride,
     CustomTime, StudentNote, ActiveLesson, SiteSettings, LessonFile,
     VideoConnection, ErrorCard, SessionExercise, SessionFile, CurriculumTopic,
-    SchoolTest,
+    SchoolTest, Family, StudentGroup, CREDIT_SINGLE, CREDIT_GROUP, add_credits, credit_field,
+    lock_wallet,
 )
-from django.db.models import Prefetch
+from django.db.models import F, Prefetch
 from . import emails, video
 from .ical import build_tutor_feed
 from .middleware import LANGUAGE_COOKIE
@@ -94,7 +95,11 @@ def serialize_user(u):
         "name": u.get_full_name() or u.username,
         "email": u.email,
         "initials": u.initials,
-        "credits": u.credits,
+        # A family member shows (and books from) the family's shared balance.
+        "credits": u.balance(CREDIT_SINGLE),
+        "groupCredits": u.balance(CREDIT_GROUP),
+        "familyId": u.family_id,
+        "familyName": u.family.name if u.family_id else "",
         "color1": u.color1,
         "color2": u.color2,
         "photo": u.photo,
@@ -144,6 +149,11 @@ def serialize_booking(b, *, private=True):
         "guestName": b.guest_name,
         "guestEmail": b.guest_email,
         "guestPhone": b.guest_phone,
+        # Group sessions: one booking per member, tied together by groupSession.
+        "creditKind": b.credit_kind,
+        "groupId": b.group_id,
+        "groupName": b.group_name,
+        "groupSession": b.group_session,
     }
     if private:
         data["tutorNotes"] = b.tutor_notes
@@ -291,6 +301,7 @@ def serialize_transaction(t):
             (t.txn_type == "open" and t.amount > 0 and t.reverses_id is None)
         ) and not t.cancelled,
         "isStorno": t.txn_type == "storno",
+        "creditKind": t.credit_kind,
     }
 
 
@@ -318,6 +329,7 @@ def serialize_receipt(r):
         # the original purchase receipt it reverses so both documents cross-reference.
         "isStorno": r.reverses_id is not None,
         "reversesNo": (r.reverses.number if r.reverses_id and r.reverses else ""),
+        "creditKind": r.credit_kind,
     }
 
 
@@ -413,7 +425,7 @@ def next_receipt_number(year):
 
 
 def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", unit_euros=None,
-                  total_cents=None):
+                  total_cents=None, kind=CREDIT_SINGLE):
     """Add ``n`` credits to ``student`` and issue the matching receipt + ledger
     entry, atomically. Shared by the tutor "add credits" action and the Stripe
     checkout flow so both produce identical, auditable records.
@@ -427,12 +439,15 @@ def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", uni
     The receipt and transaction capture a *snapshot* of the student's identity and
     billing address at issue time: these are immutable financial records that must
     stay readable verbatim even after the account is deleted (GDPR erasure).
+
+    ``kind`` CREDIT_GROUP grants group-session credits (priced at the group
+    rate). A family member's credits land in the family's shared balance.
     """
 
     with db_transaction.atomic():
-        student = User.objects.select_for_update().get(pk=student.pk)
-        student.credits += n
-        student.save()
+        lock_wallet(student)
+        add_credits(student, n, kind)
+        student = User.objects.get(pk=student.pk)
 
         now = timezone.localtime()
         date_str = now.strftime("%d.%m.%Y")
@@ -454,14 +469,17 @@ def grant_credits(student, n, settings, *, label, sub, stripe_session_id="", uni
             unit_price_cents=(
                 round(total_cents / 100 / n) if total_cents is not None
                 else unit_euros if unit_euros is not None
+                else settings.group_credit_price if kind == CREDIT_GROUP
                 else receipt_unit_price(settings, n)
             ),
             total_cents=total_cents,
             stripe_session_id=stripe_session_id,
+            credit_kind=kind,
         )
 
         CreditTransaction.log(
             student, txn_type="buy", label=label, sub=sub, amount=n, receipt_no=receipt_no,
+            credit_kind=kind,
         )
 
     # Notify the student (with their receipt) and the business inbox that a
@@ -514,14 +532,17 @@ def credit_from_stripe_session(session):
             unit_euros = int(round(float(meta.get("unit"))))
         except (ValueError, TypeError):
             unit_euros = None
+    kind = CREDIT_GROUP if meta.get("credit_kind") == CREDIT_GROUP else CREDIT_SINGLE
     if meta.get("kind") == "settle":
         label, sub = "Offener Betrag beglichen", "Online bezahlt"
+    elif kind == CREDIT_GROUP:
+        label, sub = "Gruppeneinheiten via Stripe", "Online bezahlt"
     else:
         label, sub = "Einheiten via Stripe", "Online bezahlt"
     try:
         receipt = grant_credits(
             student, n, get_settings(),
-            label=label, sub=sub, stripe_session_id=sid, unit_euros=unit_euros,
+            label=label, sub=sub, stripe_session_id=sid, unit_euros=unit_euros, kind=kind,
         )
     except IntegrityError:
         # A concurrent caller (webhook vs. redirect) won the race; reuse its receipt.
@@ -539,9 +560,9 @@ def _reverse_credits(locked):
     the snapshot from the original row when the account is gone."""
     if locked.student_id is None:
         return None, locked.student_slug, locked.student_name
-    student = User.objects.select_for_update().get(pk=locked.student_id)
-    student.credits -= locked.amount
-    student.save(update_fields=["credits"])
+    student = User.objects.get(pk=locked.student_id)
+    lock_wallet(student)
+    add_credits(student, -locked.amount, locked.credit_kind)
     return student, student.slug, student.get_full_name() or student.username
 
 
@@ -591,6 +612,7 @@ def cancel_purchase(txn):
             unit_price_cents=original.unit_price_cents,
             total_cents=(-original.total_cents if original.total_cents is not None else None),
             reverses=original,
+            credit_kind=original.credit_kind,
         )
         storno_txn = CreditTransaction.objects.create(
             student=student,
@@ -602,6 +624,7 @@ def cancel_purchase(txn):
             amount=-n,
             receipt_no=storno_no,
             reverses=locked,
+            credit_kind=locked.credit_kind,
         )
         locked.cancelled = True
         locked.save(update_fields=["cancelled"])
@@ -1071,6 +1094,22 @@ def booking_cancel_view(request, token):
     })
 
 
+def _add_shared_sheets(payload):
+    """Give every seat of a group session the session's shared worksheets,
+    whichever seat they were uploaded to (see ``_session_file_booking``)."""
+    keys = {b.get("groupSession") for b in payload if b.get("groupSession") and "files" in b}
+    if not keys:
+        return
+    sheets = {}
+    for f in (SessionFile.objects.filter(booking__group_session__in=keys, kind=SessionFile.KIND_WORKSHEET)
+              .defer("data", "annotations").select_related("uploaded_by", "booking")):
+        sheets.setdefault(f.booking.group_session, []).append(f)
+    for b in payload:
+        if b.get("groupSession") in sheets and "files" in b:
+            have = {f["id"] for f in b["files"]}
+            b["files"] += [serialize_session_file(f) for f in sheets[b["groupSession"]] if f.pk not in have]
+
+
 def app_view(request):
     if not request.user.is_authenticated:
         return redirect("login")
@@ -1083,8 +1122,10 @@ def app_view(request):
     settings = get_settings()
     expire_booking_requests()
 
-    students = list(User.objects.filter(role="student").order_by("slug"))
+    students = list(User.objects.filter(role="student").select_related("family").order_by("slug"))
     tutors = list(User.objects.filter(role="tutor").order_by("slug"))
+    if user.role == "student":
+        user = User.objects.select_related("family").get(pk=user.pk)
 
     # Scope the payload by role. A logged-in student must not receive other
     # students' PII (credits, billing, transaction logs, notes), but the
@@ -1114,10 +1155,16 @@ def app_view(request):
             .prefetch_related(*SESSION_PREFETCH)
         ]
 
-    # Transactions: per visible student slug
+    _add_shared_sheets(bookings_payload)
+
+    # Transactions: per visible student slug. A family member also sees what
+    # their siblings bought and booked: it's the same balance.
     transactions = {}
     for s in visible_students:
-        txns = list(s.transactions.all())
+        if is_student and s.family_id:
+            txns = list(CreditTransaction.objects.filter(student__family_id=s.family_id))
+        else:
+            txns = list(s.transactions.all())
         transactions[s.slug] = [serialize_transaction(t) for t in txns]
 
     # Consolidated ledger for the tutor/admin: every student's credit movements in
@@ -1210,8 +1257,19 @@ def app_view(request):
         "topics": [serialize_topic(t) for t in CurriculumTopic.objects.all()],
         "errorCards": error_cards,
         "schoolTests": school_tests,
+        # Families (shared credits) and groups (group sessions). A student only
+        # learns about their own; the family list stays with the admin.
+        "families": (
+            [serialize_family(f) for f in Family.objects.prefetch_related("members")]
+            if user.role == "admin" else []
+        ),
+        "groups": [
+            serialize_group(g) for g in StudentGroup.objects.select_related("tutor").prefetch_related("members")
+            if not is_student or any(m.pk == user.pk for m in g.members.all())
+        ],
         "settings": {
             "creditPrice": settings.credit_price,
+            "groupCreditPrice": settings.group_credit_price,
             "packs": packs,
             "popularN": settings.popular_n,
         },
@@ -1412,7 +1470,7 @@ def api_password_reset(request):
 # Bookings API
 # ---------------------------------------------------------------------------
 
-def _slot_unavailable(tutor, booking_date, time_str, *, exclude_pk=None):
+def _slot_unavailable(tutor, booking_date, time_str, *, exclude_pk=None, exclude_group=""):
     """Return an error code if the tutor's slot can't be booked — already taken, or
     explicitly closed by the tutor — else None. Server-side mirror of the browser's
     bookingConflict/slotOpen guards, so the API can't be driven into a double-booking
@@ -1420,6 +1478,8 @@ def _slot_unavailable(tutor, booking_date, time_str, *, exclude_pk=None):
     taken = Booking.objects.filter(tutor=tutor, date=booking_date, time=time_str)
     if exclude_pk is not None:
         taken = taken.exclude(pk=exclude_pk)
+    if exclude_group:
+        taken = taken.exclude(group_session=exclude_group)
     if taken.exists():
         return "slot_taken"
     if AvailabilityOverride.objects.filter(
@@ -1444,14 +1504,15 @@ def _cancel_booking(b, *, forfeit, label="Buchung storniert, Einheit erstattet",
     refund_txn = credits = None
     with db_transaction.atomic():
         if b.student_id:
-            locked = User.objects.select_for_update().get(pk=b.student_id)
+            student = User.objects.get(pk=b.student_id)
+            lock_wallet(student)
             if not forfeit:
-                locked.credits += 1
-                locked.save(update_fields=["credits"])
+                add_credits(student, 1, b.credit_kind)
                 refund_txn = CreditTransaction.log(
-                    locked, txn_type="buy", label=label, sub=sub or b.ledger_sub(), amount=1,
+                    student, txn_type="buy", label=label, sub=sub or b.ledger_sub(), amount=1,
+                    credit_kind=b.credit_kind,
                 )
-            credits = locked.credits
+            credits = student.balance(b.credit_kind)
         snapshot = emails._cancel_snapshot(b, refunded=refund_txn is not None)
         b.delete()
     if notify:
@@ -1576,10 +1637,11 @@ def api_bookings(request):
     # but not past the configured floor. The check runs under the row lock so a
     # concurrent booking can't slip a balance past the limit between check and save.
     with db_transaction.atomic():
-        locked = User.objects.select_for_update().get(pk=student.pk)
-        if is_self and locked.credits < 1:
+        wallet = lock_wallet(student)
+        locked = User.objects.get(pk=student.pk)
+        if is_self and wallet.credits < 1:
             return JsonResponse({"error": "insufficient_credits"}, status=402)
-        if not is_self and locked.credits - 1 < settings.credit_floor:
+        if not is_self and wallet.credits - 1 < settings.credit_floor:
             return JsonResponse(
                 {"error": "credit_floor_reached", "floor": settings.credit_floor},
                 status=409,
@@ -1597,8 +1659,8 @@ def api_bookings(request):
             # Capability token for the cancel links in the confirmation e-mails.
             cancel_token=secrets.token_urlsafe(24),
         )
-        # Booking.save() charged the credit on the locked instance; read it back.
-        new_credits = locked.credits
+        # Booking.save() charged the credit to the wallet; read it back.
+        new_credits = locked.balance(CREDIT_SINGLE)
 
     # A lesson the tutor logs after the fact ("nachgetragen") already happened:
     # no booking confirmation, cancel link or tutor notice, it only lands in the
@@ -1633,6 +1695,15 @@ def api_booking_detail(request, pk):
     if is_student and b.student != request.user:
         return JsonResponse({"error": "forbidden"}, status=403)
 
+    # The tutor calls off a whole group session (every seat, every refund)
+    # with ?group=all; otherwise only this one seat is removed.
+    if (request.method == "DELETE" and not is_student and b.group_session
+            and request.GET.get("group") == "all"):
+        retroactive = b.date < timezone.localdate()
+        for seat in list(b.group_seats()):
+            _cancel_booking(seat, forfeit=False, notify=not retroactive)
+        return JsonResponse({"ok": True, "refunded": True, "retroactive": retroactive})
+
     if request.method == "DELETE":
         # A booking whose day is already over is "abgeschlossen" in the UI, so
         # deleting it is a retroactive correction (the lesson never actually
@@ -1655,6 +1726,7 @@ def api_booking_detail(request, pk):
         )
         return JsonResponse({
             "ok": True, "refunded": refund_txn is not None, "credits": credits,
+            "creditKind": b.credit_kind,
             "retroactive": retroactive,
             "txn": serialize_transaction(refund_txn) if refund_txn else None,
         })
@@ -1662,6 +1734,11 @@ def api_booking_detail(request, pk):
     # PUT
     data = parse_body(request)
     old_slot = (b.date, b.time)
+    # A seat in a group session moves only with the whole group (tutor side).
+    if b.group_session and is_student and (
+            ("date" in data and data["date"] != b.date.isoformat())
+            or ("time" in data and data["time"] != b.time)):
+        return JsonResponse({"error": "group_session"}, status=400)
     if "title" in data:
         b.title = data["title"]
     if "date" in data:
@@ -1672,7 +1749,8 @@ def api_booking_detail(request, pk):
         b.time = data["time"]
     # A reschedule must land on a free, open slot — same guard as creating one.
     if ("date" in data or "time" in data) and b.tutor_id:
-        conflict = _slot_unavailable(b.tutor, b.date, b.time, exclude_pk=b.pk)
+        conflict = _slot_unavailable(b.tutor, b.date, b.time, exclude_pk=b.pk,
+                                     exclude_group=b.group_session)
         if conflict == "slot_closed" and not is_student:
             conflict = None  # closed to students only, see api_bookings
         if conflict:
@@ -1717,6 +1795,14 @@ def api_booking_detail(request, pk):
             b.video_meeting_id = ""
             b.call_link = data["callLink"]
     b.save()
+    # A group session is one lesson: what the tutor writes (summary, homework,
+    # the slot, the link) reaches every seat. Ticking homework off stays per
+    # student.
+    if b.group_session and not is_student:
+        shared = {"title": b.title, "date": b.date, "time": b.time, "notes": b.notes,
+                  "tutor_notes": b.tutor_notes, "summary": b.summary, "homework": b.homework,
+                  "call_link": b.call_link}
+        _other_seats(b).update(**shared)
     # A rescheduled booking drags its auto-created Zoom/Teams meeting along to
     # the new slot (best-effort, off-request) so the mailed link stays valid.
     if b.video_meeting_id and (b.date, b.time) != old_slot:
@@ -1780,6 +1866,21 @@ def api_error_cards(request):
     if kind not in (ErrorCard.KIND_ERROR, ErrorCard.KIND_VOCAB):
         return JsonResponse({"error": "unknown kind"}, status=400)
     base = {"kind": kind, "student": student, "booking": booking, "tutor": request.user}
+    # A mistake (or word) from a group session goes to every student in it,
+    # each into their own deck and their own seat of the lesson.
+    seats = [booking]
+    if booking is not None and booking.group_session:
+        seats += list(booking.group_seats().exclude(pk=booking.pk)
+                      .filter(student__isnull=False).select_related("student"))
+
+    def copies(card):
+        out = [card]
+        for seat in seats[1:]:
+            twin = ErrorCard(**{f.attname: getattr(card, f.attname) for f in ErrorCard._meta.concrete_fields
+                                if f.attname not in ("id", "student_id", "booking_id")})
+            twin.student_id, twin.booking_id = seat.student_id, seat.pk
+            out.append(twin)
+        return out
 
     if "items" in data:
         items = data["items"]
@@ -1793,10 +1894,13 @@ def api_error_cards(request):
             return JsonResponse({"error": str(e)}, status=400)
         if len(cards) != len(items):
             return JsonResponse({"error": "invalid items"}, status=400)
+        made = []
         with db_transaction.atomic():
             for c in cards:
-                c.save()
-        return JsonResponse({"cards": [serialize_error_card(c) for c in cards]})
+                for twin in copies(c):
+                    twin.save()
+                    made.append(twin)
+        return JsonResponse({"cards": [serialize_error_card(c) for c in made]})
 
     try:
         front = _card_text(data, "front", True)
@@ -1805,7 +1909,8 @@ def api_error_cards(request):
         source_file, page, rects = None, None, []
         if data.get("fileId"):
             source_file = SessionFile.objects.defer("data").filter(
-                pk=data["fileId"], booking=booking, kind__in=SessionFile.SHEET_KINDS).first() if booking else None
+                pk=data["fileId"], booking__in=[x.pk for x in seats],
+                kind__in=SessionFile.SHEET_KINDS).first() if booking else None
             if source_file is None:
                 raise ValueError("unknown worksheet")
             page = data.get("page")
@@ -1814,9 +1919,15 @@ def api_error_cards(request):
             rects = _card_rects(data.get("rects") or [])
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status=400)
-    card = ErrorCard.objects.create(**base, front=front, back=back, note=note,
-                                    source_file=source_file, page=page, rects=rects)
-    return JsonResponse({"card": serialize_error_card(card)})
+    card = ErrorCard(**base, front=front, back=back, note=note,
+                     source_file=source_file, page=page, rects=rects)
+    made = copies(card)
+    with db_transaction.atomic():
+        for c in made:
+            c.save()
+    # ``cards`` carries the copies for the other students of a group session.
+    return JsonResponse({"card": serialize_error_card(card),
+                         "cards": [serialize_error_card(c) for c in made]})
 
 
 @require_http_methods(["PUT", "DELETE"])
@@ -1880,6 +1991,26 @@ def _session_booking(request, pk):
     return b
 
 
+def _session_file_booking(request, sf):
+    """The lesson a session file may be opened through, or None. Worksheets
+    of a group session are shared: every student in it may open them (and
+    draw on them together), whichever seat they were uploaded to."""
+    b = _session_booking(request, sf.booking_id)
+    if b or request.user.role != "student" or sf.kind != SessionFile.KIND_WORKSHEET:
+        return b
+    owner = Booking.objects.filter(pk=sf.booking_id).only("group_session").first()
+    if not owner or not owner.group_session:
+        return None
+    return Booking.objects.filter(group_session=owner.group_session, student=request.user).first()
+
+
+def _other_seats(b):
+    """The other students' seats of ``b``'s group session (none for a 1:1 lesson)."""
+    if not b.group_session:
+        return Booking.objects.none()
+    return Booking.objects.filter(group_session=b.group_session).exclude(pk=b.pk)
+
+
 @require_http_methods(["POST"])
 @require_roles("tutor", "admin")
 def api_session_exercises(request, pk):
@@ -1902,7 +2033,18 @@ def api_session_exercises(request, pk):
     except ValueError as err:
         return JsonResponse({"error": str(err)}, status=400)
     e.save()
-    return JsonResponse({"exercise": serialize_exercise(e)})
+    # In a group session every student gets the exercise (scored per student).
+    copies = []
+    for seat in _other_seats(b):
+        twin = SessionExercise.objects.create(booking=seat, title=e.title, description=e.description,
+                                              link=e.link, level=e.level, skill=e.skill)
+        copies.append({"bookingPk": seat.pk, "exercise": serialize_exercise(twin)})
+    return JsonResponse({"exercise": serialize_exercise(e), "copies": copies})
+
+
+def _exercise_twins(e):
+    """The same exercise on the other seats of a group session (matched by title)."""
+    return SessionExercise.objects.filter(booking__in=_other_seats(e.booking), title=e.title)
 
 
 @require_http_methods(["PUT", "DELETE"])
@@ -1916,11 +2058,13 @@ def api_session_exercise_detail(request, ex_id):
     if request.method == "DELETE":
         if is_student:
             return JsonResponse({"error": "forbidden"}, status=403)
+        _exercise_twins(e).delete()
         e.delete()
         return JsonResponse({"ok": True})
     data = parse_body(request)
     if "done" in data:
         e.done = bool(data["done"])
+    twins = [] if is_student else list(_exercise_twins(e))
     if not is_student:
         if "title" in data:
             title = str(data["title"] or "").strip()[:200]
@@ -1939,6 +2083,10 @@ def api_session_exercise_detail(request, ex_id):
         except ValueError as err:
             return JsonResponse({"error": str(err)}, status=400)
     e.save()
+    # Wording changes reach the group's other copies; scores stay per student.
+    for twin in twins:
+        twin.title, twin.description, twin.link = e.title, e.description, e.link
+        twin.save(update_fields=["title", "description", "link"])
     return JsonResponse({"exercise": serialize_exercise(e)})
 
 
@@ -1993,12 +2141,23 @@ def api_session_files(request, pk):
         kind = SessionFile.KIND_ASSIGNMENT
     else:
         kind = SessionFile.KIND_WORKSHEET
+    content = f.read()
+    content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
     sf = SessionFile.objects.create(
-        booking=b, kind=kind, name=name, size=f.size, data=f.read(),
-        content_type=mimetypes.guess_type(name)[0] or "application/octet-stream",
-        uploaded_by=request.user,
+        booking=b, kind=kind, name=name, size=f.size, data=content,
+        content_type=content_type, uploaded_by=request.user,
     )
-    return JsonResponse({"file": serialize_session_file(sf)})
+    # A Hausübung in a group session is done alone: every student gets their
+    # own copy to write on and hand in.
+    copies = []
+    if kind == SessionFile.KIND_ASSIGNMENT:
+        for seat in _other_seats(b):
+            twin = SessionFile.objects.create(
+                booking=seat, kind=kind, name=name, size=f.size, data=content,
+                content_type=content_type, uploaded_by=request.user,
+            )
+            copies.append({"bookingPk": seat.pk, "file": serialize_session_file(twin)})
+    return JsonResponse({"file": serialize_session_file(sf), "copies": copies})
 
 
 @require_http_methods(["GET", "DELETE"])
@@ -2006,11 +2165,17 @@ def api_session_files(request, pk):
 def api_session_file_detail(request, file_id):
     """Download a lesson file, or delete it (tutor/admin, or the student's own upload)."""
     sf = SessionFile.objects.filter(pk=file_id).first()
-    if not sf or not _session_booking(request, sf.booking_id):
+    if not sf or not _session_file_booking(request, sf):
         raise Http404
     if request.method == "DELETE":
         if request.user.role == "student" and sf.uploaded_by_id != request.user.pk:
             return JsonResponse({"error": "forbidden"}, status=403)
+        if request.user.role != "student" and sf.kind == SessionFile.KIND_ASSIGNMENT:
+            # Removing a group's Hausübung removes every student's copy.
+            owner = Booking.objects.filter(pk=sf.booking_id).first()
+            if owner:
+                SessionFile.objects.filter(booking__in=_other_seats(owner), kind=sf.kind,
+                                           name=sf.name).delete()
         sf.delete()
         return JsonResponse({"ok": True})
     data = _session_file_bytes(sf)
@@ -2085,7 +2250,7 @@ def api_session_file_annotations(request, file_id):
     may only remove their own items. Changes are applied to what is stored, so
     tutor and student drawing at the same time don't overwrite each other."""
     sf = SessionFile.objects.defer("data").filter(pk=file_id, kind__in=SessionFile.SHEET_KINDS).first()
-    if not sf or not _session_booking(request, sf.booking_id):
+    if not sf or not _session_file_booking(request, sf):
         return JsonResponse({"error": "not found"}, status=404)
     if request.method == "GET":
         if request.GET.get("rev") == str(sf.annotations_rev):
@@ -2143,14 +2308,21 @@ def api_session_file_import(request, pk):
         return JsonResponse({"error": "Datei nicht gefunden."}, status=404)
     if not LessonFile.objects.filter(pk=lf.pk, data__isnull=False).exists():
         return JsonResponse({"error": "Diese Datei ist nicht mehr verfügbar."}, status=400)
-    sf = SessionFile.objects.defer("data").filter(booking=b, material=lf, kind=kind).first()
-    if not sf:
-        sf = SessionFile.objects.create(
-            booking=b, kind=kind, name=lf.original_name, size=lf.size,
-            data=None, material=lf, uploaded_by=request.user,
-            content_type=lf.content_type or mimetypes.guess_type(lf.original_name)[0] or "application/octet-stream",
-        )
-    return JsonResponse({"file": serialize_session_file(sf)})
+    # Shared worksheets live once per group session; a Hausübung goes to each seat.
+    seats = [b] + (list(_other_seats(b)) if kind == SessionFile.KIND_ASSIGNMENT else [])
+    made = []
+    for seat in seats:
+        sf = SessionFile.objects.defer("data").filter(booking=seat, material=lf, kind=kind).first()
+        if not sf:
+            sf = SessionFile.objects.create(
+                booking=seat, kind=kind, name=lf.original_name, size=lf.size,
+                data=None, material=lf, uploaded_by=request.user,
+                content_type=lf.content_type or mimetypes.guess_type(lf.original_name)[0] or "application/octet-stream",
+            )
+        made.append(sf)
+    return JsonResponse({"file": serialize_session_file(made[0]),
+                         "copies": [{"bookingPk": f.booking_id, "file": serialize_session_file(f)}
+                                    for f in made[1:]]})
 
 
 # ---------------------------------------------------------------------------
@@ -2200,12 +2372,14 @@ def api_credits(request, slug):
     if method not in TOPUP_METHODS:
         return JsonResponse({"error": "Ungültige Zahlungsart."}, status=400)
     note = (data.get("note") or "").strip()[:80]
+    kind = CREDIT_GROUP if data.get("kind") == CREDIT_GROUP else CREDIT_SINGLE
 
     receipt = grant_credits(
         student, n, get_settings(),
-        label=note or "Einheiten von Tutor*in",
+        label=note or ("Gruppeneinheiten von Tutor*in" if kind == CREDIT_GROUP else "Einheiten von Tutor*in"),
         sub=f"Heute · {TOPUP_METHODS[method]}",
         total_cents=total_cents,
+        kind=kind,
     )
     return JsonResponse({"receipt": serialize_receipt(receipt)})
 
@@ -2261,7 +2435,8 @@ def api_cancel_transaction(request, txn_id):
         student = rev.student
         return JsonResponse({
             "ok": True,
-            "credits": student.credits if student is not None else None,
+            "credits": student.balance() if student is not None else None,
+            "groupCredits": student.balance(CREDIT_GROUP) if student is not None else None,
             "stornoTxn": serialize_transaction(rev),
             "cancelledTxnId": txn.pk,
             "receipt": None,
@@ -2288,7 +2463,8 @@ def api_cancel_transaction(request, txn_id):
     return JsonResponse({
         "ok": True,
         "refundedStripe": refunded_stripe,
-        "credits": student.credits if student is not None else None,
+        "credits": student.balance() if student is not None else None,
+            "groupCredits": student.balance(CREDIT_GROUP) if student is not None else None,
         "stornoTxn": serialize_transaction(storno_txn),
         "cancelledTxnId": txn.pk,
         "receiptNo": storno_receipt.number,
@@ -2351,10 +2527,12 @@ def api_checkout(request):
     data = parse_body(request)
     try:
         n = int(data.get("n", 1))
-        if n <= 0:
+        if n <= 0 or n > MAX_TOPUP_CREDITS:
             raise ValueError("n must be positive")
     except (ValueError, TypeError):
         return JsonResponse({"error": "invalid amount"}, status=400)
+    # Group credits (for group sessions) are their own product at a flat rate.
+    group = data.get("kind") == CREDIT_GROUP
 
     # A card payment needs a completed account: a real e-mail for the receipts
     # and a receipt address.
@@ -2363,7 +2541,17 @@ def api_checkout(request):
         return setup_required_response(missing)
 
     settings = get_settings()
-    amount = pack_price_cents(settings, n)
+    amount = settings.group_credit_price * 100 * n if group else pack_price_cents(settings, n)
+    product = (
+        {"name": f"{n} Gruppeneinheiten · the green pencil",
+         "description": "1 Gruppeneinheit = 45 Minuten Englisch in der Gruppe"}
+        if group else
+        {"name": f"{n} Einheiten · the green pencil",
+         "description": "1 Einheit = 45 Minuten Englisch-Einzelunterricht"}
+    )
+    metadata = {"student_slug": request.user.slug, "credits": str(n)}
+    if group:
+        metadata["credit_kind"] = CREDIT_GROUP
     origin = request.build_absolute_uri("/").rstrip("/")
     client = stripe_client()
     try:
@@ -2374,15 +2562,12 @@ def api_checkout(request):
                 "price_data": {
                     "currency": "eur",
                     "unit_amount": amount,
-                    "product_data": {
-                        "name": f"{n} Einheiten · the green pencil",
-                        "description": "1 Einheit = 45 Minuten Englisch-Einzelunterricht",
-                    },
+                    "product_data": product,
                 },
             }],
             # Server-trusted facts the webhook/redirect use to credit the right
             # student. The price is set above, not taken from the client.
-            metadata={"student_slug": request.user.slug, "credits": str(n)},
+            metadata=metadata,
             client_reference_id=request.user.slug,
             customer_email=emails._account_email(request.user) or None,
             success_url=f"{origin}/app/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
@@ -2420,7 +2605,8 @@ def api_checkout_confirm(request):
     request.user.refresh_from_db()
     return JsonResponse({
         "paid": True,
-        "credits": request.user.credits,
+        "credits": request.user.balance(),
+        "groupCredits": request.user.balance(CREDIT_GROUP),
         "receipt": serialize_receipt(receipt),
     })
 
@@ -2499,7 +2685,7 @@ def api_settle(request):
     outstanding amount so the balance returns to zero."""
     if not stripe_enabled():
         return JsonResponse({"error": "stripe_disabled"}, status=503)
-    outstanding = max(0, -request.user.credits)
+    outstanding = max(0, -request.user.balance())
     if outstanding <= 0:
         return JsonResponse({"error": "nothing_outstanding"}, status=400)
     # Settling is a card payment too — the account must be set up first.
@@ -2557,7 +2743,7 @@ def api_settle_link(request, slug):
     student = User.objects.filter(slug=slug, role="student").first()
     if not student:
         return JsonResponse({"error": "not found"}, status=404)
-    outstanding = max(0, -student.credits)
+    outstanding = max(0, -student.balance())
     if outstanding <= 0:
         return JsonResponse({"error": "nothing_outstanding"}, status=400)
     missing = payment_setup_missing(student)
@@ -2591,7 +2777,7 @@ def settle_page(request, token):
     student = _settle_student_for_token(token)
     if not student:
         return render(request, "settle.html", {"invalid": True}, status=404)
-    outstanding = max(0, -student.credits)
+    outstanding = max(0, -student.balance())
     settings = get_settings()
     return render(request, "settle.html", {
         "invalid": False,
@@ -2616,7 +2802,7 @@ def api_settle_token_checkout(request, token):
     student = _settle_student_for_token(token)
     if not student:
         return JsonResponse({"error": "not found"}, status=404)
-    outstanding = max(0, -student.credits)
+    outstanding = max(0, -student.balance())
     if outstanding <= 0:
         return JsonResponse({"error": "nothing_outstanding"}, status=400)
     missing = payment_setup_missing(student)
@@ -2708,15 +2894,15 @@ def api_opening_credit(request, slug):
     note = (data.get("note") or "").strip()[:200]
 
     with db_transaction.atomic():
-        locked = User.objects.select_for_update().get(pk=student.pk)
+        lock_wallet(student)
+        locked = User.objects.get(pk=student.pk)
         # One active opening balance per student. A reversed one (cancelled) frees
         # the slot so a corrected balance can be booked after a fat-finger.
         if CreditTransaction.objects.filter(
             student=locked, txn_type="open", cancelled=False, amount__gt=0
         ).exists():
             return JsonResponse({"error": "already_set"}, status=409)
-        locked.credits += n
-        locked.save(update_fields=["credits"])
+        add_credits(locked, n)
         txn = CreditTransaction.log(
             locked,
             txn_type="open",
@@ -2724,7 +2910,7 @@ def api_opening_credit(request, slug):
             sub=note or "Übertrag bestehender Einheiten",
             amount=n,
         )
-    return JsonResponse({"ok": True, "credits": locked.credits, "txn": serialize_transaction(txn)})
+    return JsonResponse({"ok": True, "credits": locked.balance(), "txn": serialize_transaction(txn)})
 
 
 # ---------------------------------------------------------------------------
@@ -3043,6 +3229,247 @@ def api_receipt_pdf(request, number):
     resp = HttpResponse(pdf, content_type="application/pdf")
     resp["Content-Disposition"] = f'inline; filename="{kind}-{receipt.number}.pdf"'
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Families (shared credits) and student groups (group sessions)
+# ---------------------------------------------------------------------------
+
+def serialize_family(f):
+    return {
+        "id": f.pk, "name": f.name, "credits": f.credits, "groupCredits": f.group_credits,
+        "members": [m.slug for m in f.members.all()],
+    }
+
+
+def serialize_group(g):
+    return {
+        "id": g.pk, "name": g.name,
+        "tutorId": g.tutor.slug if g.tutor_id and g.tutor else "",
+        "members": [m.slug for m in g.members.all()],
+    }
+
+
+def _name_field(data):
+    name = str(data.get("name") or "").strip()[:200]
+    if not name:
+        raise ValueError("Bitte einen Namen eingeben.")
+    return name
+
+
+def _member_students(data):
+    slugs = data.get("members") or []
+    if not isinstance(slugs, list) or not all(isinstance(x, str) for x in slugs):
+        raise ValueError("invalid members")
+    students = list(User.objects.filter(slug__in=slugs, role="student"))
+    if len(students) != len(set(slugs)):
+        raise ValueError("unknown student")
+    return students
+
+
+def _join_family(student, family):
+    """Move ``student`` into ``family``: whatever they held on their own (credits
+    and group credits, also a negative balance) moves into the shared balance,
+    with a note on their ledger so the numbers stay explainable."""
+    locked = User.objects.select_for_update().get(pk=student.pk)
+    if locked.family_id == family.pk:
+        return
+    if locked.family_id:
+        _leave_family(locked)
+    moved = {"credits": locked.credits, "group_credits": locked.group_credits}
+    Family.objects.filter(pk=family.pk).update(
+        credits=F("credits") + moved["credits"], group_credits=F("group_credits") + moved["group_credits"],
+    )
+    locked.credits = locked.group_credits = 0
+    locked.family = family
+    locked.save(update_fields=["credits", "group_credits", "family"])
+    if moved["credits"] or moved["group_credits"]:
+        parts = [f"{moved['credits']} Einheiten"]
+        if moved["group_credits"]:
+            parts.append(f"{moved['group_credits']} Gruppeneinheiten")
+        CreditTransaction.log(locked, txn_type="family", label="Ins Familienkonto übertragen",
+                              sub=f"{family.name} · {' + '.join(parts)}", amount=0)
+
+
+def _leave_family(student):
+    """Take ``student`` out of their family. The shared balance stays with the
+    family (the student starts again from 0); the last one to leave takes
+    whatever is left, so no credit is ever lost."""
+    family = student.family
+    others = family.members.exclude(pk=student.pk).exists() if family else False
+    student.family = None
+    if family and not others and (family.credits or family.group_credits):
+        student.credits, student.group_credits = family.credits, family.group_credits
+        Family.objects.filter(pk=family.pk).update(credits=0, group_credits=0)
+        CreditTransaction.log(student, txn_type="family", label="Aus dem Familienkonto übernommen",
+                              sub=family.name, amount=0)
+    student.save(update_fields=["family", "credits", "group_credits"])
+
+
+def _set_family_members(family, students):
+    keep = {s.pk for s in students}
+    for gone in family.members.exclude(pk__in=keep):
+        _leave_family(User.objects.select_for_update().get(pk=gone.pk))
+    for s in students:
+        _join_family(s, family)
+
+
+@require_http_methods(["POST"])
+@require_roles("admin")
+def api_families(request):
+    """Admin creates a family: a name and the students (siblings) in it."""
+    data = parse_body(request)
+    try:
+        name, students = _name_field(data), _member_students(data)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    with db_transaction.atomic():
+        family = Family.objects.create(name=name)
+        _set_family_members(family, students)
+    family.refresh_from_db()
+    return JsonResponse({"family": serialize_family(family)})
+
+
+@require_http_methods(["PUT", "DELETE"])
+@require_roles("admin")
+def api_family_detail(request, pk):
+    """Rename a family or change who is in it; DELETE dissolves it (the shared
+    balance goes to the last member, see ``_leave_family``)."""
+    family = Family.objects.filter(pk=pk).first()
+    if not family:
+        return JsonResponse({"error": "not found"}, status=404)
+    if request.method == "DELETE":
+        with db_transaction.atomic():
+            _set_family_members(family, [])
+            family.delete()
+        return JsonResponse({"ok": True})
+    data = parse_body(request)
+    try:
+        if "name" in data:
+            family.name = _name_field(data)
+        students = _member_students(data) if "members" in data else None
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    with db_transaction.atomic():
+        family.save(update_fields=["name"])
+        if students is not None:
+            _set_family_members(family, students)
+    family.refresh_from_db()
+    return JsonResponse({"family": serialize_family(family)})
+
+
+def _group_fields(group, data):
+    if "name" in data or group.pk is None:
+        group.name = _name_field(data)
+    if "tutorSlug" in data:
+        slug = data.get("tutorSlug") or ""
+        group.tutor = User.objects.filter(slug=slug, role="tutor").first() if slug else None
+        if slug and group.tutor is None:
+            raise ValueError("unknown tutor")
+    return _member_students(data) if "members" in data else None
+
+
+@require_http_methods(["POST"])
+@require_roles("admin")
+def api_groups(request):
+    """Admin creates a student group (name, tutor, students)."""
+    data = parse_body(request)
+    group = StudentGroup()
+    try:
+        students = _group_fields(group, data)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    group.save()
+    group.members.set(students or [])
+    return JsonResponse({"group": serialize_group(group)})
+
+
+@require_http_methods(["PUT", "DELETE"])
+@require_roles("admin")
+def api_group_detail(request, pk):
+    """Edit a group or delete it. Lessons already held keep the group's name."""
+    group = StudentGroup.objects.filter(pk=pk).first()
+    if not group:
+        return JsonResponse({"error": "not found"}, status=404)
+    if request.method == "DELETE":
+        group.delete()
+        return JsonResponse({"ok": True})
+    data = parse_body(request)
+    try:
+        students = _group_fields(group, data)
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    group.save()
+    if students is not None:
+        group.members.set(students)
+    return JsonResponse({"group": serialize_group(group)})
+
+
+@require_http_methods(["POST"])
+@require_roles("tutor", "admin")
+def api_group_sessions(request):
+    """Tutor books a group session: one seat (Booking) per group member, all in
+    the same slot and tied together by ``group_session``. Each seat costs that
+    student one group credit; like any tutor booking it may go into the
+    negative down to the credit floor. All seats are made, or none."""
+    data = parse_body(request)
+    try:
+        group = StudentGroup.objects.get(pk=data["groupId"])
+        tutor = User.objects.get(slug=data["tutorSlug"], role="tutor")
+        booking_date = date.fromisoformat(data["date"])
+        time_str = data["time"]
+        if not _TIME_RE.match(str(time_str)):
+            raise ValueError("invalid time")
+        title = str(data.get("title") or "Gruppenstunde")[:200]
+    except (KeyError, StudentGroup.DoesNotExist, User.DoesNotExist, ValueError, TypeError) as e:
+        return JsonResponse({"error": str(e)}, status=400)
+    if request.user.role == "tutor" and tutor != request.user:
+        return JsonResponse({"error": "forbidden"}, status=403)
+    members = list(group.members.filter(role="student").order_by("slug"))
+    if not members:
+        return JsonResponse({"error": "empty_group"}, status=400)
+    today = timezone.localdate()
+    if booking_date < today and (today - booking_date).days > BACKDATE_LIMIT_DAYS:
+        return JsonResponse({"error": "too_far_back", "maxDays": BACKDATE_LIMIT_DAYS}, status=400)
+    expire_booking_requests()
+    if _slot_unavailable(tutor, booking_date, time_str) == "slot_taken":
+        return JsonResponse({"error": "slot_taken"}, status=409)
+
+    settings = get_settings()
+    key = secrets.token_hex(8)
+    seats = []
+    with db_transaction.atomic():
+        # Siblings share one wallet: count how many seats each wallet pays for.
+        need = {}
+        for m in members:
+            w = ("f", m.family_id) if m.family_id else ("u", m.pk)
+            need[w] = need.get(w, 0) + 1
+        short = []
+        for m in members:
+            wallet = lock_wallet(m)
+            w = ("f", m.family_id) if m.family_id else ("u", m.pk)
+            if wallet.group_credits - need[w] < settings.credit_floor:
+                short.append(m.get_full_name() or m.username)
+        if short:
+            return JsonResponse({"error": "credit_floor_reached", "floor": settings.credit_floor,
+                                 "students": short}, status=409)
+        for m in members:
+            seats.append(Booking.objects.create(
+                student=m, tutor=tutor, date=booking_date, time=time_str, title=title,
+                status=Booking.STATUS_CONFIRMED, credit_kind=CREDIT_GROUP,
+                group=group, group_session=key, cancel_token=secrets.token_urlsafe(24),
+            ))
+    now_local = timezone.localtime()
+    after_the_fact = booking_date < today or (
+        booking_date == today and time_str <= now_local.strftime("%H:%M"))
+    if not after_the_fact:
+        for seat in seats:
+            emails.queue_email(emails.send_lesson_student_confirmation, seat.pk)
+    return JsonResponse({
+        "groupSession": key,
+        "bookings": [serialize_booking(b) for b in seats],
+        "balances": {b.student.slug: b.student.balance(CREDIT_GROUP) for b in seats},
+    })
 
 
 # ---------------------------------------------------------------------------

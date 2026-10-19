@@ -48,12 +48,92 @@ class User(AbstractUser):
     # German unless they switch to English (DE/EN switch in the app header).
     LANGUAGES = [('de', 'Deutsch'), ('en', 'English')]
     language = models.CharField(max_length=5, choices=LANGUAGES, default='de')
+    # Students only: credits for group sessions, a balance of their own next to
+    # ``credits`` (single lessons). Both move to the family when the student is
+    # in one (see ``wallet``).
+    group_credits = models.IntegerField(default=0)
+    # Students only: the family whose shared balance this student books from.
+    # Siblings keep their own profile; only the credits are pooled.
+    family = models.ForeignKey('Family', on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name='members')
 
     class Meta:
         db_table = 'core_user'
 
+    @property
+    def wallet(self):
+        """Where this student's credits live: the family, else the account itself."""
+        return self.family if self.family_id else self
+
+    def balance(self, kind='single'):
+        """Current balance of ``kind`` ('single' or 'group') credits."""
+        return getattr(self.wallet, credit_field(kind))
+
     def __str__(self):
         return f'{self.slug} ({self.role})'
+
+
+CREDIT_SINGLE = 'single'
+CREDIT_GROUP = 'group'
+CREDIT_KINDS = [(CREDIT_SINGLE, 'Einzel'), (CREDIT_GROUP, 'Gruppe')]
+
+
+def credit_field(kind):
+    """The balance column a credit kind is kept in."""
+    return 'group_credits' if kind == CREDIT_GROUP else 'credits'
+
+
+def lock_wallet(student):
+    """The row holding ``student``'s credits (their family, else the account),
+    locked for update. Call inside a transaction."""
+    student = User.objects.only('pk', 'family').get(pk=student.pk)
+    if student.family_id:
+        return Family.objects.select_for_update().get(pk=student.family_id)
+    return User.objects.select_for_update().get(pk=student.pk)
+
+
+def add_credits(student, n, kind='single'):
+    """Atomically add ``n`` (may be negative) credits of ``kind`` to the
+    student's wallet; returns the new balance."""
+    field = credit_field(kind)
+    student = User.objects.only('pk', 'family').get(pk=student.pk)
+    model, pk = (Family, student.family_id) if student.family_id else (User, student.pk)
+    model.objects.filter(pk=pk).update(**{field: models.F(field) + n})
+    return model.objects.values_list(field, flat=True).get(pk=pk)
+
+
+class Family(models.Model):
+    """Siblings who share one credit balance. The admin creates the family and
+    assigns the students; each child keeps their own login and profile, but any
+    credits bought by (or given to) one of them are there for all of them."""
+    name = models.CharField(max_length=200)
+    credits = models.IntegerField(default=0)
+    group_credits = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class StudentGroup(models.Model):
+    """A set of students who take lessons together, created by the admin. A
+    group session is one Booking per member (sharing ``group_session``), so
+    each student keeps their own homework, results and error cards, and pays
+    with their own group credits."""
+    name = models.CharField(max_length=200)
+    tutor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='tutored_groups')
+    members = models.ManyToManyField(User, blank=True, related_name='student_groups')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
 
 
 class Booking(models.Model):
@@ -111,10 +191,25 @@ class Booking(models.Model):
                               db_index=True)
     # When the current request was made (a student reschedule re-requests).
     requested_at = models.DateTimeField(null=True, blank=True)
+    # Which balance the lesson is paid from: a single credit, or a group credit
+    # for a seat in a group session.
+    credit_kind = models.CharField(max_length=10, choices=CREDIT_KINDS, default=CREDIT_SINGLE)
+    # Group sessions: every member's seat is its own Booking; they share this
+    # key (and the group, kept by name if the group is deleted).
+    group = models.ForeignKey(StudentGroup, on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='bookings')
+    group_name = models.CharField(max_length=200, blank=True)
+    group_session = models.CharField(max_length=32, blank=True, default='', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['date', 'time']
+
+    def group_seats(self):
+        """Every seat of this booking's group session (just itself otherwise)."""
+        if not self.group_session:
+            return Booking.objects.filter(pk=self.pk)
+        return Booking.objects.filter(group_session=self.group_session)
 
     # A request still unanswered this long before its start is declined
     # automatically. Short-notice requests (made inside that window) get until
@@ -148,6 +243,8 @@ class Booking(models.Model):
         if self.tutor_id and self.tutor:
             self.tutor_slug = self.tutor.slug
             self.tutor_name = self.tutor.get_full_name() or self.tutor.username
+        if self.group_id and self.group:
+            self.group_name = self.group.name
         super().save(*args, **kwargs)
         if is_new:
             self._charge_credit()
@@ -196,10 +293,13 @@ class Booking(models.Model):
         if self.is_intro or not self.student_id:
             return
         student = self.student
-        student.credits -= 1
-        student.save(update_fields=['credits'])
+        add_credits(student, -1, self.credit_kind)
+        # Keep the caller's instance in step (the balance lives in the wallet).
+        student.refresh_from_db(fields=['credits', 'group_credits'])
+        group = self.credit_kind == CREDIT_GROUP
         CreditTransaction.log(
-            student, txn_type='book', label='Stunde gebucht', sub=self.ledger_sub(), amount=-1,
+            student, txn_type='book', label='Gruppenstunde gebucht' if group else 'Stunde gebucht',
+            sub=self.ledger_sub(), amount=-1, credit_kind=self.credit_kind,
         )
 
     def __str__(self):
@@ -257,6 +357,8 @@ class CreditTransaction(models.Model):
     reverses = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='reversals'
     )
+    # Which balance the entry moved: single or group credits.
+    credit_kind = models.CharField(max_length=10, choices=CREDIT_KINDS, default=CREDIT_SINGLE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -311,6 +413,8 @@ class Receipt(models.Model):
     # The Stripe refund created when a Stripe-paid purchase is cancelled. Empty for
     # cash purchases, when Stripe isn't involved, or if the refund could not be made.
     stripe_refund_id = models.CharField(max_length=255, blank=True, default='')
+    # Group credits are their own receipt line ("Gruppeneinheiten").
+    credit_kind = models.CharField(max_length=10, choices=CREDIT_KINDS, default=CREDIT_SINGLE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def amounts(self):
@@ -457,6 +561,8 @@ class SiteSettings(models.Model):
     # badge so it can be toggled from the admin without hand-editing packs_json.
     # 0 = no pack highlighted.
     popular_n = models.IntegerField(default=10)
+    # Price of one group-session credit (EUR); students buy these in the app.
+    group_credit_price = models.IntegerField(default=30)
 
     def __str__(self):
         return f'SiteSettings (credit_price={self.credit_price})'
