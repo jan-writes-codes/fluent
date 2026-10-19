@@ -1058,6 +1058,7 @@ window.TGP_I18N = {
     "Bitte gib deine E-Mail-Adresse ein.": "Please enter your email address.",
     "Bevor es losgeht: Bitte ersetze das Passwort, das du bekommen hast, durch ein eigenes, und trag deine eigene E-Mail-Adresse ein.": "Before you start: please replace the password you were given with your own, and enter your own email address.",
     // Families, groups and group lessons.
+    "Preis pro Gruppenstunde (€)": "Price per group lesson (€)",
     "Für Gruppenstunden. Jede*r zahlt mit den eigenen Gruppeneinheiten (€": "For group lessons. Everyone pays with their own group credits (€",
     "pro Stunde).": "per lesson).",
     "Gruppenstunde": "Group lesson",

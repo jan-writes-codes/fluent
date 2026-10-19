@@ -1901,6 +1901,8 @@
             <div class="section-h"><h2>Preise</h2></div>
             <div class="ed-sub">Einheiten-Pakete für Schüler*innen</div>
             <div class="admin-packs" id="adminPacks"></div>
+            <div class="ed-sub" style="margin-top:18px;">Gruppeneinheiten</div>
+            <label class="bf-lab" style="max-width:240px;">Preis pro Gruppenstunde (€)<input class="bf-input" id="adminGroupPrice" type="number" min="1" max="1000" step="1" inputmode="numeric"></label>
             <button class="btn" id="adminSettingsSave" style="margin-top:14px; width:auto; padding-left:22px; padding-right:22px;"><span class="grainbtn"></span>Preise speichern</button>
             <div class="micro" style="text-align:left; margin-top:10px;">Pakete sehen die Schüler*innen unter „Einheiten aufladen“.</div>
           </div>
@@ -4235,6 +4237,7 @@
     return "€" + (Number.isInteger(per) ? per : per.toFixed(2)) + " / session";
   }
   function renderAdminPacks(){
+    const gp=$("#adminGroupPrice"); if(gp && document.activeElement!==gp) gp.value=state.groupCreditPrice;
     const el=$("#adminPacks"); if(!el) return; el.innerHTML="";
     PACKS.forEach((p,idx)=>{
       const row=document.createElement("div"); row.className="apack-row";
@@ -4269,7 +4272,9 @@
     state.popularN = popSel ? (parseInt(PACKS[+popSel.dataset.pop].n,10)||0) : 0;
     // Reflect the badge locally so the account screen updates without a reload.
     PACKS.forEach(p=>{ const isPop=(parseInt(p.n,10)===state.popularN); p.feat=isPop; p.tag=isPop?"Beliebt":""; });
-    api('PUT', '/api/settings/', { packs: PACKS, popularN: state.popularN });
+    const gp=parseInt(($("#adminGroupPrice")||{}).value,10);
+    if(gp>0 && gp<=1000){ state.groupCreditPrice=gp; const l=$("#grpPriceLbl"); if(l) l.textContent=gp; }
+    api('PUT', '/api/settings/', { packs: PACKS, popularN: state.popularN, groupCreditPrice: state.groupCreditPrice });
     renderPacks(); renderAdmin();
     toast("Preise gespeichert");
   }

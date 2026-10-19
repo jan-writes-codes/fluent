@@ -3773,6 +3773,7 @@ def api_settings(request):
             "creditPrice": settings.credit_price,
             "packs": json.loads(settings.packs_json),
             "popularN": settings.popular_n,
+            "groupCreditPrice": settings.group_credit_price,
         })
 
     # PUT
@@ -3798,6 +3799,14 @@ def api_settings(request):
             settings.popular_n = int(data["popularN"])
         except (ValueError, TypeError):
             pass
+    if "groupCreditPrice" in data:
+        try:
+            v = int(data["groupCreditPrice"])
+        except (ValueError, TypeError):
+            return JsonResponse({"error": "Ungültiger Preis."}, status=400)
+        if not 0 < v <= 1000:
+            return JsonResponse({"error": "Ungültiger Preis."}, status=400)
+        settings.group_credit_price = v
     settings.save()
     return JsonResponse({"ok": True})
 

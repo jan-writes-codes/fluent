@@ -269,3 +269,12 @@ class GroupCreditPurchaseTests(GroupsBase):
         data = extract_payload(self.client.get(reverse("app")).content.decode())
         self.assertEqual(data["groups"][0]["name"], "Matura-Gruppe")
         self.assertEqual(data["currentUser"]["groupCredits"], 2)
+
+
+class GroupPriceSettingTests(GroupsBase):
+    def test_admin_sets_group_credit_price_used_on_receipts(self):
+        r = self.post(self.admin, "/api/settings/", {"groupCreditPrice": 35}, method="put")
+        self.assertEqual(r.status_code, 200)
+        self.post(self.davit, "/api/credits/cleo/", {"n": 2, "kind": "group"})
+        self.assertEqual(Receipt.objects.get().unit_price_cents, 35)
+        self.assertEqual(self.post(self.admin, "/api/settings/", {"groupCreditPrice": 0}, method="put").status_code, 400)
