@@ -1055,16 +1055,20 @@
   details.lgrp .lgrp-n { margin-left: auto; font-family: var(--font-body); font-weight: 400; font-size: 12px; color: var(--muted); }
   details.lgrp .lgrp-body { padding-bottom: 6px; }
   /* Tutor calendar: one grid, row by row, so every start time lines up across the week. */
-  .days-row.t-grid { row-gap: 8px; align-items: stretch; }
+  .days-row.t-grid { row-gap: 8px; align-items: stretch; grid-template-columns: repeat(var(--cols, 7), minmax(96px, 1fr)); }
   .t-grid .day-name { padding-bottom: 4px; }
   .slot-gap { min-height: 0; }
-  .t-events { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .t-ev { display: flex; align-items: center; gap: 5px; min-width: 0; font-family: var(--font-body); font-size: 11px; line-height: 1.25;
-    padding: 4px 7px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.35); color: var(--ink); cursor: pointer; text-align: left; }
-  .t-ev .t-ev-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: 600; }
-  .t-ev .t-ev-t small { display: block; font-weight: 400; font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
-  .t-ev.bday { background: color-mix(in oklch, #d9688f 12%, transparent); border-color: color-mix(in oklch, #d9688f 35%, transparent); }
-  .t-ev.test { background: color-mix(in oklch, #4f7cb0 11%, transparent); border-color: color-mix(in oklch, #4f7cb0 32%, transparent); }
+  /* Birthdays and tests: small round labels in the day head, unlike the square slot tiles. */
+  .t-grid .day-name { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .t-ev { display: block; max-width: 100%; margin-top: 2px; font-family: var(--font-body); font-size: 10.5px; font-weight: 600; line-height: 1.2;
+    padding: 3px 9px; border-radius: 12px; border: 0; color: #fff; cursor: pointer; text-align: center; overflow-wrap: anywhere;
+    letter-spacing: 0.01em; text-transform: none; }
+  .t-ev.bday { background: #c95a82; }
+  .t-ev.test { background: #3f6a9e; }
+  .t-ev:hover { filter: brightness(1.08); }
+  .slot.t-open.t-gone { cursor: default; opacity: 0.35; }
+  .slot.t-open.t-gone:hover { opacity: 0.35; transform: none; }
+  .hours-toggle.has-hidden { border-style: solid; color: var(--ink); }
   .slot.t-booked.t-sugg { background: transparent; border: 1.5px dashed color-mix(in oklch, var(--good) 55%, transparent); }
   .slot.t-booked.t-sugg .ts-time { color: var(--muted); font-weight: 500; }
   .slot.t-booked.t-sugg .ts-name { opacity: 0.85; }
@@ -1095,8 +1099,9 @@
     .weeknav { flex-wrap: wrap; gap: 6px; width: 100%; }
     .weeknav .avail-toggle { flex: 1 1 auto; justify-content: center; padding-left: 10px; padding-right: 10px; }
     .weeknav .today { flex: 1 1 auto; }
+    .weeknav .avail-toggle svg { display: none; }
     .cal-scroll { padding: 8px 14px 18px; scroll-snap-type: x mandatory; scroll-padding-left: 14px; -webkit-overflow-scrolling: touch; container-type: inline-size; }
-    .days-row.t-grid { grid-template-columns: repeat(7, calc((100cqw - 16px) / 3)); column-gap: 8px; }
+    .days-row.t-grid { grid-template-columns: repeat(var(--cols, 7), calc((100cqw - 16px) / 3)); column-gap: 8px; }
     .t-grid .day-name, #daysRow .cal-head .day-name { scroll-snap-align: start; }
     #daysRow .days-row { grid-template-columns: repeat(7, calc((100cqw - 16px) / 3)); column-gap: 8px; }
     .t-legend, .t-counts { padding-left: 14px; padding-right: 14px; }
@@ -2409,11 +2414,14 @@
       daysRow.appendChild(section);
     });
     // On a phone only a few days fit: open a new week on today (else Monday).
-    if (state.sScrolledWeek !== state.weekOffset) {
+    // (Only once the calendar is on screen: a hidden one has no positions yet.)
+    const sc = daysRow.parentElement;
+    if (state.sScrolledWeek !== state.weekOffset && sc) requestAnimationFrame(() => {
+      if (!sc.offsetParent) return;
       state.sScrolledWeek = state.weekOffset;
-      const sc = daysRow.parentElement, ti = days.findIndex(d => d.isToday);
-      if (sc) sc.scrollLeft = ti > 0 ? head.children[ti].offsetLeft - head.children[0].offsetLeft : 0;
-    }
+      const ti = days.findIndex(d => d.isToday);
+      sc.scrollLeft = ti > 0 ? head.children[ti].offsetLeft - head.children[0].offsetLeft : 0;
+    });
     renderNextLessons();
   }
 
@@ -3156,49 +3164,49 @@
     $("#tMonthLabel").textContent = fM===lM ? MONTHS[fM]+" "+weekStart.getFullYear() : MONTHS_S[fM]+" – "+MONTHS_S[lM]+" "+weekStart.getFullYear();
     renderTeacherCounts(weekStart);
     const row = $("#tDaysRow"); row.innerHTML=""; row.classList.add("t-grid");
+    // By default the week is Mon–Fri, 13–19 Uhr; the toggle below adds the
+    // weekend and the earlier and later times.
     const days=[];
-    for (let i=0;i<7;i++){ const date=addDays(weekStart,i), isToday=sameDay(date,NOW); days.push({ date, isToday, isPast: date<NOW&&!isToday }); }
+    for (let i=0;i<(state.tAllHours?7:5);i++){ const date=addDays(weekStart,i), isToday=sameDay(date,NOW); days.push({ date, isToday, isPast: date<NOW&&!isToday }); }
+    row.style.setProperty("--cols", days.length);
     days.forEach((d,i)=>{
       const head=document.createElement("div"); head.className="day-name"+(d.isToday?" is-today":"");
       head.innerHTML=`<div class="dn">${DOW[i]}</div><div class="dd">${d.date.getDate()}</div>`;
+      // Birthdays and Schularbeiten/Tests sit in the day head as small labels.
+      if(!state.editAvail) calendarEvents(d.date).forEach(ev=>{
+        const b=document.createElement("button"); b.type="button"; b.className="t-ev "+ev.kind; b.title=ev.title;
+        b.innerHTML=`<span aria-hidden="true">${ev.icon}</span> ${esc(ev.label)}${ev.sub?` · ${esc(ev.sub)}`:""}`;
+        b.onclick=()=>{ const st=studentById(ev.studentId); if(st) openStudentModal(st); };
+        head.appendChild(b);
+      });
       row.appendChild(head);
     });
-    // Birthdays and Schularbeiten/Tests of the week, under the day heads.
-    if(!state.editAvail){
-      const evs=days.map(d=>calendarEvents(d.date));
-      if(evs.some(e=>e.length)) evs.forEach(list=>{
-        const cell=document.createElement("div"); cell.className="t-events";
-        list.forEach(ev=>{
-          const b=document.createElement("button"); b.type="button"; b.className="t-ev "+ev.kind; b.title=ev.title;
-          b.innerHTML=`<span class="t-ev-ic" aria-hidden="true">${ev.icon}</span><span class="t-ev-t">${esc(ev.label)}${ev.sub?`<small>${esc(ev.sub)}</small>`:""}</span>`;
-          b.onclick=()=>{ const st=studentById(ev.studentId); if(st) openStudentModal(st); };
-          cell.appendChild(b);
-        });
-        row.appendChild(cell);
-      });
-    }
     const perDay=days.map(d=>teacherDayCells(d));
     const times=[...new Set(perDay.flatMap(p=>[...p.cells.keys()]))].sort((a,b)=>toMin(a)-toMin(b));
     const gap=()=>{ const g=document.createElement("div"); g.className="slot-gap"; return g; };
     times.forEach(t=> perDay.forEach(p=> row.appendChild(p.cells.get(t) || gap())));
-    if(perDay.some(p=>p.extra)) perDay.forEach(p=> row.appendChild(p.extra || gap()));
-    if(!times.length && !perDay.some(p=>p.extra)) perDay.forEach(()=>{ const n=document.createElement("div"); n.className="no-slot"; n.textContent="·"; row.appendChild(n); });
-    renderHoursToggle();
+    if(!times.length) perDay.forEach(()=>{ const n=document.createElement("div"); n.className="no-slot"; n.textContent="·"; row.appendChild(n); });
+    renderHoursToggle(weekStart);
     // On a phone only a few days fit: open a new week on today (else Monday).
-    if(state.tScrolledWeek!==state.tWeekOffset){
+    // (Only once the calendar is on screen: a hidden one has no positions yet.)
+    const sc=row.parentElement;
+    if(state.tScrolledWeek!==state.tWeekOffset && sc) requestAnimationFrame(()=>{
+      if(!sc.offsetParent) return;
       state.tScrolledWeek=state.tWeekOffset;
-      const sc=row.parentElement, ti=days.findIndex(d=>d.isToday);
-      if(sc) sc.scrollLeft = ti>0 ? row.children[ti].offsetLeft - row.children[0].offsetLeft : 0;
-    }
+      const ti=days.findIndex(d=>d.isToday);
+      sc.scrollLeft = ti>0 ? row.children[ti].offsetLeft - row.children[0].offsetLeft : 0;
+    });
   }
 
-  // One day of the tutor calendar: {cells: Map(time → tile), extra: tile|null}.
+  // One day of the tutor calendar: {cells: Map(time → tile)}.
   function teacherDayCells({ date, isToday, isPast }){
-    const cells=new Map(); let extra=null;
+    const cells=new Map();
     const dk=ymd(date);
     const sugg=state.editAvail ? {} : usualSuggestions(date);
     const times=[...new Set([...dayTimes(date, state.myTutor), ...Object.keys(sugg)])].sort((a,b)=>toMin(a)-toMin(b));
     times.forEach(time=>{
+      // Earlier and later times only show once the tutor expands the calendar.
+      if(!state.tAllHours && !inCoreHours(time)) return;
       const bk=state.bookings.find(b=>b.tutorId===state.myTutor&&sameDay(b.date,date)&&b.time===time);
       const conflict = bookingConflict(date,time,null,state.myTutor);
       // A student's fixed weekly time, not booked yet: suggested until confirmed.
@@ -3213,12 +3221,11 @@
         cells.set(time, el);
         return;
       }
-      // Outside the usual hours only booked or open times show, unless the tutor expands the calendar.
-      if(!state.tAllHours && !inCoreHours(time) && !bk && !slotOpen(date,time,state.myTutor)) return;
       const open = !isPast && slotOpen(date,time,state.myTutor) && !conflict;
       // A free slot on a past day (within the 30-day look-back) can be tapped
       // to log a lesson that happened there.
-      const loggable = isPast && !bk && !conflict && slotOpen(date,time,state.myTutor) && (NOW-date)/864e5 <= 30;
+      const fullHour = time.endsWith(":00");
+      const loggable = isPast && !bk && !conflict && (fullHour || slotOpen(date,time,state.myTutor)) && (NOW-date)/864e5 <= 30;
       const el=document.createElement("button");
       if(state.editAvail){
         if(isPast) return;
@@ -3243,8 +3250,16 @@
       // The whole week stays visible: every full hour that isn't open to
       // students shows too, so the tutor can still put a student there
       // (students can't book it, it was never published as availability).
-      const closedHour = !isPast && !bk && !conflict && !open && time.endsWith(":00");
-      if(!open && !bk && !loggable && !closedHour) return;
+      const closedHour = !isPast && !bk && !conflict && !open && fullHour;
+      // Older past days keep their hours as empty tiles, so every day has the same rows.
+      const gone = isPast && !bk && !loggable && fullHour;
+      if(!open && !bk && !loggable && !closedHour && !gone) return;
+      if(gone){
+        const g=document.createElement("div"); g.className="slot t-open t-past t-gone";
+        g.innerHTML=`<span class="ts-time">${time}</span>`;
+        cells.set(time, g);
+        return;
+      }
       if(closedHour){
         const isSel=state.teacherSel && state.teacherSel.dateKey===dk && state.teacherSel.time===time;
         el.className="slot t-open t-closed"+(isSel?" sel":"");
@@ -3268,13 +3283,7 @@
       }
       cells.set(time, el);
     });
-    // A past day without free slots still offers one tile to log a lesson on it.
-    if(isPast && !state.editAvail && (NOW-date)/864e5 <= 30 && ![...cells.values()].some(el=>el.classList.contains("t-past"))){
-      extra=document.createElement("button"); extra.className="slot t-open t-past";
-      extra.innerHTML=`<span class="ts-add">+ Nachtragen</span>`;
-      extra.onclick=()=>openBackdate({ date:new Date(date) });
-    }
-    return { cells, extra };
+    return { cells };
   }
 
   // Students whose fixed weekly time falls on this day and who have no lesson
@@ -3341,9 +3350,15 @@
   // The tutor's usual teaching hours: start times from 13:00 to 19:00.
   const CORE_FROM=13*60, CORE_TO=19*60;
   function inCoreHours(time){ const m=toMin(time); return m>=CORE_FROM && m<=CORE_TO; }
-  function renderHoursToggle(){
+  function renderHoursToggle(weekStart){
     const b=$("#tHoursToggle"); if(!b) return;
-    b.textContent = state.tAllHours ? "Nur 13–19 Uhr zeigen" : "Frühere und spätere Zeiten zeigen";
+    if(state.tAllHours){ b.textContent="Nur Mo–Fr, 13–19 Uhr zeigen"; return; }
+    // Lessons outside Mo–Fr 13–19 Uhr are only behind the toggle: count them on it.
+    const end=addDays(weekStart,7);
+    const hidden=oneSeatPerGroup(state.bookings.filter(bk=>bk.tutorId===state.myTutor && bk.studentId!=="__blocked__" && bk.date>=weekStart && bk.date<end
+      && ((bk.date.getDay()+6)%7>4 || !inCoreHours(bk.time)))).length;
+    b.textContent="Wochenende, frühere und spätere Zeiten zeigen"+(hidden?` · ${hidden} ${hidden===1?"Stunde":"Stunden"}`:"");
+    b.classList.toggle("has-hidden", !!hidden);
   }
 
   function teacherSelectSlot(date,time,closed,suggest){ state.teacherManage=null; state.teacherSel={ dateKey:ymd(date), date:new Date(date), time, closed:!!closed, suggest:suggest||null }; renderTeacherWeek(); renderTeacherSummary(); }
