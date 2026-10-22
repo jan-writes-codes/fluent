@@ -213,6 +213,12 @@
      is never clipped. */
   .credits-pill .coin { min-width: 26px; height: 26px; padding: 0 3px; border-radius: 999px; display:grid; place-items:center;
     background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c3), var(--c1)); font-size: 12px; }
+  .credits-pill .coin.grp { background: conic-gradient(from 0deg, #7a6bb0, #5a4c90, #9a8bd0, #7a6bb0); }
+  .credits-pill .coin.grp span { color: #5a4c90; }
+  .assign-kind { display: flex; gap: 6px; margin-bottom: 12px; }
+  .assign-kind button { flex: 1; padding: 9px 10px; border-radius: 12px; border: 1px solid var(--line); background: transparent; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+  .assign-kind button.on { background: color-mix(in oklch, var(--c1) 14%, transparent); border-color: var(--c1); font-weight: 600; }
+  .assign-kind button.on.grp { background: color-mix(in oklch, #7a6bb0 18%, transparent); border-color: #7a6bb0; }
   .credits-pill .coin span { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--bg); display:grid; place-items:center; font-weight:700; font-size:11px; color: var(--c1); }
 
   .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
@@ -392,6 +398,7 @@
   .pf-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .pf-legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
   .pf-chart .empty { font-size: 12.5px; color: var(--faint); padding: 26px 0 22px; text-align: center; }
+  .rc-grp .rc-num { color: #5a4c90; }
   .rc-week { font: inherit; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 3px 6px; cursor: pointer; }
   .rc-week:hover { border-color: var(--line); }
   .rc-week .rc-num { color: var(--ink); }
@@ -1624,6 +1631,8 @@
       <div class="credits-pill" id="creditsPill" title="Deine Einheiten ansehen">
         <span class="lbl">Einheiten</span>
         <span class="coin"><span id="coinNum">8</span></span>
+        <span class="lbl" data-grp-pill hidden>Gruppe</span>
+        <span class="coin grp" data-grp-pill hidden title="Gruppeneinheiten"><span id="grpCoinNum">0</span></span>
       </div>
       <div class="user-wrap">
         <button class="avatar" id="meAvatar" style="background: conic-gradient(from 140deg, #7cb342, #309050, #4cb56b, #7cb342);">MK</button>
@@ -1896,7 +1905,7 @@
               <div class="fg-col fg-col-groups">
                 <div class="txn-col-h">Gruppen</div>
                 <div class="micro" style="text-align:left; margin:2px 2px 12px;" data-fg-admin>Für Gruppenstunden. Jede*r zahlt mit den eigenen Gruppeneinheiten (€ <span id="grpPriceLbl"></span> pro Stunde).</div>
-                <div class="micro" style="text-align:left; margin:2px 2px 12px;" data-fg-tutor hidden>Gruppenstunde planen: Tippe im Kalender auf einen freien Termin und wähle bei „oder Gruppe“ die Gruppe. Die Zahl neben jedem Namen sind die Gruppeneinheiten.</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;" data-fg-tutor hidden>Gruppenstunde planen: Tippe im Kalender auf einen freien Termin und wähle „Gruppenstunde“. Die Zahl neben jedem Namen sind die Gruppeneinheiten.</div>
                 <div id="adminGroups"></div>
                 <button class="btn ghost" id="addGroupBtn" style="margin-top:10px;" data-fg-admin>+ Gruppe anlegen</button>
               </div>
@@ -3586,10 +3595,19 @@
           <span class="time-end" id="assignEnd">endet ${endTime(sel.time)}</span>
         </div>
         ${sel.closed ? `<div class="micro" style="text-align:left;margin:-4px 0 12px;">Diese Zeit ist nicht als Verfügbarkeit freigegeben. Schüler*innen können sie nicht buchen, nur du trägst hier jemanden ein.</div>` : ""}
-        <label class="field-label">Schüler*in</label>
-        <select class="t-select" id="assignSel">${opts}</select>
-        ${myGroups().length ? `<label class="field-label" style="margin-top:12px;">oder Gruppe <span class="lbl-only">· je 1 Gruppeneinheit</span></label>
-        <select class="t-select" id="assignGroup"><option value="">Keine Gruppe</option>${myGroups().map(g=>`<option value="${g.id}">${esc(g.name)} (${g.members.length})</option>`).join("")}</select>` : ""}
+        <div class="assign-kind" role="tablist" aria-label="Art der Stunde">
+          <button type="button" data-kind="single" class="${sel.kind==="group"?"":"on"}">Einzelstunde</button>
+          <button type="button" data-kind="group" class="grp ${sel.kind==="group"?"on":""}">Gruppenstunde</button>
+        </div>
+        <div id="assignSingle" ${sel.kind==="group"?"hidden":""}>
+          <label class="field-label">Schüler*in <span class="lbl-only">· 1 Einheit</span></label>
+          <select class="t-select" id="assignSel">${opts}</select>
+        </div>
+        <div id="assignGroupWrap" ${sel.kind==="group"?"":"hidden"}>
+          ${myGroups().length ? `<label class="field-label">Gruppe <span class="lbl-only">· je 1 Gruppeneinheit</span></label>
+          <select class="t-select" id="assignGroup">${myGroups().map(g=>`<option value="${g.id}">${esc(g.name)} (${g.members.length})</option>`).join("")}</select>`
+          : `<div class="micro" style="text-align:left;margin:0 0 12px;">Noch keine Gruppe für dich. Gruppen legt die Admin unter Familien &amp; Gruppen an.</div>`}
+        </div>
         <div class="assign-note" id="assignNote"></div>
         <button class="btn" id="assignBtn"><span class="grainbtn"></span>Eintragen</button>
         ${sugg.length ? `<button class="btn ghost" id="assignSkip" style="margin-top:10px;">Diese Woche nicht</button>` : ""}
@@ -3597,9 +3615,15 @@
       `;
       if($("#assignSkip")) $("#assignSkip").onclick=()=>skipUsualSlot(sugg, sel);
       const selEl=$("#assignSel"), grpEl=$("#assignGroup");
-      const note=()=>{ const g=grpEl && grpEl.value ? groupById(+grpEl.value) : null;
-        selEl.disabled=!!g;
-        if(g){ $("#assignNote").innerHTML=groupAssignNote(g); return; }
+      const isGroup=()=> sel.kind==="group";
+      card.querySelectorAll(".assign-kind button").forEach(btn=> btn.onclick=()=>{
+        sel.kind=btn.dataset.kind;
+        card.querySelectorAll(".assign-kind button").forEach(x=> x.classList.toggle("on", x===btn));
+        $("#assignSingle").hidden=isGroup(); $("#assignGroupWrap").hidden=!isGroup(); note();
+      });
+      const note=()=>{
+        if(isGroup()){ const g=grpEl && grpEl.value ? groupById(+grpEl.value) : null; $("#assignNote").innerHTML = g ? groupAssignNote(g) : ""; $("#assignBtn").disabled=!g; return; }
+        $("#assignBtn").disabled=false;
         const s=studentById(selEl.value); $("#assignNote").innerHTML = s.credits>0
         ? `Bucht die Stunde und zieht <b style='color:var(--c1)'>1 Einheit</b> von ${esc(s.name.split(" ")[0])} ab (→ ${s.credits-1}).`
         : `<span class="warn">${esc(s.name.split(" ")[0])} hat keine Einheiten mehr offen.</span>`; };
@@ -3609,7 +3633,7 @@
         const tm=$("#assignTime").value;
         if(!/^\d{2}:\d{2}$/.test(tm)){ toast("Gib eine gültige Startzeit ein"); return; }
         if(bookingConflict(sel.date, tm, null, state.myTutor)){ toast("Das überschneidet eine andere Buchung. Wähle eine andere Zeit"); return; }
-        if(grpEl && grpEl.value){ teacherAssignGroup(sel.date, tm, +grpEl.value); return; }
+        if(isGroup()){ if(grpEl && grpEl.value) teacherAssignGroup(sel.date, tm, +grpEl.value); return; }
         teacherAssign(sel.date, tm, selEl.value);
       };
       $("#assignCancel").onclick=()=>{ state.teacherSel=null; renderTeacherWeek(); renderTeacherSummary(); };
@@ -3819,7 +3843,7 @@
         <div class="st-sheet-top">
         <div class="sum-head">
           ${s.isGuest ? `<div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${avatarText(s)}</div>` : `<button class="av-edit" id="modalAvatarBtn" title="Profilbild ändern" aria-label="Profilbild ändern"><div class="avatar" style="${avatarStyle(s)};width:50px;height:50px;font-size:17px;">${avatarText(s)}</div></button>`}
-          <div><div class="nm">${esc(s.name)}</div><div class="rl">${s.credits} Einheiten · ${upc} geplante Stunde${upc!==1?"n":""}</div>${familyLineHtml(s)}</div>
+          <div><div class="nm">${esc(s.name)}</div><div class="rl">${s.credits} Einheiten · ${s.groupCredits||0} Gruppeneinheiten · ${upc} geplante Stunde${upc!==1?"n":""}</div>${familyLineHtml(s)}</div>
         </div>
         <div class="modal-add">
           <span class="ma-label">Einheiten hinzufügen<em>Bar oder Stripe</em></span>
@@ -3991,7 +4015,6 @@
   function rosterBadges(s){
     const gs=(state.groups||[]).filter(g=>g.members.includes(s.id));
     const out=gs.map(g=>`<span class="rbadge grp">${esc(g.name)}</span>`);
-    if(gs.length || (s.groupCredits||0)!==0) out.push(`<span class="rbadge grp">${s.groupCredits||0} Gruppeneinh.</span>`);
     if(s.familyName) out.push(`<span class="rbadge">Familie ${esc(s.familyName)}</span>`);
     return out.length ? `<div class="rbadges">${out.join("")}</div>` : "";
   }
@@ -4004,6 +4027,7 @@
         <select class="rg-select" data-group aria-label="Gruppe">${ROSTER_GROUPS.map(g=>`<option value="${g.id}"${(s.rosterGroup||"active")===g.id?" selected":""}>${g.label}</option>`).join("")}</select></div>
       <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
       <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
+      <div class="rcredits rc-grp"><div class="rc-num">${s.groupCredits||0}</div><div class="rc-lbl">Gruppeneinh.</div></div>
       <div class="rc-actions">
         ${creditQuickAdds().map(n=>`<button class="mini-btn" data-add="${n}">+${n}</button>`).join("")}
       </div>`;
@@ -4614,6 +4638,8 @@
     const me=studentById(state.currentUser), extra=$("#balanceExtra"), packsEl=$("#groupPacks");
     if(!me || !extra || !packsEl) return;
     me.groupCredits=state.groupCredits;
+    document.querySelectorAll("[data-grp-pill]").forEach(x=> x.hidden=false);
+    $("#grpCoinNum").textContent=state.groupCredits;
     const mine=(state.groups||[]).filter(g=>g.members.includes(me.id)).map(g=>{ const t=tutorAccounts.find(x=>x.id===g.tutorId); return esc(g.name)+(t ? " mit "+esc(t.name) : ""); });
     extra.innerHTML = `<div class="bal-group"><b>${state.groupCredits}</b> Gruppeneinheit${state.groupCredits===1?"":"en"} <span>für Gruppenstunden</span></div>`
       + (mine.length ? `<div class="bal-family">Deine Gruppe${mine.length>1?"n":""}: ${mine.join(", ")}</div>` : "")
