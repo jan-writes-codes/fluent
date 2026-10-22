@@ -402,6 +402,7 @@
   .rc-week { font: inherit; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 3px 6px; cursor: pointer; }
   .rc-week:hover { border-color: var(--line); }
   .rc-week .rc-num { color: var(--ink); }
+  .rc-month .rc-num { color: var(--ink); }
   .rc-week-in { width: 68px; padding: 6px 8px; text-align: right; flex-shrink: 0; }
   .roster-week { font-size: 13px; color: var(--muted); margin: 0 2px 10px; }
   .roster-week b { color: var(--ink); }
@@ -1211,8 +1212,7 @@
   .rcredits { text-align: right; flex-shrink: 0; }
   .rc-num { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; color: var(--c1); }
   .rc-lbl { font-size: 10.5px; color: var(--faint); letter-spacing: 0.04em; }
-  .rc-actions { display: flex; gap: 6px; flex-shrink: 0; }
-  @media (max-width: 600px) { .rc-actions { display: none; }
+  @media (max-width: 600px) {
     /* Phones: name and section on the first line, the two numbers under them. */
     .rost { flex-wrap: wrap; gap: 8px 12px; }
     .rinfo { flex: 1 1 calc(100% - 56px); }
@@ -4023,17 +4023,15 @@
       <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div>${rosterBadges(s)}
         <select class="rg-select" data-group aria-label="Gruppe">${ROSTER_GROUPS.map(g=>`<option value="${g.id}"${(s.rosterGroup||"active")===g.id?" selected":""}>${g.label}</option>`).join("")}</select></div>
       <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
+      <div class="rcredits rc-month" title="Stunden pro Kalendermonat (pro Woche × ${fmtNum(WEEKS_PER_MONTH)})"><div class="rc-num">${fmtNum((s.weeklyLessons||0)*WEEKS_PER_MONTH)}</div><div class="rc-lbl">pro Monat</div></div>
       <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
       <div class="rcredits rc-grp"><div class="rc-num">${s.groupCredits||0}</div><div class="rc-lbl">Gruppeneinh.</div></div>
-      <div class="rc-actions">
-        ${creditQuickAdds().map(n=>`<button class="mini-btn" data-add="${n}">+${n}</button>`).join("")}
-      </div>`;
-    card.querySelectorAll("[data-add]").forEach(btn=> btn.onclick=(e)=>{ e.stopPropagation(); openSettleChooser(s, +btn.dataset.add, false); });
+`;
     card.querySelector("[data-week]").onclick=(e)=>{ e.stopPropagation(); editWeekly(s, e.currentTarget); };
     const sel=card.querySelector("[data-group]");
     sel.onclick=(e)=>e.stopPropagation();
     sel.onchange=()=>setRosterGroup(s, sel.value);
-    card.onclick=(e)=>{ if(e.target.closest("[data-add],[data-week],[data-group],.rc-week-in")) return; openStudentModal(s); };
+    card.onclick=(e)=>{ if(e.target.closest("[data-week],[data-group],.rc-week-in")) return; openStudentModal(s); };
     card.style.cursor="pointer";
     return card;
   }
@@ -6659,6 +6657,8 @@
 
   // The weekly income estimate counts every planned lesson at a flat 40 €.
   const PLANNED_LESSON_PRICE=40;
+  // A calendar month counts as 4.25 weeks (52 weeks / 12 months, rounded).
+  const WEEKS_PER_MONTH=4.25;
   // Lessons per week: set by hand per student (not computed from bookings),
   // summed into the weekly hours / income line above the student list.
   function renderRosterWeek(){
@@ -6666,7 +6666,7 @@
     // Only the weekly (Aktiv) students count towards the planned week.
     const total=state.students.filter(s=>(s.rosterGroup||"active")==="active").reduce((a, s)=>a+(s.weeklyLessons||0), 0);
     rw.innerHTML = total
-      ? `Geplant: <b>${fmtNum(total)} Stunden pro Woche</b> · ≈ <b>€ ${Math.round(total*PLANNED_LESSON_PRICE)}</b> pro Woche (€ ${PLANNED_LESSON_PRICE} pro Stunde)`
+      ? `Geplant: <b>${fmtNum(total)} Stunden pro Woche</b> · <b>${fmtNum(total*WEEKS_PER_MONTH)} Stunden pro Monat</b> · ≈ <b>€ ${Math.round(total*PLANNED_LESSON_PRICE)}</b> pro Woche (€ ${PLANNED_LESSON_PRICE} pro Stunde)`
       : `Tippe bei einer*m Schüler*in auf „pro Woche“, um festzulegen, wie oft ihr euch seht.`;
   }
   function editWeekly(s, btn){

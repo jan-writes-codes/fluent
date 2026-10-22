@@ -273,11 +273,13 @@ setTimeout(() => {
   }
 
   if (doQuickAdds) {
+    // The +N buttons live in the student's profile, not on the roster row.
     const card = document.querySelector("#rosterList .rost");
-    const adds = card
-      ? [...card.querySelectorAll("[data-add]")].map((b) => +b.dataset.add)
-      : [];
-    return finish({ quickAdds: adds });
+    if (!card) return finish({ quickAdds: [] });
+    const rowAdds = card.querySelectorAll("[data-add]").length;
+    card.click();
+    const adds = [...document.querySelectorAll("#studentModal [data-madd]")].map((b) => +b.dataset.madd);
+    return finish({ quickAdds: adds, rowAdds });
   }
 
   if (doPreview) {
@@ -323,7 +325,8 @@ setTimeout(() => {
         title: c.querySelector("h4").textContent, svg: !!c.querySelector("svg"),
         tips: [...c.querySelectorAll("title")].map((t) => t.textContent) }));
       const week = { total: $("#rosterWeek") ? $("#rosterWeek").textContent : "",
-        perStudent: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-week .rc-num") && r.querySelector(".rc-week .rc-num").textContent]) };
+        perStudent: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-week .rc-num") && r.querySelector(".rc-week .rc-num").textContent]),
+        perStudentMonth: [...document.querySelectorAll("#rosterList .rost")].map((r) => [r.querySelector(".rname").textContent.trim(), r.querySelector(".rc-month .rc-num") && r.querySelector(".rc-month .rc-num").textContent]) };
       const way = isStudent ? [...document.querySelectorAll("#myProgress .stu-way, #myProgress .stu-wins")].map((x) => x.textContent.replace(/\s+/g, " ").trim()) : [];
       let detail = null;
       const opener = !isStudent && document.querySelector('#studentModal [data-pfopen="a"]');

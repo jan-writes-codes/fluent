@@ -1503,6 +1503,7 @@ class DomQuickAddTests(_DomProbeBase):
         r = self.run_probe(self.davit, quick_adds=True)
         self.assertEqual(r["initErrors"], [])
         self.assertEqual(sorted(set(r["quickAdds"])), [2, 4, 8])
+        self.assertEqual(r["rowAdds"], 0)  # topped up from the profile, not the roster row
 
 
 class DomBookingTests(_DomProbeBase):
@@ -4630,6 +4631,9 @@ class ProgressChartDomTests(_DomProbeBase):
         self.assertEqual(per["Maya Karlsson"], "1,5")  # set by hand, not from the four bookings
         self.assertEqual(per["Ines Reyes"], "0")
         self.assertIn("1,5 Stunden pro Woche", st["week"]["total"])
+        # The calendar month is 4.25 weeks: 1.5 × 4.25 = 6.375, shown as 6,4.
+        self.assertEqual(dict(st["week"]["perStudentMonth"])["Maya Karlsson"], "6,4")
+        self.assertIn("6,4 Stunden pro Monat", st["week"]["total"])
         # The student sees the same charts on their own page.
         mine = self.run_probe(self.maya, school_tests=True)["schoolTests"]["charts"]
         self.assertEqual(len(mine), 3)
