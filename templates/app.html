@@ -1429,6 +1429,11 @@
   .fg-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .fg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .fg-chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: color-mix(in oklch, var(--c1) 12%, transparent); }
+  .fg-chip.low { background: color-mix(in oklch, #c2552f 16%, transparent); }
+  .rbadges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .rbadge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: color-mix(in oklch, var(--c1) 12%, transparent); }
+  .rbadge.grp { background: color-mix(in oklch, #7a6bb0 18%, transparent); }
+  .grp-chip { display: inline-block; font-size: 11px; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: color-mix(in oklch, #7a6bb0 18%, transparent); vertical-align: middle; }
   .fg-picklist { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; padding: 4px 6px; margin: 6px 0 10px; }
   .fg-pick { display: flex; align-items: center; gap: 10px; padding: 9px 6px; font-size: 14px; cursor: pointer; min-height: 40px; }
   .fg-pick + .fg-pick { border-top: 1px solid var(--line); }
@@ -1879,20 +1884,22 @@
             <div class="panel" style="padding: 24px;"><div id="adminEditor"></div></div>
           </div>
 
-          <div class="panel" style="padding: 24px; margin-top: 22px;">
-            <div class="section-h"><h2>Familien &amp; Gruppen</h2></div>
+          <div id="fgAnchor"></div>
+          <div class="panel" id="fgPanel" style="padding: 24px; margin-top: 22px;">
+            <div class="section-h"><h2 id="fgTitle">Familien &amp; Gruppen</h2></div>
             <div class="fg-cols">
+              <div class="fg-col fg-col-groups">
+                <div class="txn-col-h">Gruppen</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;" data-fg-admin>Für Gruppenstunden. Jede*r zahlt mit den eigenen Gruppeneinheiten (€ <span id="grpPriceLbl"></span> pro Stunde).</div>
+                <div class="micro" style="text-align:left; margin:2px 2px 12px;" data-fg-tutor hidden>Gruppenstunde planen: Tippe im Kalender auf einen freien Termin und wähle bei „oder Gruppe“ die Gruppe. Die Zahl neben jedem Namen sind die Gruppeneinheiten.</div>
+                <div id="adminGroups"></div>
+                <button class="btn ghost" id="addGroupBtn" style="margin-top:10px;" data-fg-admin>+ Gruppe anlegen</button>
+              </div>
               <div class="fg-col">
                 <div class="txn-col-h">Familien</div>
                 <div class="micro" style="text-align:left; margin:2px 2px 12px;">Geschwister teilen sich ein Guthaben. Jede*r behält das eigene Profil, den eigenen Kalender und die eigenen Hausübungen.</div>
                 <div id="adminFamilies"></div>
-                <button class="btn ghost" id="addFamilyBtn" style="margin-top:10px;">+ Familie anlegen</button>
-              </div>
-              <div class="fg-col">
-                <div class="txn-col-h">Gruppen</div>
-                <div class="micro" style="text-align:left; margin:2px 2px 12px;">Für Gruppenstunden. Jede*r zahlt mit den eigenen Gruppeneinheiten (€ <span id="grpPriceLbl"></span> pro Stunde).</div>
-                <div id="adminGroups"></div>
-                <button class="btn ghost" id="addGroupBtn" style="margin-top:10px;">+ Gruppe anlegen</button>
+                <button class="btn ghost" id="addFamilyBtn" style="margin-top:10px;" data-fg-admin>+ Familie anlegen</button>
               </div>
             </div>
           </div>
@@ -2354,11 +2361,11 @@
         if (!open && !booked) return; // skip closed/conflicting slots
         const el = document.createElement("button");
         const isSel = state.selected && state.selected.dateKey===dk && state.selected.time===time && state.selected.tutorId===state.tutor;
-        el.className = "slot" + (booked?" booked":"") + (isSel?" sel":"");
+        el.className = "slot" + (booked?" booked":"") + (booked && myBk.groupSession?" t-group":"") + (isSel?" sel":"");
         el.textContent = time;
         if (booked) {
           if (!state.rescheduling) {
-            el.title = "Buchung verwalten";
+            el.title = myBk.groupSession ? "Gruppenstunde · "+(myBk.groupName||"Gruppe") : "Buchung verwalten";
             el.style.cursor = "pointer";
             el.onclick = () => openManage(state.bookings.find(x => x.studentId===state.currentUser && x.tutorId===state.tutor && sameDay(x.date,d.date) && x.time===time));
           }
@@ -3010,7 +3017,7 @@
       row.innerHTML = `
         <div class="dt"><div class="dm">${MONTHS_S[b.date.getMonth()]}</div><div class="dnum">${b.date.getDate()}</div></div>
         <div class="avatar" style="${avatarStyle(t)};width:38px;height:38px;font-size:13px;">${avatarText(t)}</div>
-        <div class="info"><div class="t">${esc(b.title)}${b.status==="requested"?'<span class="req-chip" title="Wartet auf Bestätigung durch deine*n Tutor*in">Angefragt</span>':""}</div><div class="s">${esc(t.name)} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${esc(b.notes)}</div>`:""}</div>
+        <div class="info"><div class="t">${esc(b.title)}${b.groupSession?`<span class="grp-chip">Gruppe ${esc(b.groupName||"")}</span>`:""}${b.status==="requested"?'<span class="req-chip" title="Wartet auf Bestätigung durch deine*n Tutor*in">Angefragt</span>':""}</div><div class="s">${esc(t.name)} · ${b.time}–${endTime(b.time)}</div>${b.notes?`<div class="note-line">${esc(b.notes)}</div>`:""}</div>
         <div class="tail">
           ${b.callLink?`<a class="join-mini" href="${esc(b.callLink)}" target="_blank" rel="noopener" title="Zum Call">Call</a>`:""}
           <button class="ics-mini" title="Zum Kalender (.ics)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></button>
@@ -3806,7 +3813,7 @@
             <button class="mini-btn" id="maddCustom" title="Beliebige Anzahl und Betrag, z. B. Familienangebot">Individuell…</button>
           </div>
         </div>
-        ${showsGroupCredits(s) ? `
+        ${!s.isGuest ? `
         <div class="modal-add">
           <span class="ma-label">Gruppeneinheiten · ${s.groupCredits||0}<em>bar, je € ${state.groupCreditPrice}</em></span>
           <div class="ma-btns">${[1,5,10].map(n=>`<button class="mini-btn" data-gadd="${n}">+${n}</button>`).join("")}</div>
@@ -3966,12 +3973,19 @@
     const r=await apiResult('POST', `/api/students/${s.id}/roster-group/`, { rosterGroup: group });
     if(!r.ok){ s.rosterGroup=prev; renderRoster(); toast((r.data && r.data.error) || "Speichern fehlgeschlagen"); }
   }
+  function rosterBadges(s){
+    const gs=(state.groups||[]).filter(g=>g.members.includes(s.id));
+    const out=gs.map(g=>`<span class="rbadge grp">${esc(g.name)}</span>`);
+    if(gs.length || (s.groupCredits||0)!==0) out.push(`<span class="rbadge grp">${s.groupCredits||0} Gruppeneinh.</span>`);
+    if(s.familyName) out.push(`<span class="rbadge">Familie ${esc(s.familyName)}</span>`);
+    return out.length ? `<div class="rbadges">${out.join("")}</div>` : "";
+  }
   function rosterCard(s){
     const upc=state.bookings.filter(b=>b.studentId===s.id && (b.date>=NOW||sameDay(b.date,NOW))).length;
     const card=document.createElement("div"); card.className="rost";
     card.innerHTML=`
       <div class="avatar" style="${avatarStyle(s)};width:40px;height:40px;">${avatarText(s)}</div>
-      <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div>
+      <div class="rinfo"><div class="rname">${esc(s.name)}</div><div class="rsub">${upc} geplante Stunde${upc!==1?"n":""}${nextTestLine(s.id)}</div>${rosterBadges(s)}
         <select class="rg-select" data-group aria-label="Gruppe">${ROSTER_GROUPS.map(g=>`<option value="${g.id}"${(s.rosterGroup||"active")===g.id?" selected":""}>${g.label}</option>`).join("")}</select></div>
       <button class="rcredits rc-week" data-week title="Stunden pro Woche mit ${esc(s.name.split(" ")[0])} festlegen"><div class="rc-num">${fmtNum(s.weeklyLessons||0)}</div><div class="rc-lbl">pro Woche ✎</div></button>
       <div class="rcredits"><div class="rc-num">${s.credits}</div><div class="rc-lbl">Einheiten</div></div>
@@ -4578,18 +4592,17 @@
     renderWeek(); renderSummary(); renderAccount();
     toast(refund ? "Gruppenstunde storniert · 1 Gruppeneinheit erstattet" : "Gruppenstunde storniert");
   }
-  // Group credits show for students who are in a group or hold some.
-  function showsGroupCredits(s){ return !!s && ((s.groupCredits||0)!==0 || (state.groups||[]).some(g=>g.members.includes(s.id))); }
+  // Every student sees their group credits, their groups and the buy panel.
   function groupPacks(){ return [1,5,10].map(n=>({ n, kind:"group", price:"€"+(n*state.groupCreditPrice), each:"€"+state.groupCreditPrice+" / Gruppenstunde" })); }
   function renderGroupCredits(){
     if(state.role!=="student") return;
     const me=studentById(state.currentUser), extra=$("#balanceExtra"), packsEl=$("#groupPacks");
     if(!me || !extra || !packsEl) return;
     me.groupCredits=state.groupCredits;
-    const show=showsGroupCredits(me);
-    extra.innerHTML = (show ? `<div class="bal-group"><b>${state.groupCredits}</b> Gruppeneinheit${state.groupCredits===1?"":"en"} <span>für Gruppenstunden</span></div>` : "")
+    const mine=(state.groups||[]).filter(g=>g.members.includes(me.id)).map(g=>{ const t=tutorAccounts.find(x=>x.id===g.tutorId); return esc(g.name)+(t ? " mit "+esc(t.name) : ""); });
+    extra.innerHTML = `<div class="bal-group"><b>${state.groupCredits}</b> Gruppeneinheit${state.groupCredits===1?"":"en"} <span>für Gruppenstunden</span></div>`
+      + (mine.length ? `<div class="bal-family">Deine Gruppe${mine.length>1?"n":""}: ${mine.join(", ")}</div>` : "")
       + (me.familyName ? `<div class="bal-family">Familienkonto ${esc(me.familyName)} · geteilt mit deinen Geschwistern</div>` : "");
-    if(!show){ packsEl.innerHTML=""; return; }
     packsEl.innerHTML=`<div class="section-h" style="margin-top:22px;"><h2>Gruppeneinheiten aufladen</h2></div>
       <div class="packs" id="groupPackList"></div>
       <div class="micro" style="margin-top:12px;">Für Gruppenstunden. Jede*r in der Gruppe zahlt mit den eigenen Gruppeneinheiten.</div>`;
@@ -4621,20 +4634,29 @@
   }
 
   // Admin: families (shared balance) and groups (group sessions).
+  // The same panel serves the admin (who manages families and groups) and the
+  // tutor's Schüler*innen view (read-only: their groups and the families).
   function renderAdminGroups(){
-    const fe=$("#adminFamilies"), ge=$("#adminGroups"); if(!fe || !ge) return;
-    const ed=state.fgEdit;
-    const chips=ids=> ids.map(id=>{ const s=studentById(id); return s ? `<span class="fg-chip">${esc(s.name)}</span>` : ""; }).join("") || `<span class="micro" style="margin:0;">Noch niemand</span>`;
+    const fe=$("#adminFamilies"), ge=$("#adminGroups"), panel=$("#fgPanel"); if(!fe || !ge || !panel) return;
+    const inStudents=state.view==="students", admin=state.role==="admin" && !inStudents;
+    const home=inStudents ? $("#view-students .wrap") : $("#fgAnchor");
+    if(home && panel.previousElementSibling!==home && panel.parentElement!==home){ inStudents ? home.appendChild(panel) : home.after(panel); }
+    panel.querySelectorAll("[data-fg-admin]").forEach(x=> x.hidden=!admin);
+    panel.querySelectorAll("[data-fg-tutor]").forEach(x=> x.hidden=admin);
+    $("#fgTitle").textContent = admin ? "Familien & Gruppen" : "Gruppen & Familien";
+    const ed=admin ? state.fgEdit : null;
+    const chips=(ids, gc)=> ids.map(id=>{ const s=studentById(id); return s ? `<span class="fg-chip${gc && (s.groupCredits||0)<1 ? " low" : ""}">${esc(s.name)}${gc ? ` · ${s.groupCredits||0}` : ""}</span>` : ""; }).join("") || `<span class="micro" style="margin:0;">Noch niemand</span>`;
     const card=(type, x, sub)=> (ed && ed.type===type && ed.id===x.id) ? fgEditorHtml(type, x) : `<div class="fg-card">
-        <div class="fg-top"><div><div class="fg-name">${esc(x.name)}</div><div class="fg-sub">${sub}</div></div><button class="mini-btn" data-fg-edit="${type}:${x.id}">Bearbeiten</button></div>
-        <div class="fg-chips">${chips(x.members)}</div></div>`;
+        <div class="fg-top"><div><div class="fg-name">${esc(x.name)}</div><div class="fg-sub">${sub}</div></div>${admin ? `<button class="mini-btn" data-fg-edit="${type}:${x.id}">Bearbeiten</button>` : ""}</div>
+        <div class="fg-chips">${chips(x.members, type==="group")}</div></div>`;
+    const groups=admin ? state.groups : state.groups.filter(g=> !g.tutorId || g.tutorId===state.myTutor || state.role==="admin");
     fe.innerHTML = state.families.map(f=>card("family", f, `${f.credits} Einheiten · ${f.groupCredits} Gruppeneinheiten`)).join("")
       + (ed && ed.type==="family" && ed.id==="new" ? fgEditorHtml("family", { id:"new", name:"", members:[] }) : "")
       || `<div class="empty-list">Noch keine Familien.</div>`;
-    ge.innerHTML = state.groups.map(g=>{ const t=tutorAccounts.find(x=>x.id===g.tutorId); return card("group", g, t ? "mit "+esc(t.name) : "ohne feste*n Tutor*in"); }).join("")
+    ge.innerHTML = groups.map(g=>{ const t=tutorAccounts.find(x=>x.id===g.tutorId); return card("group", g, t ? "mit "+esc(t.name) : "ohne feste*n Tutor*in"); }).join("")
       + (ed && ed.type==="group" && ed.id==="new" ? fgEditorHtml("group", { id:"new", name:"", tutorId:(tutorAccounts[0]||{}).id||"", members:[] }) : "")
       || `<div class="empty-list">Noch keine Gruppen.</div>`;
-    document.querySelectorAll("[data-fg-edit]").forEach(btn=> btn.onclick=()=>{ const [type, id]=btn.dataset.fgEdit.split(":"); state.fgEdit={ type, id:+id }; renderAdminGroups(); });
+    panel.querySelectorAll("[data-fg-edit]").forEach(btn=> btn.onclick=()=>{ const [type, id]=btn.dataset.fgEdit.split(":"); state.fgEdit={ type, id:+id }; renderAdminGroups(); });
     const ef=document.querySelector(".fg-editor"); if(ef) bindFgEditor(ef);
   }
   function fgEditorHtml(type, x){
@@ -6874,7 +6896,7 @@
     document.body.classList.toggle("sx-focus", v==="session" && !!state.sxWide);
     // Leaving a session page drops its #stunde-… address.
     if(v!=="session" && location.hash.startsWith("#stunde-")) history.replaceState(null, "", location.pathname + location.search);
-    if(v==="students") renderRoster();
+    if(v==="students"){ renderRoster(); renderAdminGroups(); }
     if(v==="materials") renderMaterials();
     if(v==="methods") renderMethods();
     document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b.dataset.view===v));

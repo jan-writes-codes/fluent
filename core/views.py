@@ -1283,10 +1283,10 @@ def app_view(request):
         "errorCards": error_cards,
         "schoolTests": school_tests,
         # Families (shared credits) and groups (group sessions). A student only
-        # learns about their own; the family list stays with the admin.
+        # learns about their own groups; tutors and the admin see all families.
         "families": (
+            [] if is_student else
             [serialize_family(f) for f in Family.objects.prefetch_related("members")]
-            if user.role == "admin" else []
         ),
         "groups": [
             serialize_group(g) for g in StudentGroup.objects.select_related("tutor").prefetch_related("members")
