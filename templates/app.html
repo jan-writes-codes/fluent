@@ -2956,7 +2956,7 @@
       <button class="btn ghost" id="buyClose">Schließen</button>
       <div class="micro" style="margin-top:12px;">Zahlung über Stripe · du verlässt kurz die Seite und kommst danach automatisch zurück.</div>`)
       : `<h3 class="buy-h">${unitWord} fügt dein*e Tutor*in hinzu</h3>
-      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die ${unitWord} werden zu deinem Stand hinzugefügt und ein österreichischer Beleg wird dir automatisch ausgestellt.</p>
+      <p class="buy-p">Für das <b>${p.n}er-Paket</b> (<b>${esc(p.price)}</b>) schreib <b>${esc(tutorFirst)}</b> auf WhatsApp. Die ${unitWord} werden zu deinem Stand hinzugefügt.</p>
       ${billingComplete(studentById(state.currentUser)) ? "" : `<div class="credit-warn" role="alert">⚠ Deine Rechnungsadresse ist noch unvollständig. Ergänze sie vorher in deinem Konto, sonst steht sie nicht auf deinem Beleg.</div>`}
       ${waNum ? `<div class="buy-contact"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5z"/></svg><span>WhatsApp ${esc(waNum)}</span></div>` : ""}
       <a class="btn" id="buyMail" href="${esc(mailHref())}" target="_blank" rel="noopener"><span class="grainbtn"></span>Auf WhatsApp schreiben</a>
@@ -3009,9 +3009,6 @@
           // yet, so the same payment never shows twice.
           if (!meLog().some(a => a.receiptNo === r.no)) {
             meLog().unshift({ type:"buy", label:"Einheiten gekauft", sub:"Online bezahlt", amt:"+"+r.credits, receiptNo:r.no });
-          }
-          if (!state.receipts.some(x => x.no === r.no)) {
-            state.receipts.unshift({ no:r.no, dateStr:r.dateStr, studentName:r.studentName, studentId:r.studentId, billing:r.billing, credits:r.credits, unit:r.unit, net:r.net, total:r.total });
           }
         }
         renderAccount();

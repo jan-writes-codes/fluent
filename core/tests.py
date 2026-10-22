@@ -1932,20 +1932,18 @@ class ReceiptPdfTests(FluentDataMixin, TestCase):
         from core.views import grant_credits, get_settings
         return grant_credits(self.maya, n, get_settings(), label="Kauf", sub="bar")
 
-    def test_student_downloads_own_receipt_pdf(self):
+    def test_student_cannot_download_own_receipt_pdf(self):
+        # Receipts are staff-only on the site; students get theirs by e-mail.
         receipt = self._grant(5)
         self.client.force_login(self.maya)
         resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp["Content-Type"], "application/pdf")
-        body = b"".join(resp.streaming_content) if resp.streaming else resp.content
-        self.assertTrue(body.startswith(b"%PDF"), "response must be a real PDF")
-
-    def test_student_cannot_download_another_students_receipt(self):
-        receipt = self._grant(5)  # maya's receipt
-        self.client.force_login(self.ines)
-        resp = self.client.get(f"/api/receipts/{receipt.number}/pdf/")
         self.assertEqual(resp.status_code, 403)
+
+    def test_student_app_payload_has_no_receipts(self):
+        self._grant(5)
+        self.client.force_login(self.maya)
+        payload = extract_payload(self.client.get(reverse("app")).content.decode())
+        self.assertEqual(payload["receipts"], [])
 
     def test_admin_downloads_any_receipt_pdf(self):
         receipt = self._grant(5)

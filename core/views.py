@@ -1202,11 +1202,10 @@ def app_view(request):
             for t in CreditTransaction.objects.all().select_related("student")
         ]
 
-    # Receipts: only the viewer's own for students; all for tutor/admin
+    # Receipts are staff-only on the site: students get theirs by e-mail (Stripe
+    # payments only), never in the app.
     if is_student:
-        all_receipts = list(
-            Receipt.objects.filter(student=user).select_related("student", "reverses")
-        )
+        all_receipts = []
     else:
         all_receipts = list(Receipt.objects.all().select_related("student", "reverses"))
     receipts_data = [serialize_receipt(r) for r in all_receipts]
@@ -3330,22 +3329,17 @@ def _attachment(data, name, content_type):
 # ---------------------------------------------------------------------------
 
 @require_http_methods(["GET"])
-@require_roles("student", "tutor", "admin")
+@require_roles("tutor", "admin")
 def api_receipt_pdf(request, number):
     """Serve an issued receipt (or Storno credit note) as a formatted PDF.
 
-    Access is default-deny: the studio staff (tutor/admin) who manage billing may
-    fetch any receipt; everyone else may only fetch a receipt that belongs to them.
-    A logged-in student therefore can't open another student's receipt by guessing
-    its number. Rendered on the fly from the frozen snapshot, so it reads the same
-    forever and needs no stored file."""
+    Staff only: the tutors/admins who manage billing may fetch any receipt.
+    Students never see receipts on the site; they get theirs by e-mail. Rendered
+    on the fly from the frozen snapshot, so it reads the same forever and needs no
+    stored file."""
     receipt = Receipt.objects.filter(number=number).select_related("student", "reverses").first()
     if not receipt:
         raise Http404
-    is_staff = request.user.role in ("tutor", "admin")
-    owns_it = receipt.student_id is not None and receipt.student_id == request.user.pk
-    if not (is_staff or owns_it):
-        return JsonResponse({"error": "forbidden"}, status=403)
     try:
         pdf = render_receipt_pdf(receipt)
     except Exception:
