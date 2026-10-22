@@ -1989,7 +1989,7 @@ class PurchaseAndCancellationEmailTests(FluentDataMixin, TestCase):
     def test_purchase_notifies_student_and_business(self):
         from django.core import mail
         with self.captureOnCommitCallbacks(execute=True):
-            self._grant(10)
+            self._grant(10, stripe_session_id="cs_test_123")
         student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
         studio_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
         self.assertEqual(len(student_mail), 1, "the student must get their receipt")
@@ -2002,6 +2002,15 @@ class PurchaseAndCancellationEmailTests(FluentDataMixin, TestCase):
             self.assertEqual(len(pdfs), 1, "the receipt PDF must be attached")
             self.assertTrue(pdfs[0][0].endswith(".pdf"))
             self.assertTrue(pdfs[0][1].startswith(b"%PDF"), "attachment must be a real PDF")
+
+    def test_tutor_topup_notifies_only_business(self):
+        from django.core import mail
+        with self.captureOnCommitCallbacks(execute=True):
+            self._grant(10)
+        student_mail = [m for m in mail.outbox if m.to == ["maya@fluent.at"]]
+        studio_mail = [m for m in mail.outbox if m.to == ["studio@thegreenpencil.at"]]
+        self.assertEqual(student_mail, [], "a tutor top-up must not mail the student a Beleg")
+        self.assertEqual(len(studio_mail), 1, "the business is still notified")
 
     def test_cancellation_notifies_student_and_business(self):
         from django.core import mail

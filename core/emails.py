@@ -558,15 +558,17 @@ def send_purchase_notifications(receipt_id):
     """Tell the student and the business that a credit purchase went through, with
     the receipt attached as a PDF.
 
-    Covers every purchase path — a tutor's cash top-up or a student's Stripe
-    payment. If the student has no address (e.g. a deleted account) the business is
-    still notified."""
+    Covers every purchase path, but only a student's Stripe payment mails the
+    student: a tutor's manual top-up notifies the business alone. If the student has
+    no address (e.g. a deleted account) the business is still notified."""
     receipt = Receipt.objects.filter(pk=receipt_id).select_related("student").first()
     if not receipt:
         return
     pdf = _receipt_pdf(receipt)
     pdf_name = f"Beleg-{receipt.number}.pdf"
     student_email = (receipt.student.email if receipt.student_id and receipt.student else "") or ""
+    if not receipt.stripe_session_id:
+        student_email = ""  # tutor top-up: no Beleg mail to the student
     business = _business_inbox()
 
     if student_email and _lang(receipt.student) == "en":
